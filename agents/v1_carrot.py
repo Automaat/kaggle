@@ -1,17 +1,12 @@
 """Kaggriculture submission entrypoint. Must expose `agent(obs)`."""
 
 import math
-import os
 
 CROPS = {
-    "WHEAT": {"seed": 10, "first_yield_day": 2, "max_yield_day": 4, "ongoing": False},
-    "CARROT": {"seed": 20, "first_yield_day": 2, "max_yield_day": 3, "ongoing": False},
-    "TOMATO": {"seed": 50, "first_yield_day": 8, "max_yield_day": 8, "ongoing": True},
-    "STRAWBERRY": {"seed": 100, "first_yield_day": 10, "max_yield_day": 10, "ongoing": True},
-    "MELON": {"seed": 80, "first_yield_day": 10, "max_yield_day": 12, "ongoing": False},
+    "WHEAT": {"seed": 10, "first_yield_day": 2, "max_yield_day": 4},
+    "CARROT": {"seed": 20, "first_yield_day": 2, "max_yield_day": 3},
+    "MELON": {"seed": 80, "first_yield_day": 10, "max_yield_day": 12},
 }
-# Days a tile stays occupied, used to decide whether a crop can still finish.
-LIFESPAN = {"WHEAT": 4, "CARROT": 3, "TOMATO": 11, "STRAWBERRY": 16, "MELON": 12}
 
 # Mirrors MARKET_PARAMS in the environment: price(inv) = base +- amp * f(|inv - I0|).
 MARKET_PARAMS = {
@@ -29,8 +24,7 @@ MARKET_I0 = 10000
 PRICE_FLOOR = 1
 HINGE_GAIN = 8.0
 
-# Tile mix, as weights over the tile list. Overridable for sweeps.
-DEFAULT_MIX = "MELON:4,STRAWBERRY:1,CARROT:1"
+CROP = "CARROT"
 MAX_HANDS = 8
 MAX_ORDERS = 10
 SHED_CAP = 100
@@ -124,59 +118,6 @@ def _sell_orders(shed, inventory, money, day, player):
     return orders
 
 
-def _parse_mix(spec):
-    pattern = []
-    for part in spec.split(","):
-        crop, _, weight = part.partition(":")
-        crop = crop.strip().upper()
-        if crop in CROPS:
-            pattern += [crop] * max(1, int(weight or 1))
-    return pattern or ["CARROT"]
-
-
-_mix_cache = {}
-
-
-def _mix(player):
-    """Per-player mix so a sweep can pit two mixes against each other."""
-    if player not in _mix_cache:
-        spec = os.environ.get(f"KAGG_MIX_{player}") or os.environ.get("KAGG_MIX") or DEFAULT_MIX
-        _mix_cache[player] = _parse_mix(spec)
-    return _mix_cache[player]
-
-
-def _planned_crop(player, x, y, board_size, day):
-    """Crop this tile should hold. Falls back to a faster crop late in the season."""
-    mix = _mix(player)
-    wanted = mix[(y * board_size + x) % len(mix)]
-    order = [wanted] + sorted(CROPS, key=lambda c: LIFESPAN[c])
-    for crop in order:
-        if day + LIFESPAN[crop] <= LAST_DAY:
-            return crop
-    return None
-
-
-def _seed_orders(player, farm, seeds, day, board_size):
-    """Buy exactly the seeds the empty tiles are planned to hold."""
-    wanted = {}
-    for x, y, tile in _my_tiles(farm):
-        if tile is not None:
-            continue
-        crop = _planned_crop(player, x, y, board_size, day)
-        if crop:
-            wanted[crop] = wanted.get(crop, 0) + 1
-    orders = []
-    budget = farm["money"] - MIN_CASH
-    for crop, n in sorted(wanted.items(), key=lambda kv: -CROPS[kv[0]]["seed"]):
-        need = max(0, n - seeds.get(crop, 0))
-        afford = int(budget // CROPS[crop]["seed"])
-        take = min(need, afford)
-        if take > 0:
-            orders.append(["BUY_SEED", crop, take])
-            budget -= take * CROPS[crop]["seed"]
-    return orders
-
-
 def _my_tiles(farm):
     """Coordinates of every tile this player can act on."""
     for y, row in enumerate(farm["tiles"]):
@@ -185,26 +126,20 @@ def _my_tiles(farm):
                 yield x, y, tile
 
 
-def _tile_task(tile, day, want, seeds):
+def _tile_task(tile, day, seeds_left):
     if tile is None:
-        return ("PLANT", want) if want and seeds.get(want, 0) > 0 else None
+        return "PLANT" if seeds_left > 0 and day < LAST_DAY - 2 else None
     kind = tile.get("kind")
     if kind == "WEED":
-        return ("DIG", None)
+        return "DIG"
     if kind == "PLANT":
-        crop = tile["crop"]
-        if crop not in CROPS:
+        if tile["crop"] not in CROPS:
             return None
-        data = CROPS[crop]
         age = day - tile["planted_day"]
-        ripe = tile.get("yield_units", 0) > 0 and age >= data["first_yield_day"]
-        if data["ongoing"]:
-            if ripe:
-                return ("HARVEST", None)
-        elif ripe and (age >= data["max_yield_day"] or day >= LAST_DAY):
-            return ("HARVEST", None)
+        if age >= CROPS[tile["crop"]]["max_yield_day"]:
+            return "HARVEST"
         if not tile["watered_today"]:
-            return ("WATER", None)
+            return "WATER"
     return None
 
 
@@ -227,8 +162,8 @@ def _step_toward(src, dst):
     return None
 
 
-def _act(task, crop):
-    return ["PLANT", crop] if task == "PLANT" else [task]
+def _act(task):
+    return ["PLANT", CROP] if task == "PLANT" else [task]
 
 
 def _cashout_op(pos, carried):
@@ -243,16 +178,18 @@ def agent(obs):
     farm = obs["farms"][player]
     private = obs["private"]
     day, hour = obs["day"], obs["hour"]
-    seeds = dict(private.get("seeds", {}))
+    seeds = private.get("seeds", {}).get(CROP, 0)
     shed = private.get("shed", {})
-    board_size = len(farm["tiles"])
     inventories = private.get("inventories", [{}])
 
     orders = []
     if hour == 0 and day < LAST_DAY:
         orders += [["HIRE"]] * max(0, MAX_HANDS - farm.get("hires_today", 0))
 
-    orders += _seed_orders(player, farm, seeds, day, board_size)
+    empty = sum(1 for _, _, t in _my_tiles(farm) if t is None)
+    need_seeds = max(0, empty - seeds)
+    if need_seeds and day < LAST_DAY - 2 and farm["money"] > need_seeds * CROPS[CROP]["seed"] + MIN_CASH:
+        orders.append(["BUY_SEED", CROP, need_seeds])
 
     if hour == 0:
         if day == 0:
@@ -265,16 +202,14 @@ def agent(obs):
 
     tasks = []
     if not cashing_out:
-        budget = dict(seeds)
+        budget = seeds
         for x, y, tile in _my_tiles(farm):
-            want = _planned_crop(player, x, y, board_size, day)
-            task = _tile_task(tile, day, want, budget)
-            if task is None:
-                continue
-            if task[0] == "PLANT":
-                budget[task[1]] -= 1
-            tasks.append((_priority(task[0]), x, y, task))
-        tasks.sort(key=lambda t: t[:3])
+            task = _tile_task(tile, day, budget)
+            if task == "PLANT":
+                budget -= 1
+            if task:
+                tasks.append((_priority(task), x, y, task))
+        tasks.sort()
 
     ops = []
     taken = set()
@@ -285,7 +220,7 @@ def agent(obs):
             continue
         chosen = None
         best = None
-        for i, (prio, x, y, _task) in enumerate(tasks):
+        for i, (prio, x, y, task) in enumerate(tasks):
             if i in taken:
                 continue
             dist = abs(pos[0] - x) + abs(pos[1] - y)
@@ -296,7 +231,7 @@ def agent(obs):
             ops.append(["PASS"])
             continue
         taken.add(chosen)
-        _, x, y, (task, crop) = tasks[chosen]
-        ops.append(_step_toward(pos, (x, y)) or _act(task, crop))
+        _, x, y, task = tasks[chosen]
+        ops.append(_step_toward(pos, (x, y)) or _act(task))
 
     return {"farmer": ops[0], "hands": ops[1:], "market": orders[:MAX_ORDERS]}
