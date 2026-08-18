@@ -32,15 +32,18 @@ Built-in opponents: `pass`, `random`, `starter`. Any path to a `.py` file with a
 | `tools/bench.py` | Parallel seeded benchmark |
 | `tools/trace.py` | Per-day price and money trace |
 | `tools/sweep.py` | Crop-mix comparison |
+| `tools/param_sweep.py` | Sweeps any `KAGG_*` knob against a fixed opponent |
 | `agents/` | Frozen past versions, kept as benchmark opponents |
 | `tests/` | Pins the local price model to the environment |
 | `EXPERIMENTS.md` | Every idea tried and how it scored |
 
-## Current agent (v2)
+## Current agent (v4)
 
-Crop mix `MELON:4,STRAWBERRY:1,CARROT:1`, tiled deterministically over the farm.
-Hires 8 farm hands each morning and assigns every unit to the nearest tile that
-needs work (water > harvest > dig > plant).
+Crop mix `MELON:4,STRAWBERRY:2,CARROT:1`, tiled deterministically over the farm.
+Hires 8 farm hands over the first four hours (only 10 market orders clear per
+turn, so hiring must not crowd out selling and sowing) and assigns every unit to
+the nearest tile that needs work. A plant already on one dry day outranks
+everything else, because it dies tonight.
 
 Selling is trend-aware: the agent re-implements the market price curve, tracks
 each product's price once per day, and holds stock while the trend is positive,
@@ -49,7 +52,13 @@ units first. When the trend turns negative it dumps. On the final day it stops
 farming at hour 17 and walks every unit to the shed, because produce still in
 hand when the season ends is worth nothing.
 
-Beats `starter` 20/20 seeds (mean $36,868 vs $3,560) and the v1 baseline 20/20.
+Selling always covers the seed bill first: holding for a better price is
+worthless if the empty tiles stay bare.
+
+Livestock is fully supported (`GOOSE`, `COW`, `SHEEP` are valid mix tokens) but
+is not in the default mix, because every ratio tested loses.
+
+Beats `starter` 20/20 seeds (mean $38,151 vs $3,608) and the v2 baseline 20/20.
 
 ## Sweeping mixes
 
@@ -83,13 +92,19 @@ players share one market, so the opponent's strength moves both means together.
 
 See [EXPERIMENTS.md](EXPERIMENTS.md) for the full list. The open leads, in order:
 
-1. Buy land (NE $1k, SW $2k, SE $4k). v2 ends with $37k unspent.
-2. Animals, especially geese: 1 unit/tile/day forever and eggs barely glut.
-3. Fertilizer, for the doubled watering bonus.
-4. Opponent modelling: both farms are visible, so the coming glut is predictable.
+1. Sell into scarcity spikes. Carrot, tomato and egg use a `hinge` price curve,
+   so they run away once town demand passes `T`. `unlocked_shops` says what the
+   town just started eating.
+2. Opponent modelling: both farms are visible, so the coming glut is predictable.
+3. Wheat arbitrage with idle mid-game cash: buy at $25, sell at $48, no tiles
+   and no labour needed.
+
+Land, animals and fertilizer were each built, measured and rejected. Labour is
+the hard constraint (Fibonacci hire costs) and melon dominates return on capital
+while cash is scarce. See [EXPERIMENTS.md](EXPERIMENTS.md).
 
 ## Submit
 
 ```bash
-uv run kaggle competitions submit kaggriculture -f main.py -m "v2 melon mix"
+uv run kaggle competitions submit kaggriculture -f main.py -m "v4 melon mix"
 ```

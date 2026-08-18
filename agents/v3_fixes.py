@@ -10,17 +10,8 @@ CROPS = {
     "STRAWBERRY": {"seed": 100, "first_yield_day": 10, "max_yield_day": 10, "ongoing": True},
     "MELON": {"seed": 80, "first_yield_day": 10, "max_yield_day": 12, "ongoing": False},
 }
-ANIMALS = {
-    "GOOSE": {"cost": 300, "structure": "COOP", "product": "EGG"},
-    "COW": {"cost": 400, "structure": "PASTURE", "product": "MILK"},
-    "SHEEP": {"cost": 500, "structure": "PASTURE", "product": "WOOL"},
-}
-# Days a tile stays occupied, used to decide whether a plan item can still pay off.
-LIFESPAN = {
-    "WHEAT": 4, "CARROT": 3, "TOMATO": 11, "STRAWBERRY": 16, "MELON": 12,
-    "GOOSE": 9, "COW": 13, "SHEEP": 11,
-}
-FEED_DAYS = 2  # Days of wheat kept back from the market to cover the herd.
+# Days a tile stays occupied, used to decide whether a crop can still finish.
+LIFESPAN = {"WHEAT": 4, "CARROT": 3, "TOMATO": 11, "STRAWBERRY": 16, "MELON": 12}
 
 # Mirrors MARKET_PARAMS in the environment: price(inv) = base +- amp * f(|inv - I0|).
 MARKET_PARAMS = {
@@ -120,7 +111,7 @@ def _sell_quota(shed_total, money, cheapest_price, day, rising, cash_needed):
     return min(quota, shed_total)
 
 
-def _sell_orders(shed, inventory, money, day, player, cash_needed, feed_reserve):
+def _sell_orders(shed, inventory, money, day, player, cash_needed):
     """Hold produce only while its price is climbing; sell the cheapest units first.
 
     Town demand can outpace supply and lift prices all season, but two farms
@@ -128,16 +119,10 @@ def _sell_orders(shed, inventory, money, day, player, cash_needed, feed_reserve)
     positive price trend. The shed holds 100 units, so we sell the overflow and
     keep the units worth the most per shed slot.
     """
-    held = []
-    for item, n in shed.items():
-        if item == "WHEAT":
-            n -= feed_reserve
-        if n > 0 and item in MARKET_PARAMS:
-            held.append((market_price(item, inventory.get(item, MARKET_I0)), item, n))
+    held = [(market_price(i, inventory.get(i, MARKET_I0)), i, n) for i, n in shed.items() if n > 0 and i in MARKET_PARAMS]
     if not held:
         return []
     held.sort()
-
     rising = all(_drift(player, item, day) > 0 for _, item, _ in held)
     quota = _sell_quota(sum(n for _, _, n in held), money, held[0][0], day, rising, cash_needed)
     orders = []
@@ -153,10 +138,10 @@ def _sell_orders(shed, inventory, money, day, player, cash_needed, feed_reserve)
 def _parse_mix(spec):
     pattern = []
     for part in spec.split(","):
-        item, _, weight = part.partition(":")
-        item = item.strip().upper()
-        if item in CROPS or item in ANIMALS:
-            pattern += [item] * max(1, int(weight or 1))
+        crop, _, weight = part.partition(":")
+        crop = crop.strip().upper()
+        if crop in CROPS:
+            pattern += [crop] * max(1, int(weight or 1))
     return pattern or ["CARROT"]
 
 
@@ -176,9 +161,9 @@ def _planned_crop(player, x, y, board_size, day):
     mix = _mix(player)
     wanted = mix[(y * board_size + x) % len(mix)]
     order = [wanted] + sorted(CROPS, key=lambda c: LIFESPAN[c])
-    for item in order:
-        if day + LIFESPAN[item] <= LAST_DAY:
-            return item
+    for crop in order:
+        if day + LIFESPAN[crop] <= LAST_DAY:
+            return crop
     return None
 
 
@@ -199,56 +184,16 @@ def _land_orders(farm, day, empty_tiles):
     return [["BUY_LAND"]]
 
 
-def _plan_counts(player, tiles, day, board_size):
-    """What the empty tiles are planned to hold, split into crops and animals."""
-    crops, animals = {}, {}
+def _wanted_seeds(player, tiles, seeds, day, board_size):
+    """Seeds still missing for the empty tiles, by crop."""
+    wanted = {}
     for x, y, tile in tiles:
         if tile is not None:
             continue
-        item = _planned_crop(player, x, y, board_size, day)
-        if item in ANIMALS:
-            animals[item] = animals.get(item, 0) + 1
-        elif item:
-            crops[item] = crops.get(item, 0) + 1
-    return crops, animals
-
-
-def _wanted_seeds(crops, seeds):
-    return {c: n - seeds.get(c, 0) for c, n in crops.items() if n > seeds.get(c, 0)}
-
-
-def _empty_structures(tiles):
-    """Built but unoccupied coops and pastures, by the animal that fits them."""
-    want = {}
-    for _, _, tile in tiles:
-        if isinstance(tile, dict) and tile.get("kind") in ("COOP", "PASTURE") and "animal" not in tile:
-            for animal, data in ANIMALS.items():
-                if data["structure"] == tile["kind"]:
-                    want[animal] = want.get(animal, 0) + 1
-                    break
-    return want
-
-
-def _animal_orders(wanted, shed, money):
-    """Buy livestock for the structures that are standing empty."""
-    orders = []
-    budget = money
-    for animal, need in sorted(wanted.items(), key=lambda kv: ANIMALS[kv[0]]["cost"]):
-        take = min(need - shed.get(animal, 0), int(budget // ANIMALS[animal]["cost"]))
-        if take > 0:
-            orders.append(["BUY_ANIMAL", animal, take])
-            budget -= take * ANIMALS[animal]["cost"]
-    return orders
-
-
-def _feed_orders(herd, shed, prices, money):
-    """Top up the wheat store when the herd would otherwise go hungry."""
-    if not herd:
-        return []
-    short = herd * FEED_DAYS - shed.get("WHEAT", 0)
-    price = max(1, prices.get("WHEAT", 25))
-    take = min(short, int(money // price))
-    return [["BUY_PRODUCT", "WHEAT", take]] if take > 0 else []
+        crop = _planned_crop(player, x, y, board_size, day)
+        if crop:
+            wanted[crop] = wanted.get(crop, 0) + 1
+    return {c: n - seeds.get(c, 0) for c, n in wanted.items() if n > seeds.get(c, 0)}
 
 
 def _seed_orders(wanted, money):
@@ -271,20 +216,12 @@ def _my_tiles(farm):
                 yield x, y, tile
 
 
-def _tile_task(tile, day, want, seeds, shed):
+def _tile_task(tile, day, want, seeds):
     if tile is None:
-        if want in ANIMALS:
-            # Build only once the animal is bought: an empty coop is a dead tile.
-            return ("BUILD", want) if shed.get(want, 0) > 0 else None
         return ("PLANT", want) if want and seeds.get(want, 0) > 0 else None
     kind = tile.get("kind")
     if kind == "WEED":
         return ("DIG", None)
-    if kind in ("COOP", "PASTURE"):
-        if "animal" not in tile:
-            animal = next((a for a in ANIMALS if ANIMALS[a]["structure"] == kind and shed.get(a, 0) > 0), None)
-            return ("PLACE", animal) if animal else None
-        return _animal_task(tile, day)
     if kind == "PLANT":
         crop = tile["crop"]
         if crop not in CROPS:
@@ -303,26 +240,9 @@ def _tile_task(tile, day, want, seeds, shed):
     return None
 
 
-def _animal_task(tile, day):
-    """Feeding outranks collecting: an animal unfed twice running escapes for good."""
-    if not tile["fed_today"]:
-        return ("FEED!" if tile.get("consecutive_unfed", 0) >= 1 else "FEED", None)
-    if tile.get("yield_units", 0) > 0:
-        return ("HARVEST", None)
-    if tile.get("fertilizer_available"):
-        return ("COLLECT_FERTILIZER", None)
-    if not tile["cared_today"] and day < LAST_DAY:
-        return ("CARE", None)
-    return None
-
-
 def _priority(task):
     # Water first: an unwatered plant dies. Harvest before planting.
-    return {
-        "WATER!": 0, "FEED!": 0, "FEED": 1, "WATER": 2, "HARVEST": 3,
-        "PLACE": 4, "PLANT": 5, "BUILD": 5, "COLLECT_FERTILIZER": 6,
-        "CARE": 7, "DIG": 8,
-    }.get(task, 9)
+    return {"WATER!": 0, "WATER": 1, "HARVEST": 2, "PLANT": 3, "DIG": 4}.get(task, 9)
 
 
 def _step_toward(src, dst):
@@ -339,45 +259,10 @@ def _step_toward(src, dst):
     return None
 
 
-def _act(task, item):
+def _act(task, crop):
     if task == "PLANT":
-        return ["PLANT", item]
-    if task == "PLACE":
-        return ["PLACE", item]
-    if task == "BUILD":
-        return ["BUILD_COOP"] if ANIMALS[item]["structure"] == "COOP" else ["BUILD_PASTURE"]
-    if task == "WATER!":
-        return ["WATER"]
-    if task == "FEED!":
-        return ["FEED"]
-    return [task]
-
-
-def _can_do(task, item, carried):
-    """Feeding needs wheat in hand and placing needs the animal in hand."""
-    if task in ("FEED", "FEED!"):
-        return carried.get("WHEAT", 0) > 0
-    if task == "PLACE":
-        return carried.get(item, 0) > 0
-    return True
-
-
-def _pickup_op(pos, carried, shed, hungry, unplaced, n_units, board_size):
-    """Load up before leaving the shed: feed and livestock only move in hand."""
-    if not _is_shed_adjacent(pos, board_size):
-        return None
-    for animal, n in unplaced.items():
-        if n > 0 and shed.get(animal, 0) > 0 and not carried.get(animal):
-            return ["PICKUP", animal, min(n, shed[animal])]
-    if hungry > 0 and not carried.get("WHEAT") and shed.get("WHEAT", 0) > 0:
-        share = max(1, -(-hungry // max(1, n_units)))
-        return ["PICKUP", "WHEAT", min(share, shed["WHEAT"])]
-    return None
-
-
-def _is_shed_adjacent(pos, board_size):
-    half = board_size // 2
-    return tuple(pos) in {(half - 1, half - 1), (half, half - 1), (half - 1, half), (half, half)}
+        return ["PLANT", crop]
+    return ["WATER"] if task == "WATER!" else [task]
 
 
 def _cashout_op(pos, carried):
@@ -405,27 +290,15 @@ def agent(obs):
         orders += [["HIRE"]] * min(missing, HIRES_PER_TURN)
     orders += _land_orders(farm, day, sum(1 for _, _, t in tiles if t is None))
 
-    plan_crops, plan_animals = _plan_counts(player, tiles, day, board_size)
-    wanted_seeds = _wanted_seeds(plan_crops, seeds)
+    wanted_seeds = _wanted_seeds(player, tiles, seeds, day, board_size)
     seed_bill = sum(n * CROPS[c]["seed"] for c, n in wanted_seeds.items())
-
-    herd = sum(1 for _, _, t in tiles if isinstance(t, dict) and "animal" in t)
-    structures = _empty_structures(tiles)
-    for animal, n in plan_animals.items():
-        structures[animal] = structures.get(animal, 0) + n
 
     if hour == 0:
         if day == 0:
             _history.clear()
         _record_prices(player, obs["market"]["prices"], day)
-    orders += _sell_orders(
-        shed, obs["market"]["inventory"], farm["money"], day, player,
-        seed_bill + MIN_CASH, herd * FEED_DAYS,
-    )
+    orders += _sell_orders(shed, obs["market"]["inventory"], farm["money"], day, player, seed_bill + MIN_CASH)
     orders += _seed_orders(wanted_seeds, farm["money"])
-    orders += _feed_orders(herd, shed, obs["market"]["prices"], farm["money"] - seed_bill)
-    if day <= LAST_DAY - LIFESPAN["GOOSE"]:
-        orders += _animal_orders(structures, shed, farm["money"] - seed_bill - MIN_CASH)
 
     units = [farm["farmer"]] + list(farm.get("hands", []))
     cashing_out = day >= LAST_DAY and hour >= CASHOUT_HOUR
@@ -435,7 +308,7 @@ def agent(obs):
         budget = dict(seeds)
         for x, y, tile in tiles:
             want = _planned_crop(player, x, y, board_size, day)
-            task = _tile_task(tile, day, want, budget, shed)
+            task = _tile_task(tile, day, want, budget)
             if task is None:
                 continue
             if task[0] == "PLANT":
@@ -443,26 +316,17 @@ def agent(obs):
             tasks.append((_priority(task[0]), x, y, task))
         tasks.sort(key=lambda t: t[:3])
 
-    hungry = sum(1 for _, _, t in tiles if isinstance(t, dict) and "animal" in t and not t["fed_today"])
-    unplaced = _empty_structures(tiles)
-
     ops = []
     taken = set()
     for idx, pos in enumerate(units):
-        carried = dict(inventories[idx]) if idx < len(inventories) else {}
         if cashing_out:
-            ops.append(_cashout_op(pos, sum(carried.values())))
-            continue
-        load = _pickup_op(pos, carried, shed, hungry, unplaced, len(units), board_size)
-        if load is not None:
-            if load[0] == "PICKUP" and load[1] in ANIMALS:
-                unplaced[load[1]] = unplaced.get(load[1], 0) - load[2]
-            ops.append(load)
+            carried = sum((inventories[idx] if idx < len(inventories) else {}).values())
+            ops.append(_cashout_op(pos, carried))
             continue
         chosen = None
         best = None
-        for i, (prio, x, y, (task, item)) in enumerate(tasks):
-            if i in taken or not _can_do(task, item, carried):
+        for i, (prio, x, y, _task) in enumerate(tasks):
+            if i in taken:
                 continue
             dist = abs(pos[0] - x) + abs(pos[1] - y)
             key = (prio, dist)
