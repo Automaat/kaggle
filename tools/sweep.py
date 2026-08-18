@@ -13,13 +13,15 @@ from concurrent.futures import ProcessPoolExecutor
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 CANDIDATES = [
-    "MELON:5,STRAWBERRY:2,CARROT:2",
     "MELON:4,STRAWBERRY:1,CARROT:1",
+    "MELON:5,STRAWBERRY:2,CARROT:2",
     "MELON:3,STRAWBERRY:1",
-    "MELON:3,STRAWBERRY:1,TOMATO:1",
-    "MELON:2,STRAWBERRY:1,CARROT:1",
+    "MELON:6,STRAWBERRY:1,CARROT:1",
+    "MELON:4,STRAWBERRY:2,CARROT:1",
+    "MELON:4,STRAWBERRY:1,CARROT:1,WHEAT:1",
+    "MELON:1",
 ]
-OPPONENT = "MELON:5,STRAWBERRY:2,CARROT:2"
+OPPONENT = "MELON:4,STRAWBERRY:1,CARROT:1"
 
 
 def _one(job):
