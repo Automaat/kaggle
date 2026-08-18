@@ -1,5 +1,6 @@
 """Kaggriculture submission entrypoint. Must expose `agent(obs)`."""
 
+import copy
 import math
 import os
 
@@ -35,7 +36,9 @@ def _planner(player):
     return os.environ.get(f"KAGG_PLANNER_{player}") or os.environ.get("KAGG_PLANNER") or "dynamic"
 # Herd composition, as animal:count. Milk, wool and egg sit on independent price
 # curves, so a mixed herd saturates three of them instead of glutting one.
-HERD_SPEC = os.environ.get("KAGG_HERD_SPEC", "COW:4,SHEEP:3")
+HERD_SPEC = os.environ.get(
+    "KAGG_HERD_EXPERIMENT", os.environ.get("KAGG_HERD_SPEC", "COW:4,SHEEP:3")
+)
 
 SHOPS = {
     "BAKERY": ["EGG", "WHEAT"],
@@ -51,6 +54,33 @@ SHOP_TICKS_PER_DAY = 6  # One tick every 4 turns.
 # How much of the forecast drain to believe. The opponent is also producing into
 # the same market, so the raw forecast overstates how scarce a crop will be.
 DRAIN_FACTOR = float(os.environ.get("KAGG_DRAIN_FACTOR", "0.25"))
+
+
+def _enabled(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.lower() not in ("", "0", "false", "no", "off")
+
+
+# Replicated winners default on; unresolved or losing experiments stay opt-in.
+EFFECTIVE_PROJECTION = _enabled("KAGG_EFFECTIVE_PROJECTION", True)
+FUTURE_SHOPS = _enabled("KAGG_FUTURE_SHOPS", True)
+PARTIAL_SCARCITY = _enabled("KAGG_PARTIAL_SCARCITY")
+EXACT_SELL_ORDER = _enabled("KAGG_EXACT_SELL_ORDER")
+SELL_LOT = int(os.environ.get("KAGG_SELL_LOT", "0"))
+MELON_RACE = _enabled("KAGG_MELON_RACE")
+MELON_RACE_THRESHOLD = int(os.environ.get("KAGG_MELON_RACE_THRESHOLD", "4"))
+MELON_FERTILIZER_CAP = int(os.environ.get("KAGG_MELON_FERTILIZER_CAP", "13"))
+SEASONAL_PLANNER = _enabled("KAGG_SEASONAL_PLANNER")
+MELON_QUOTA = int(os.environ.get("KAGG_MELON_QUOTA", "13"))
+STRAWBERRY_QUOTA = int(os.environ.get("KAGG_STRAWBERRY_QUOTA", "5"))
+HERD_START_DAY = int(os.environ.get("KAGG_HERD_START_DAY", "0"))
+HERD_BUY_PER_DAY = int(os.environ.get("KAGG_HERD_BUY_PER_DAY", "99"))
+OPPONENT_STOCK = _enabled("KAGG_OPPONENT_STOCK")
+OPPONENT_DUMP_THRESHOLD = int(os.environ.get("KAGG_OPPONENT_DUMP_THRESHOLD", "12"))
+DAIRY_LAND_COWS = int(os.environ.get("KAGG_DAIRY_LAND_COWS", "0"))
+DAIRY_LAND_START_DAY = int(os.environ.get("KAGG_DAIRY_LAND_START_DAY", "10"))
 
 # Mirrors MARKET_PARAMS in the environment: price(inv) = base +- amp * f(|inv - I0|).
 MARKET_PARAMS = {
@@ -102,6 +132,94 @@ def _shape(func, x, t):
 
 
 _market_params = None  # Episode overrides, if the configuration supplies any.
+_race_active = False
+_opponent_state = {}
+
+
+def _town_consumption(step, shops):
+    consumed = {p: 0 for p in MARKET_PARAMS}
+    if step % 4 == 0:
+        for shop in shops:
+            products = SHOPS.get(shop, [])
+            multiplier = 2 if len(products) == 1 else 1
+            for product in products:
+                consumed[product] += multiplier
+    if step % 24 == 0:
+        for product in consumed:
+            if product != "FERTILIZER":
+                consumed[product] += 1
+    return consumed
+
+
+def _public_harvest(previous, current):
+    harvested = {p: 0 for p in MARKET_PARAMS}
+    for y, row in enumerate(previous):
+        for x, old in enumerate(row):
+            if not isinstance(old, dict) or old.get("yield_units", 0) <= 0:
+                continue
+            new = current[y][x]
+            if old.get("kind") == "PLANT" and not CROPS.get(old.get("crop"), {}).get("ongoing"):
+                same = isinstance(new, dict) and new.get("kind") == "PLANT" and new.get("crop") == old.get("crop")
+                if not same:
+                    harvested[old["crop"]] += old["yield_units"]
+            elif isinstance(new, dict):
+                if "animal" in old and new.get("animal") == old.get("animal"):
+                    product = ANIMALS[old["animal"]]["product"]
+                elif old.get("kind") == "PLANT" and new.get("crop") == old.get("crop"):
+                    product = old["crop"]
+                else:
+                    continue
+                harvested[product] += max(0, old["yield_units"] - new.get("yield_units", 0))
+    return harvested
+
+
+def _update_opponent_stock(obs, player):
+    """Lower-bound hidden stock from public harvests and market deltas."""
+    if not OPPONENT_STOCK:
+        return {}
+    step = obs.get("step", obs["day"] * 24 + obs["hour"])
+    opponent_tiles = obs["farms"][1 - player]["tiles"]
+    state = _opponent_state.get(player)
+    if state is None or step <= state["step"]:
+        state = {
+            "step": step,
+            "tiles": copy.deepcopy(opponent_tiles),
+            "inventory": dict(obs["market"]["inventory"]),
+            "shops": list(obs["town"]["unlocked_shops"]),
+            "orders": [],
+            "stock": {p: 0 for p in MARKET_PARAMS},
+        }
+        _opponent_state[player] = state
+        return state["stock"]
+
+    harvested = _public_harvest(state["tiles"], opponent_tiles)
+    consumed = _town_consumption(state["step"], state["shops"])
+    own_sells = {p: 0 for p in MARKET_PARAMS}
+    own_buys = {p: 0 for p in MARKET_PARAMS}
+    for order in state["orders"]:
+        if len(order) < 3 or order[1] not in MARKET_PARAMS:
+            continue
+        if order[0] == "SELL" and market_price(order[1], state["inventory"][order[1]]) > PRICE_FLOOR:
+            own_sells[order[1]] += order[2]
+        elif order[0] == "BUY_PRODUCT":
+            own_buys[order[1]] += order[2]
+    for product in MARKET_PARAMS:
+        delta = obs["market"]["inventory"][product] - state["inventory"][product]
+        rival_sales = max(0, delta + consumed[product] - own_sells[product] + own_buys[product])
+        state["stock"][product] = max(0, state["stock"][product] + harvested[product] - rival_sales)
+    state.update({
+        "step": step,
+        "tiles": copy.deepcopy(opponent_tiles),
+        "inventory": dict(obs["market"]["inventory"]),
+        "shops": list(obs["town"]["unlocked_shops"]),
+        "orders": [],
+    })
+    return dict(state["stock"])
+
+
+def _remember_market_orders(player, orders):
+    if OPPONENT_STOCK and player in _opponent_state:
+        _opponent_state[player]["orders"] = [list(order) for order in orders]
 
 
 def market_price(item, inventory, params=None):
@@ -165,6 +283,32 @@ def _supply_forecast(farms, day):
     return supply
 
 
+def _expected_shop_daily_drain():
+    """Expected daily demand contributed by one future random shop."""
+    expected = {p: 0.0 for p in MARKET_PARAMS}
+    for products in SHOPS.values():
+        multiplier = 2 if len(products) == 1 else 1
+        for product in products:
+            expected[product] += SHOP_TICKS_PER_DAY * multiplier / len(SHOPS)
+    return expected
+
+
+def _demand_until(shops, day, days):
+    """Town demand over a horizon, including expected future shop unlocks."""
+    current = _daily_drain(shops)
+    total = {p: current.get(p, 0) * days for p in MARKET_PARAMS}
+    if not FUTURE_SHOPS or days <= 0:
+        return total
+    expected = _expected_shop_daily_drain()
+    room = max(0, 8 - len(shops))
+    for offset in range(days):
+        future_day = day + offset
+        unlocks = min(room, max(0, future_day // 3 - day // 3))
+        for product in total:
+            total[product] += unlocks * expected.get(product, 0)
+    return total
+
+
 def _scarcity(farms, shops, day):
     """Per product, town drain minus remaining supply from both farms.
 
@@ -173,9 +317,9 @@ def _scarcity(farms, shops, day):
     down the glut curve, so the best sale is the one made now.
     """
     days_left = max(0, LAST_DAY - day)
-    drain = _daily_drain(shops)
+    demand = _demand_until(shops, day, days_left)
     supply = _supply_forecast(farms, day)
-    return {p: drain.get(p, 0) * days_left - supply.get(p, 0) for p in MARKET_PARAMS}
+    return {p: demand.get(p, 0) - supply.get(p, 0) for p in MARKET_PARAMS}
 
 
 def _hold_quota(kept_total, money, cheapest_price, cash_needed):
@@ -186,7 +330,25 @@ def _hold_quota(kept_total, money, cheapest_price, cash_needed):
     return min(quota, kept_total)
 
 
-def _sell_orders(shed, inventory, money, day, player, cash_needed, feed_reserve, scarcity, fertilizer_reserve):
+def _advance_inventory(item, inventory, count):
+    for _ in range(max(0, count)):
+        if market_price(item, inventory) > PRICE_FLOOR:
+            inventory += 1
+    return inventory
+
+
+def _sale_revenue(item, inventory, count):
+    revenue = 0
+    for _ in range(max(0, count)):
+        price = market_price(item, inventory)
+        revenue += price
+        if price > PRICE_FLOOR:
+            inventory += 1
+    return revenue
+
+
+def _sell_orders(shed, inventory, money, day, player, cash_needed, feed_reserve, scarcity,
+                 fertilizer_reserve, opponent_stock=None):
     """Decide hold vs sell per product, never as one global flag.
 
     A single flag meant melon — which starts falling the moment either farm
@@ -208,11 +370,30 @@ def _sell_orders(shed, inventory, money, day, player, cash_needed, feed_reserve,
     dumping = day >= LAST_DAY
     dumps, keepers, raised = [], [], 0
     for price, item, count in held:
-        if dumping or scarcity.get(item, 0) <= count:
+        rival_holds = (opponent_stock or {}).get(item, 0)
+        forced_race = OPPONENT_STOCK and rival_holds >= OPPONENT_DUMP_THRESHOLD
+        if dumping or forced_race or scarcity.get(item, 0) <= count:
             # Falling price: the best sale of this product is the one made now.
-            after = market_price(item, inventory.get(item, MARKET_I0) + count)
-            dumps.append(((price - after) * count, item, count))
-            raised += price * count
+            sell_count = count
+            if PARTIAL_SCARCITY and not dumping and not forced_race:
+                sell_count = max(0, count - max(0, math.ceil(scarcity.get(item, 0))))
+            if SELL_LOT > 0:
+                sell_count = min(sell_count, SELL_LOT)
+            if sell_count <= 0:
+                keepers.append((price, item, count))
+                continue
+            inv = inventory.get(item, MARKET_I0)
+            if EXACT_SELL_ORDER:
+                delayed = _advance_inventory(item, inv, rival_holds or sell_count)
+                loss = _sale_revenue(item, inv, sell_count) - _sale_revenue(item, delayed, sell_count)
+                raised += _sale_revenue(item, inv, sell_count)
+            else:
+                after = market_price(item, inv + sell_count)
+                loss = (price - after) * sell_count
+                raised += price * sell_count
+            dumps.append((loss, item, sell_count))
+            if sell_count < count:
+                keepers.append((price, item, count - sell_count))
         else:
             keepers.append((price, item, count))
 
@@ -294,6 +475,10 @@ def _parse_herd():
     return herd
 
 
+def _desired_herd():
+    return _parse_herd() + ["COW"] * DAIRY_LAND_COWS
+
+
 def _crop_value(crop, projected_inv, day):
     """Profit per tile-day, priced at the market we will actually sell into.
 
@@ -312,24 +497,63 @@ def _harvest_inventory(inventory, drain, days):
     return {p: n - drain.get(p, 0) * days * DRAIN_FACTOR for p, n in inventory.items()}
 
 
-def _dynamic_plan(tiles, day, inventory, shops):
+def _effective_yield(crop):
+    return EXPECTED_YIELD[crop] * (2 if crop in PRODUCTION_AGES else 1)
+
+
+def _projected_inventory(inventory, shops, day, days):
+    if FUTURE_SHOPS:
+        demand = _demand_until(shops, day, days)
+        return {p: n - demand.get(p, 0) * DRAIN_FACTOR for p, n in inventory.items()}
+    return _harvest_inventory(inventory, _daily_drain(shops), days)
+
+
+def _seasonal_crop(ready, standing, allocated, projected, day):
+    """Deadline-aware seasonal quotas before falling back to marginal value."""
+    if "MELON" in ready and day <= 1 and standing.get("MELON", 0) + allocated.get("MELON", 0) < MELON_QUOTA:
+        return "MELON"
+    if ("STRAWBERRY" in ready
+            and standing.get("STRAWBERRY", 0) + allocated.get("STRAWBERRY", 0) < STRAWBERRY_QUOTA):
+        return "STRAWBERRY"
+    candidates = [crop for crop in ready if crop != "MELON" or day <= 1]
+    return max(candidates or ready, key=lambda crop: _crop_value(crop, projected, day))
+
+
+def _dairy_positions(tiles, board_size):
+    half = board_size // 2
+    positions = sorted(
+        ((x, y) for x, y, _tile in tiles if x >= half and y < half),
+        key=lambda pos: abs(pos[0] - (half - 1)) + abs(pos[1] - (half - 1)),
+    )
+    return set(positions[:DAIRY_LAND_COWS])
+
+
+def _dynamic_plan(tiles, day, inventory, shops, board_size=10):
     """Assign each empty tile the crop with the best marginal return at harvest.
 
     The first `HERD` tiles are reserved for livestock. Letting the value model
     bid for every tile floods the farm with animals it cannot pay for, and a
     tile reserved for an unaffordable animal simply sits empty.
     """
-    drain = _daily_drain(shops)
     banned = set(os.environ.get("KAGG_BAN", "").upper().split(",")) - {""}
     ready = [c for c in CROPS if day + LIFESPAN[c] <= LAST_DAY and c not in banned]
-    projected = {c: _harvest_inventory(inventory, drain, LIFESPAN[c]).get(c, MARKET_I0) for c in ready}
-    herd = _parse_herd()
+    projected = {c: _projected_inventory(inventory, shops, day, LIFESPAN[c]).get(c, MARKET_I0) for c in ready}
+    herd = _parse_herd() if day >= HERD_START_DAY else []
     plan, reserved = {}, 0
+    standing = {crop: 0 for crop in CROPS}
     for x, y, tile in tiles:
         if isinstance(tile, dict) and ("animal" in tile or tile.get("kind") in ("COOP", "PASTURE")):
             reserved += 1
+        elif isinstance(tile, dict) and tile.get("kind") == "PLANT" and tile.get("crop") in standing:
+            standing[tile["crop"]] += 1
+    allocated = {crop: 0 for crop in CROPS}
+    half = board_size // 2
+    dairy_positions = _dairy_positions(tiles, board_size) if DAIRY_LAND_COWS > 0 else set()
     for x, y, tile in tiles:
         if tile is not None:
+            continue
+        if DAIRY_LAND_COWS > 0 and x >= half and y < half:
+            plan[(x, y)] = "COW" if (x, y) in dairy_positions else None
             continue
         if reserved < len(herd) and day <= LAST_DAY - LIFESPAN[herd[reserved]]:
             plan[(x, y)] = herd[reserved]
@@ -338,9 +562,13 @@ def _dynamic_plan(tiles, day, inventory, shops):
         if not ready:
             plan[(x, y)] = None
             continue
-        best = max(ready, key=lambda c: _crop_value(c, projected, day))
+        if SEASONAL_PLANNER:
+            best = _seasonal_crop(ready, standing, allocated, projected, day)
+        else:
+            best = max(ready, key=lambda c: _crop_value(c, projected, day))
         plan[(x, y)] = best
-        projected[best] += EXPECTED_YIELD[best]
+        allocated[best] += 1
+        projected[best] += _effective_yield(best) if EFFECTIVE_PROJECTION else EXPECTED_YIELD[best]
     return plan
 
 
@@ -367,8 +595,15 @@ def _land_orders(farm, day, empty_tiles):
     crop in the mix can no longer finish.
     """
     bought = len(farm.get("unlocked_quadrants", ["NW"])) - 1
-    if bought >= min(MAX_QUADRANTS, len(LAND_PRICES)) or day > LAST_DAY - MIN_LAND_PAYBACK_DAYS:
+    wanted_quadrants = max(MAX_QUADRANTS, 1 if DAIRY_LAND_COWS > 0 else 0)
+    payback_days = LIFESPAN["COW"] if DAIRY_LAND_COWS > 0 else MIN_LAND_PAYBACK_DAYS
+    if DAIRY_LAND_COWS > 0 and day < DAIRY_LAND_START_DAY:
         return []
+    if bought >= min(wanted_quadrants, len(LAND_PRICES)) or day > LAST_DAY - payback_days:
+        return []
+    if DAIRY_LAND_COWS > 0 and bought == 0:
+        needed = LAND_PRICES[0] + DAIRY_LAND_COWS * ANIMALS["COW"]["cost"] + MIN_CASH
+        return [["BUY_LAND"]] if farm["money"] >= needed else []
     # Price in the tiles we are about to unlock, not just the ones we hold: a
     # quadrant that leaves us unable to sow it is worse than no quadrant.
     quadrant_tiles = (len(farm["tiles"]) // 2) ** 2
@@ -398,7 +633,7 @@ def _wanted_seeds(crops, seeds):
 def _herd_deficit(tiles):
     """Animals the planned herd still wants, by kind."""
     want = {}
-    for animal in _parse_herd():
+    for animal in _desired_herd():
         want[animal] = want.get(animal, 0) + 1
     for _, _, tile in tiles:
         if isinstance(tile, dict) and "animal" in tile:
@@ -436,11 +671,15 @@ def _animal_orders(wanted, shed, money):
     if sum(shed.values()) >= SHED_TARGET:
         return orders
     budget = money
+    remaining_today = HERD_BUY_PER_DAY
     for animal, need in sorted(wanted.items(), key=lambda kv: ANIMALS[kv[0]]["cost"]):
-        take = min(need - shed.get(animal, 0), int(budget // ANIMALS[animal]["cost"]))
+        take = min(
+            need - shed.get(animal, 0), int(budget // ANIMALS[animal]["cost"]), remaining_today
+        )
         if take > 0:
             orders.append(["BUY_ANIMAL", animal, take])
             budget -= take * ANIMALS[animal]["cost"]
+            remaining_today -= take
     return orders
 
 
@@ -453,6 +692,14 @@ def _feed_orders(herd, shed, prices, money):
     price = max(1, prices.get("WHEAT", 25))
     take = min(short, int(money // price))
     return [["BUY_PRODUCT", "WHEAT", take]] if take > 0 else []
+
+
+def _fertilizer_orders(need, stock, shed, prices, money):
+    if not MELON_RACE or need <= stock or sum(shed.values()) >= SHED_TARGET:
+        return []
+    price = max(1, prices.get("FERTILIZER", 100))
+    take = min(need - stock, MELON_FERTILIZER_CAP, int(money // price))
+    return [["BUY_PRODUCT", "FERTILIZER", take]] if take > 0 else []
 
 
 def _seed_orders(wanted, money):
@@ -516,6 +763,8 @@ def _tile_task(tile, day, want, seeds, stock, wanted_animals):
         if not tile["watered_today"]:
             # A plant already on one dry day turns to weed tonight.
             jobs.append(("WATER!" if tile.get("consecutive_unwatered", 0) >= 1 else "WATER", None))
+        if _fertilize_pays(tile, crop, age, day):
+            jobs.append(("FERTILIZE", None))
         done = tile["yield_units"] >= data["max_yield"] or age >= data["max_yield_day"]
         # Harvesting before the day's watering throws away the last bonus unit —
         # a quarter of every carrot tile and every wheat tile.
@@ -532,6 +781,10 @@ def _fertilize_pays(tile, crop, age, day):
     AND watered that day. The effect lasts three days, so two applications cover
     all four of a strawberry's productions.
     """
+    if (MELON_RACE and crop == "MELON" and _race_active
+            and tile.get("planted_day", LAST_DAY) <= 1 and age == 5
+            and tile.get("yield_units", 0) < CROPS["MELON"]["max_yield"]):
+        return tile.get("fertilized_until_day", -1) < day
     if crop not in PRODUCTION_AGES:
         return False
     if tile.get("fertilized_until_day", -1) >= day:
@@ -658,8 +911,14 @@ def agent(obs):
     board_size = len(farm["tiles"])
     inventories = private.get("inventories", [{}])
 
-    global _market_params
+    global _market_params, _race_active
     _market_params = obs["market"].get("params")
+    opponent = obs["farms"][1 - player]
+    _race_active = MELON_RACE and sum(
+        1 for row in opponent["tiles"] for tile in row
+        if isinstance(tile, dict) and tile.get("kind") == "PLANT" and tile.get("crop") == "MELON"
+    ) >= MELON_RACE_THRESHOLD
+    opponent_stock = _update_opponent_stock(obs, player)
 
     tiles = [t for t in _my_tiles(farm)]
     hires = []
@@ -670,7 +929,9 @@ def agent(obs):
     orders = []
 
     if _planner(player) == "dynamic":
-        plan = _dynamic_plan(tiles, day, obs["market"]["inventory"], obs["town"]["unlocked_shops"])
+        plan = _dynamic_plan(
+            tiles, day, obs["market"]["inventory"], obs["town"]["unlocked_shops"], board_size
+        )
     else:
         plan = _tile_plan(player, tiles, day)
     plan_crops, plan_animals = _plan_counts(plan, tiles)
@@ -687,15 +948,26 @@ def agent(obs):
     for animal, n in plan_animals.items():
         structures[animal] = structures.get(animal, 0) + n
 
+    land_orders = _land_orders(farm, day, sum(1 for _, _, t in tiles if t is None))
     orders += _sell_orders(
         shed, obs["market"]["inventory"], farm["money"], day, player,
         seed_bill + MIN_CASH, 0 if day >= LAST_DAY else herd * FEED_DAYS,
         _scarcity(obs["farms"], obs["town"]["unlocked_shops"], day),
-        0 if day >= LAST_DAY else fertilize_jobs,
+        0 if day >= LAST_DAY else fertilize_jobs, opponent_stock,
     )
-    orders += _seed_orders(wanted_seeds, farm["money"])
+    land_reserve = LAND_PRICES[0] if DAIRY_LAND_COWS > 0 and land_orders else 0
+    if DAIRY_LAND_COWS > 0:
+        orders += land_orders
+    orders += _seed_orders(wanted_seeds, farm["money"] - land_reserve)
     if day < LAST_DAY:
         orders += _feed_orders(herd, shed, obs["market"]["prices"], farm["money"] - seed_bill)
+        fertilizer_stock = shed.get("FERTILIZER", 0) + sum(
+            inv.get("FERTILIZER", 0) for inv in inventories
+        )
+        orders += _fertilizer_orders(
+            fertilize_jobs, fertilizer_stock, shed, obs["market"]["prices"],
+            farm["money"] - seed_bill - land_reserve,
+        )
     if day <= LAST_DAY - LIFESPAN["GOOSE"]:
         # Count animals already in a unit's hands: a pasture stays "empty" until
         # the animal is placed, and PLACE only puts down one per turn.
@@ -709,7 +981,8 @@ def agent(obs):
     # Hires last: both players share one descending price curve per order index,
     # so a sell at index 0 clears above a sell the opponent placed at index 3.
     # Truncation also drops the tail, and losing a hire beats losing a sale.
-    orders += _land_orders(farm, day, sum(1 for _, _, t in tiles if t is None))
+    if DAIRY_LAND_COWS <= 0:
+        orders += land_orders
     orders += hires
 
     units = [farm["farmer"]] + list(farm.get("hands", []))
@@ -733,7 +1006,11 @@ def agent(obs):
     tasks = []
     if True:
         budget = dict(seeds)
+        dairy_positions = _dairy_positions(tiles, board_size)
+        half = board_size // 2
         for x, y, tile in tiles:
+            if DAIRY_LAND_COWS > 0 and x >= half and y < half and (x, y) not in dairy_positions:
+                continue
             want = plan.get((x, y))
             for task in _tile_task(tile, day, want, budget, stock, wanted_animals):
                 if task[0] == "PLANT":
@@ -774,4 +1051,6 @@ def agent(obs):
         _, x, y, (task, crop) = tasks[chosen]
         ops.append(_step_toward(pos, (x, y)) or _act(task, crop))
 
-    return {"farmer": ops[0], "hands": ops[1:], "market": orders[:MAX_ORDERS]}
+    market_orders = orders[:MAX_ORDERS]
+    _remember_market_orders(player, market_orders)
+    return {"farmer": ops[0], "hands": ops[1:], "market": market_orders}

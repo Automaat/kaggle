@@ -39,7 +39,7 @@ Built-in opponents: `pass`, `random`, `starter`. Any path to a `.py` file with a
 | `tests/` | Pins the local price model to the environment |
 | `EXPERIMENTS.md` | Every idea tried and how it scored |
 
-## Current agent (v20)
+## Current agent (v21)
 
 **Dynamic planner.** Every empty tile gets the crop with the best profit per
 tile-day, priced at the market we will actually sell into — `market_price`
@@ -52,6 +52,14 @@ the crop tables are fixed, so remaining supply is a hard ceiling. Against the
 town's drain that gives `scarcity = drain * days_left - supply` per product:
 hold while it is positive, dump otherwise. This replaced a trailing 3-day price
 drift that reacted three days late.
+
+**Future shops are priced before they unlock.** Shop draws are random, but their
+per-product expected demand and unlock schedule are fixed. Long-lived crops now
+include that expected drain instead of pretending today's town lasts forever.
+
+**Fertilized output is charged to the glut curve.** Strawberry and tomato return
+8 units under the existing fertilizer policy, so every allocation advances the
+planner's projected inventory by 8 rather than the old, inconsistent 4.
 
 **Fertilizer as an input.** An ongoing crop yields 2 instead of 1 per scheduled
 production when fertilized and watered, and one application covers three days —
@@ -67,8 +75,9 @@ one descending price curve per order index and truncation drops the tail, so a
 sale must never sit behind a hire — and the item that loses most to being second
 in line goes first.
 
-Beats `starter` 60/60 seeds (mean **$66,374** vs $3,600) and v16 by
-+$4,991 +/- $1,463.
+Against frozen v20, the two planner fixes score +$2,176 +/- $910 on development
+seeds and +$1,676 +/- $931 on held-out seeds. The held-out regression pool wins
+229/240 games across v10, v12, v16, melon, strawberry and dairy opponents.
 
 ## Sweeping mixes
 
@@ -102,13 +111,9 @@ players share one market, so the opponent's strength moves both means together.
 
 See [EXPERIMENTS.md](EXPERIMENTS.md) for the full list. The open leads, in order:
 
-1. A Lagrangian whole-season planner. The problem is a concave separable
-   knapsack in tile-days, so it has a water-filling solution — no search needed.
-   The current planner only allocates tiles that are empty today.
-2. The melon race: depth is 158 units for both players combined, and a
-   fertilized first wave caps at age 8 instead of 10.
-3. Robustness. Benchmarks are nearly all self-play; a melon rusher and a
-   fertilized strawberry farm are untested opponents worth writing.
+1. Replace the experimental seasonal quotas with a full water-filling planner.
+2. Tune against downloaded leaderboard replays, not only synthetic specialists.
+3. Revisit the all-cow herd; it won 57% held-out but its score interval crossed 0.
 
 `tools/bench.py` compares **paired** — both agents on the same seeds — and
 reports confidence intervals on the per-seed difference. Differences below about

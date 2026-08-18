@@ -26,6 +26,7 @@ down and a weak one lifts both.
 | v12 `agents/v12_fertilize.py` | FERTILIZE ongoing crops: strawberry and tomato yield doubles | — |
 | v16 `agents/v16_endgame.py` | Steepness-ordered sells, mixed herd, endgame tidy-ups | 20/20, mean $53,960 |
 | v20 `main.py` | Ten bugs found by a source audit | 60/60, mean **$66,374** |
+| v21 `main.py` | Expected future shops + correct fertilized projection | held-out +$1,676 +/- $931 vs v20 |
 
 v2 beats v1 20/20 ($34,914 vs $5,266). v3 beats v2 20/20 ($26,396 vs $13,810).
 v4 with the default mix is v3: 3/20 wins and matching means is what a mirror
@@ -654,6 +655,64 @@ EGG            160      9001      56      63
 MELON          197      8303      42     272
 WOOL            29      6384     222     229
 ```
+
+---
+
+# Exploration round 5
+
+Every strategy was implemented behind an independent `KAGG_*` switch and
+compared with frozen `agents/v20_audit.py`. The new benchmark swaps seats for
+every seed; reported differences use the seed-pair as the sampling unit.
+
+## Isolated results
+
+| Experiment | 40 paired seeds vs v20 | Decision |
+| --- | ---: | --- |
+| Effective fertilized-yield projection | +$783 +/- $519 | keep |
+| Expected future shop demand | +$2,106 +/- $1,088 | keep |
+| Partial scarcity liquidation | -$1,736 +/- $852 | reject |
+| Integrated sale-order loss | +$12 +/- $7 | disabled; immaterial |
+| Fertilized first-wave melon race | +$994 +/- $1,369 | disabled; unresolved |
+| Deadline-aware seasonal quotas | +$97 +/- $1,932 | disabled; unresolved |
+| Opponent hidden-stock trigger | -$1,013 +/- $697 | reject |
+| Four-cow NE dairy expansion, day 10 | -$372 +/- $1,206 | disabled; unresolved |
+
+Ten-unit sale lots lost -$8,009 +/- $1,318. Delaying the herd to day 3 lost
+-$11,277 +/- $1,965. A seven-cow herd reached 57% held-out wins but only
++$658 +/- $869, so the existing four-cow/three-sheep herd remains the default.
+
+The melon-race policy correctly buys fertilizer, applies it at age 5, reaches
+the cap at age 8 and sells immediately. Against the pure-melon specialist it
+still reduced our advantage by roughly $4k because v20 already exploits that
+opponent without paying for fertilizer.
+
+## Combined result
+
+Effective-yield projection plus future-shop demand:
+
+```
+development  seeds 0..59        67% wins   +2176 +/- 910
+held-out     seeds 100000..100059 61% wins  +1676 +/- 931
+```
+
+Held-out regression pool, 20 paired seeds per opponent:
+
+```
+v10 livestock       40/40
+v12 fertilize       40/40
+v16 endgame         37/40
+melon specialist    40/40
+strawberry specialist 40/40
+dairy specialist    32/40
+aggregate          229/240
+```
+
+Only the two replicated planner fixes default on. All other implementations
+remain switchable for future tuning: `KAGG_PARTIAL_SCARCITY`,
+`KAGG_EXACT_SELL_ORDER`, `KAGG_SELL_LOT`, `KAGG_MELON_RACE`,
+`KAGG_SEASONAL_PLANNER`, `KAGG_HERD_EXPERIMENT`, `KAGG_HERD_START_DAY`,
+`KAGG_HERD_BUY_PER_DAY`, `KAGG_OPPONENT_STOCK`, and
+`KAGG_DAIRY_LAND_COWS`.
 
 Milk and strawberry are the business. Melon sells 197 units at an average of $42
 against a peak of $272 — both farms dump it at the floor. Wool at 29 units was

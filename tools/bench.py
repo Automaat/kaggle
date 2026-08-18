@@ -1,11 +1,12 @@
-"""Paired benchmark: uv run python tools/bench.py [a] [b] [n_seeds]
+"""Seat-swapped, paired Kaggriculture benchmark.
 
-Both agents play the same seeds, so the comparison is paired. Reports the win
-rate and a paired confidence interval on the per-seed difference — unpaired
-means are useless here, because the two farms share one market and a strong
-opponent drags both scores down together.
+Examples:
+  uv run python tools/bench.py main.py starter 60
+  uv run python tools/bench.py main.py --pool agents/v10_livestock.py,specialist:melon --seeds 100 --held-out
+  uv run python tools/bench.py main.py --pool default --seed-start 20000 --seeds 200
 """
 
+import argparse
 import math
 import os
 import pathlib
@@ -17,19 +18,31 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from runner import run_match
 
+DEFAULT_POOL = (
+    "agents/v10_livestock.py",
+    "agents/v12_fertilize.py",
+    "agents/v16_endgame.py",
+    "specialist:melon",
+    "specialist:strawberry",
+    "specialist:dairy",
+)
+HELD_OUT_START = 100_000
 
-def _one(seed):
-    _, rewards, _ = run_match(_A, _B, seed=seed)
-    return rewards
 
-
-def _init(a, b):
-    global _A, _B
-    _A, _B = a, b
+def _one(job):
+    candidate, opponent, seed = job
+    _, first, first_status = run_match(candidate, opponent, seed=seed)
+    _, second, second_status = run_match(opponent, candidate, seed=seed)
+    return {
+        "seed": seed,
+        "candidate": (first[0], second[1]),
+        "opponent": (first[1], second[0]),
+        "statuses": (first_status[0], first_status[1], second_status[1], second_status[0]),
+    }
 
 
 def _binomial_ci(wins, n):
-    """Wilson interval, so a 20/20 result does not report zero uncertainty."""
+    """Wilson interval, including uncertainty for unanimous results."""
     if n == 0:
         return 0.0, 0.0
     z = 1.96
@@ -40,24 +53,93 @@ def _binomial_ci(wins, n):
     return max(0.0, centre - spread), min(1.0, centre + spread)
 
 
+def summarize(candidate, opponent, results):
+    """Normalize both seats and keep the seed as the paired sampling unit."""
+    game_diffs = [a - b for result in results
+                  for a, b in zip(result["candidate"], result["opponent"])]
+    seed_diffs = [statistics.mean(a - b for a, b in zip(result["candidate"], result["opponent"]))
+                  for result in results]
+    wins = sum(diff > 0 for diff in game_diffs)
+    ties = sum(diff == 0 for diff in game_diffs)
+    lo, hi = _binomial_ci(wins, len(game_diffs))
+    margin = (1.96 * statistics.stdev(seed_diffs) / math.sqrt(len(seed_diffs))
+              if len(seed_diffs) > 1 else 0.0)
+    failures = sum(status != "DONE" for result in results for status in result["statuses"])
+    return {
+        "candidate": candidate,
+        "opponent": opponent,
+        "seeds": len(results),
+        "seed_start": results[0]["seed"] if results else None,
+        "seed_end": results[-1]["seed"] if results else None,
+        "games": len(game_diffs),
+        "wins": wins,
+        "ties": ties,
+        "win_lo": lo,
+        "win_hi": hi,
+        "mean_diff": statistics.mean(seed_diffs) if seed_diffs else 0.0,
+        "margin": margin,
+        "mean_score": statistics.mean(a for r in results for a in r["candidate"]),
+        "failures": failures,
+    }
+
+
+def _print(summary):
+    significant = summary["seeds"] > 1 and abs(summary["mean_diff"]) > summary["margin"]
+    print(f'{summary["candidate"]} vs {summary["opponent"]}  '
+          f'({summary["seeds"]} paired seeds {summary["seed_start"]}..{summary["seed_end"]}, '
+          f'{summary["games"]} games)')
+    print(f'  win rate  : {summary["wins"]}/{summary["games"]} '
+          f'({summary["wins"] / summary["games"]:.0%}, 95% CI '
+          f'{summary["win_lo"]:.0%}-{summary["win_hi"]:.0%}, ties={summary["ties"]})')
+    print(f'  seat-pair : {summary["mean_diff"]:>+9.0f}  +/- {summary["margin"]:.0f}   '
+          f'{"SIGNIFICANT" if significant else "not significant"}')
+    print(f'  candidate : mean={summary["mean_score"]:>9.0f}  failures={summary["failures"]}')
+
+
+def _arguments():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("candidate", nargs="?", default="main.py")
+    parser.add_argument("opponent", nargs="?", default=None)
+    parser.add_argument("legacy_n", nargs="?", type=int, help=argparse.SUPPRESS)
+    parser.add_argument("--pool", help="comma-separated opponents; 'default' uses the regression pool")
+    parser.add_argument("--seeds", type=int, default=None, help="number of paired seeds")
+    parser.add_argument("--seed-start", type=int, default=0)
+    parser.add_argument("--held-out", action="store_true", help=f"start at seed {HELD_OUT_START}")
+    parser.add_argument("--workers", type=int, default=os.cpu_count())
+    return parser.parse_args()
+
+
+def main():
+    args = _arguments()
+    n = args.seeds if args.seeds is not None else (args.legacy_n or 60)
+    if n < 1:
+        raise SystemExit("seed count must be positive")
+    start = HELD_OUT_START if args.held_out else args.seed_start
+    if args.pool:
+        opponents = (DEFAULT_POOL if args.pool == "default" else
+                     tuple(part.strip() for part in args.pool.split(",") if part.strip()))
+    else:
+        opponents = (args.opponent or "starter",)
+    jobs = [(args.candidate, opponent, seed)
+            for opponent in opponents for seed in range(start, start + n)]
+    with ProcessPoolExecutor(max_workers=args.workers) as pool:
+        raw = list(pool.map(_one, jobs, chunksize=1))
+
+    summaries = []
+    offset = 0
+    for opponent in opponents:
+        result = summarize(args.candidate, opponent, raw[offset:offset + n])
+        summaries.append(result)
+        _print(result)
+        print()
+        offset += n
+    if len(summaries) > 1:
+        print("pool aggregate")
+        total_games = sum(row["games"] for row in summaries)
+        total_wins = sum(row["wins"] for row in summaries)
+        print(f"  win rate  : {total_wins}/{total_games} ({total_wins / total_games:.0%})")
+        print(f"  opponents : {sum(row['mean_diff'] > 0 for row in summaries)}/{len(summaries)} positive")
+
+
 if __name__ == "__main__":
-    a = sys.argv[1] if len(sys.argv) > 1 else "main.py"
-    b = sys.argv[2] if len(sys.argv) > 2 else "starter"
-    n = int(sys.argv[3]) if len(sys.argv) > 3 else 60
-
-    with ProcessPoolExecutor(initializer=_init, initargs=(a, b), max_workers=os.cpu_count()) as pool:
-        results = list(pool.map(_one, range(n), chunksize=1))
-
-    mine = [r[0] for r in results]
-    diffs = [r[0] - r[1] for r in results]
-    wins = sum(1 for d in diffs if d > 0)
-    lo, hi = _binomial_ci(wins, n)
-
-    margin = 1.96 * statistics.pstdev(diffs) / math.sqrt(n) if n > 1 else 0
-    mean_diff = statistics.mean(diffs)
-
-    print(f"{a} vs {b}  ({n} seeds)")
-    print(f"  win rate  : {wins}/{n}  ({wins / n:.0%}, 95% CI {lo:.0%}-{hi:.0%})")
-    print(f"  diff      : {mean_diff:>+9.0f}  +/- {margin:.0f}   "
-          f"{'SIGNIFICANT' if abs(mean_diff) > margin else 'not significant'}")
-    print(f"  mine      : mean={statistics.mean(mine):>9.0f}  sd={statistics.pstdev(mine):>8.0f}")
+    main()

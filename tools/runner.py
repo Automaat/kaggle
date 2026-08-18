@@ -16,6 +16,10 @@ def load_agent(name):
         return name
     if name in BUILTIN:
         return name
+    if name.startswith("specialist:"):
+        from specialists import specialist
+
+        return specialist(name.partition(":")[2])
     path = Path(name)
     if not path.is_absolute():
         path = ROOT / name
