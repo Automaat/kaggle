@@ -11,9 +11,9 @@ CROPS = {
     "MELON": {"seed": 80, "first_yield_day": 10, "max_yield_day": 12, "max_yield": 6, "ongoing": False},
 }
 ANIMALS = {
-    "GOOSE": {"cost": 300, "structure": "COOP", "product": "EGG", "first_yield_day": 4, "rate": 2.0},
-    "COW": {"cost": 400, "structure": "PASTURE", "product": "MILK", "first_yield_day": 8, "rate": 1.5},
-    "SHEEP": {"cost": 500, "structure": "PASTURE", "product": "WOOL", "first_yield_day": 6, "rate": 4 / 3},
+    "GOOSE": {"cost": 300, "structure": "COOP", "product": "EGG"},
+    "COW": {"cost": 400, "structure": "PASTURE", "product": "MILK"},
+    "SHEEP": {"cost": 500, "structure": "PASTURE", "product": "WOOL"},
 }
 # Days a tile stays occupied, used to decide whether a plan item can still pay off.
 LIFESPAN = {
@@ -24,8 +24,6 @@ FEED_DAYS = 2  # Days of wheat kept back from the market to cover the herd.
 # Units a watered, unfertilized tile returns over one full occupancy.
 EXPECTED_YIELD = {"WHEAT": 4, "CARROT": 3, "TOMATO": 4, "STRAWBERRY": 4, "MELON": 6}
 PLANNER = os.environ.get("KAGG_PLANNER", "dynamic")
-LIVESTOCK = os.environ.get("KAGG_LIVESTOCK", "COW")
-HERD = int(os.environ.get("KAGG_HERD", "4"))
 
 SHOPS = {
     "BAKERY": ["EGG", "WHEAT"],
@@ -227,46 +225,14 @@ def _harvest_inventory(inventory, drain, days):
     return {p: n - drain.get(p, 0) * days * DRAIN_FACTOR for p, n in inventory.items()}
 
 
-def _animal_value(animal, projected, day, wheat_price):
-    """Profit per tile-day for livestock, cared for daily.
-
-    CARE banks one unit per fed day and pays it out on the next production, so
-    the rate is 1 + interval per production — 3x on a cow. Every surviving
-    animal also yields one fertilizer a day, and nothing in the game drains
-    fertilizer, so that curve stays untouched all season.
-    """
-    data = ANIMALS[animal]
-    occupancy = LAST_DAY - day
-    productive = occupancy - data["first_yield_day"]
-    if productive <= 0:
-        return float("-inf")
-    units = data["rate"] * productive
-    product = data["product"]
-    revenue = units * market_price(product, projected.get(product, MARKET_I0) + units)
-    fertilizer = occupancy * market_price("FERTILIZER", projected.get("FERTILIZER", MARKET_I0) + occupancy)
-    return (revenue + fertilizer - data["cost"] - occupancy * wheat_price) / occupancy
-
-
 def _dynamic_plan(tiles, day, inventory, shops):
-    """Assign each empty tile the crop with the best marginal return at harvest.
-
-    The first `HERD` tiles are reserved for livestock. Letting the value model
-    bid for every tile floods the farm with animals it cannot pay for, and a
-    tile reserved for an unaffordable animal simply sits empty.
-    """
+    """Assign each empty tile the crop with the best marginal return at harvest."""
     drain = _daily_drain(shops)
     ready = [c for c in CROPS if day + LIFESPAN[c] <= LAST_DAY]
     projected = {c: _harvest_inventory(inventory, drain, LIFESPAN[c]).get(c, MARKET_I0) for c in ready}
-    plan, reserved = {}, 0
-    for x, y, tile in tiles:
-        if isinstance(tile, dict) and ("animal" in tile or tile.get("kind") in ("COOP", "PASTURE")):
-            reserved += 1
+    plan = {}
     for x, y, tile in tiles:
         if tile is not None:
-            continue
-        if reserved < HERD and day <= LAST_DAY - LIFESPAN[LIVESTOCK]:
-            plan[(x, y)] = LIVESTOCK
-            reserved += 1
             continue
         if not ready:
             plan[(x, y)] = None
@@ -382,23 +348,20 @@ def _my_tiles(farm):
                 yield x, y, tile
 
 
-def _tile_task(tile, day, want, seeds, stock):
+def _tile_task(tile, day, want, seeds, shed):
     if tile is None:
         if want in ANIMALS:
             # Build only once the animal is bought: an empty coop is a dead tile.
-            return [("BUILD", want)] if stock.get(want, 0) > 0 else []
-        return [("PLANT", want)] if want and seeds.get(want, 0) > 0 else []
+            return ("BUILD", want) if shed.get(want, 0) > 0 else None
+        return ("PLANT", want) if want and seeds.get(want, 0) > 0 else None
     kind = tile.get("kind")
     if kind == "WEED":
-        return [("DIG", None)]
+        return ("DIG", None)
     if kind in ("COOP", "PASTURE"):
         if "animal" not in tile:
-            # `stock` counts the shed plus every unit's hands: picking an animal
-            # up empties the shed slot, and gating on the shed alone deadlocked
-            # the placement of the animal already being carried to the tile.
-            animal = next((a for a in ANIMALS if ANIMALS[a]["structure"] == kind and stock.get(a, 0) > 0), None)
-            return [("PLACE", animal)] if animal else []
-        return _animal_tasks(tile, day)
+            animal = next((a for a in ANIMALS if ANIMALS[a]["structure"] == kind and shed.get(a, 0) > 0), None)
+            return ("PLACE", animal) if animal else None
+        return _animal_task(tile, day)
     if kind == "PLANT":
         crop = tile["crop"]
         if crop not in CROPS:
@@ -408,7 +371,7 @@ def _tile_task(tile, day, want, seeds, stock):
         ripe = tile.get("yield_units", 0) > 0 and age >= data["first_yield_day"]
         if data["ongoing"]:
             if ripe:
-                return [("HARVEST", None)]
+                return ("HARVEST", None)
         elif ripe and (
             tile["yield_units"] >= data["max_yield"]
             or age >= data["max_yield_day"]
@@ -416,43 +379,32 @@ def _tile_task(tile, day, want, seeds, stock):
         ):
             # Watering past the cap adds nothing, so the tile should turn over.
             # Melon hits its cap of 6 at age 10 but max_yield_day is 12.
-            return [("HARVEST", None)]
+            return ("HARVEST", None)
         if not tile["watered_today"]:
             # A plant already on one dry day turns to weed tonight.
-            return [("WATER!" if tile.get("consecutive_unwatered", 0) >= 1 else "WATER", None)]
-    return []
+            return ("WATER!", None) if tile.get("consecutive_unwatered", 0) >= 1 else ("WATER", None)
+    return None
 
 
-def _animal_tasks(tile, day):
-    """Every job this animal still wants today, not just the most urgent one.
-
-    An animal tile wants up to four actions a day. Emitting one at a time let
-    lower-priority crop work pull the unit off the tile between actions, so
-    CARE and COLLECT_FERTILIZER — the two that pay best — were rarely reached.
-    """
-    jobs = []
+def _animal_task(tile, day):
+    """Feeding outranks collecting: an animal unfed twice running escapes for good."""
     if not tile["fed_today"]:
-        jobs.append(("FEED!" if tile.get("consecutive_unfed", 0) >= 1 else "FEED", None))
-    else:
-        # Care only banks on a day the animal was actually fed.
-        if not tile["cared_today"] and day < LAST_DAY:
-            jobs.append(("CARE", None))
+        return ("FEED!" if tile.get("consecutive_unfed", 0) >= 1 else "FEED", None)
     if tile.get("yield_units", 0) > 0:
-        jobs.append(("HARVEST", None))
+        return ("HARVEST", None)
     if tile.get("fertilizer_available"):
-        jobs.append(("COLLECT_FERTILIZER", None))
-    return jobs
+        return ("COLLECT_FERTILIZER", None)
+    if not tile["cared_today"] and day < LAST_DAY:
+        return ("CARE", None)
+    return None
 
 
 def _priority(task):
     # Water first: an unwatered plant dies. Harvest before planting.
-    # CARE banks one extra unit per fed day, paid out on the next production, so
-    # on a cow it is worth a whole extra milk — far more than sowing another
-    # tile. Fertilizer is 1/animal/day that nothing else in the game drains.
     return {
-        "WATER!": 0, "FEED!": 0, "FEED": 1, "WATER": 2, "CARE": 3,
-        "HARVEST": 4, "COLLECT_FERTILIZER": 5, "PLACE": 6, "PLANT": 7,
-        "BUILD": 7, "DIG": 8,
+        "WATER!": 0, "FEED!": 0, "FEED": 1, "WATER": 2, "HARVEST": 3,
+        "PLACE": 4, "PLANT": 5, "BUILD": 5, "COLLECT_FERTILIZER": 6,
+        "CARE": 7, "DIG": 8,
     }.get(task, 9)
 
 
@@ -570,24 +522,20 @@ def agent(obs):
     units = [farm["farmer"]] + list(farm.get("hands", []))
     cashing_out = day >= LAST_DAY and hour >= CASHOUT_HOUR
 
-    stock = dict(shed)
-    for inv in inventories:
-        for item, n in inv.items():
-            stock[item] = stock.get(item, 0) + n
-
     tasks = []
     if not cashing_out:
         budget = dict(seeds)
         for x, y, tile in tiles:
             want = plan.get((x, y))
-            for task in _tile_task(tile, day, want, budget, stock):
-                if task[0] == "PLANT":
-                    budget[task[1]] -= 1
-                tasks.append((_priority(task[0]), x, y, task))
+            task = _tile_task(tile, day, want, budget, shed)
+            if task is None:
+                continue
+            if task[0] == "PLANT":
+                budget[task[1]] -= 1
+            tasks.append((_priority(task[0]), x, y, task))
         tasks.sort(key=lambda t: t[:3])
 
     hungry = sum(1 for _, _, t in tiles if isinstance(t, dict) and "animal" in t and not t["fed_today"])
-
     unplaced = _empty_structures(tiles)
 
     ops = []

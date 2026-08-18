@@ -33,32 +33,37 @@ Built-in opponents: `pass`, `random`, `starter`. Any path to a `.py` file with a
 | `tools/trace.py` | Per-day price and money trace |
 | `tools/sweep.py` | Crop-mix comparison |
 | `tools/param_sweep.py` | Sweeps any `KAGG_*` knob against a fixed opponent |
+| `tools/opstats.py` | Where every unit-turn goes: movement, idle, work |
 | `agents/` | Frozen past versions, kept as benchmark opponents |
 | `tests/` | Pins the local price model to the environment |
 | `EXPERIMENTS.md` | Every idea tried and how it scored |
 
-## Current agent (v4)
+## Current agent (v10)
 
-Crop mix `MELON:4,STRAWBERRY:2,CARROT:1`, tiled deterministically over the farm.
-Hires 8 farm hands over the first four hours (only 10 market orders clear per
-turn, so hiring must not crowd out selling and sowing) and assigns every unit to
-the nearest tile that needs work. A plant already on one dry day outranks
-everything else, because it dies tonight.
+**Dynamic planner.** Every empty tile is assigned the crop with the best profit
+per tile-day, priced at the market we will actually sell into — `market_price`
+quoted at post-harvest inventory, so each tile allocated pushes the next tile's
+quote down that crop's glut curve. The forecast subtracts the town's drain over
+the crop's lifespan, which `unlocked_shops` gives exactly.
 
-Selling is trend-aware: the agent re-implements the market price curve, tracks
-each product's price once per day, and holds stock while the trend is positive,
-selling only the overflow past 70 of the 100 shed slots and always the cheapest
-units first. When the trend turns negative it dumps. On the final day it stops
-farming at hour 17 and walks every unit to the shed, because produce still in
-hand when the season ends is worth nothing.
+**Four cows**, fed, cared for and milked daily, with their fertilizer collected.
+`CARE` banks a unit per fed day and pays out on the next production, so it is a
+3x on a cow; nothing in the game drains fertilizer, so that curve stays intact
+all season.
 
-Selling always covers the seed bill first: holding for a better price is
-worthless if the empty tiles stay bare.
+**Sells lead the market order list.** Both players share one descending price
+curve per order index, and truncation drops the tail — so a sale must never sit
+behind a hire.
 
-Livestock is fully supported (`GOOSE`, `COW`, `SHEEP` are valid mix tokens) but
-is not in the default mix, because every ratio tested loses.
+**Hold or dump per product, never globally.** Melon falls the moment either farm
+sells one; strawberry and milk climb all season.
 
-Beats `starter` 20/20 seeds (mean $38,151 vs $3,608) and the v2 baseline 20/20.
+Hires 8 farm hands over the first four hours. A plant already on one dry day
+outranks every other task, because it dies tonight. On the final day farming
+stops at hour 17 and every unit walks to the shed — produce still in hand when
+the season ends is worth nothing.
+
+Beats `starter` 20/20 seeds (mean **$48,780** vs $3,590), v9 19/20, v3 20/20.
 
 ## Sweeping mixes
 
@@ -92,19 +97,19 @@ players share one market, so the opponent's strength moves both means together.
 
 See [EXPERIMENTS.md](EXPERIMENTS.md) for the full list. The open leads, in order:
 
-1. Sell into scarcity spikes. Carrot, tomato and egg use a `hinge` price curve,
-   so they run away once town demand passes `T`. `unlocked_shops` says what the
-   town just started eating.
-2. Opponent modelling: both farms are visible, so the coming glut is predictable.
-3. Wheat arbitrage with idle mid-game cash: buy at $25, sell at $48, no tiles
-   and no labour needed.
+1. Treat melon as a race. No shop demands it, so whoever sells first takes the
+   pie: on 112 melons each, selling first is worth $26,883 and second $7,822.
+2. Opponent sales are exactly observable, not estimated — `BUY_PRODUCT` is
+   illegal for most products, so their sells fall out of the inventory delta.
+3. The carrot `hinge` as an option: p99 is $377 a carrot, and the signal is
+   readable on day 3.
 
-Land, animals and fertilizer were each built, measured and rejected. Labour is
-the hard constraint (Fibonacci hire costs) and melon dominates return on capital
-while cash is scarce. See [EXPERIMENTS.md](EXPERIMENTS.md).
+Land and wheat arbitrage were built or costed and rejected. Labour is **not** the
+constraint — a third of unit-turns are already idle. See
+[EXPERIMENTS.md](EXPERIMENTS.md).
 
 ## Submit
 
 ```bash
-uv run kaggle competitions submit kaggriculture -f main.py -m "v4 melon mix"
+uv run kaggle competitions submit kaggriculture -f main.py -m "v10 dynamic planner + cows"
 ```

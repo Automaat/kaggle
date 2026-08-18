@@ -11,7 +11,9 @@ BUILTIN = {"pass", "random", "starter"}
 
 
 def load_agent(name):
-    """Resolve a builtin agent name, or a python file exposing `agent`."""
+    """Resolve a builtin agent name, a callable, or a python file exposing `agent`."""
+    if callable(name):
+        return name
     if name in BUILTIN:
         return name
     path = Path(name)

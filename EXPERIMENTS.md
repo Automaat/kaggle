@@ -15,7 +15,13 @@ down and a weak one lifts both.
 | v1 `agents/v1_carrot.py` | Trend-aware selling + final-day cash-out | 20/20, mean $6,537 |
 | v2 `agents/v2_melon.py` | Crop mix `MELON:4,STRAWBERRY:1,CARROT:1` | 20/20, mean $36,868 |
 | v3 `agents/v3_fixes.py` | Hire batching, critical watering, seed-bill selling, mix `MELON:4,STRAWBERRY:2,CARROT:1` | 20/20, mean $38,151 |
-| v4 `main.py` | Animal support added; **off by default**, it loses | same as v3 |
+| v4 `agents/v4_animals.py` | Animal support added, off by default | same as v3 |
+| v5 `agents/v5_harvest.py` | Harvest at the yield cap, not at `max_yield_day` | — |
+| v6 `agents/v6_tiling.py` | Fixed the tile-assignment aliasing bug | — |
+| v7 `agents/v7_orders.py` | Sells first in the market order list | — |
+| v8 `agents/v8_dynamic.py` | Dynamic crop planner replaces the fixed mix | — |
+| v9 `agents/v9_peritem.py` | Per-product hold/dump instead of one global flag | — |
+| v10 `main.py` | Livestock working: 4 cows, care and fertilizer prioritised | 20/20, mean **$48,780** |
 
 v2 beats v1 20/20 ($34,914 vs $5,266). v3 beats v2 20/20 ($26,396 vs $13,810).
 v4 with the default mix is v3: 3/20 wins and matching means is what a mirror
@@ -218,3 +224,172 @@ both before it is built.
 - **Care and fertilizer actions for animals**, `CARE` banks +1 per fed day.
 - **Parameter tuning with CMA-ES** over the mix weights, shed target, drift
   window and cash floor, against a pool of frozen agents.
+
+
+---
+
+# Exploration round 2
+
+Two subagents audited the simulator source and generated quantified strategy
+ideas. Their reports drove most of what follows. Both are cited where their
+finding was the origin.
+
+## Corrections to earlier conclusions
+
+### "Labour is the hard constraint" — WRONG
+`tools/opstats.py` counts what every unit-turn is spent on. On 25 tiles with 9
+units:
+
+```
+unit-turns: 5852
+  movement : 3281  56.1%
+  idle     : 1665  28.5%
+  work     :  906  15.5%
+```
+
+Nearly a third of the budget is already idle. 216 unit-turns a day against about
+82 of actual demand. The Fibonacci hire cost is real but never binds, because we
+never want more than 8 hands.
+
+Two experiments confirm it. Watering only when it pays (see below) freed labour
+and money went **down**, because the freed turns had nothing to do. A
+task-centric assignment that cut movement from 56% to 48% also **lost**, 7/20.
+
+Land still loses, but the reason was misdiagnosed. The real cause is that the
+extra tiles were planted with melon, whose total market depth is fixed.
+
+### "Melon dominates" — only until it floors
+A price trace of a mirror match shows melon pinned at **$1 to $30 from day 14
+onward**, while strawberry climbs to $239, milk to $264 and wool to $251. No
+town shop demands melon, so the town drains only 1 a day; the whole melon pie is
+about 188 units for **both** players combined. A fixed melon-heavy mix keeps
+planting into a floored market.
+
+## Ideas kept
+
+### Harvest at the yield cap, not at `max_yield_day` (v5)
+`WATER` adds yield only inside the bonus window and only up to `max_yield`.
+Melon's window opens at age 6 and its cap of 6 is reached at age **10**, but
+`max_yield_day` is 12 — so the old rule sat on a finished melon for two days.
+Harvesting at the cap turns melon into a 10-day crop.
+
+20/20 against v4, $26,328 vs $13,766.
+
+### Tile-assignment aliasing (v6) — a bug
+The mix was tiled by `(y * board_size + x) % len(mix)`. With a 10-wide board any
+pattern whose length divides 10 collapses to `x % len(mix)`: every tile in a
+column gets the same crop and most of the mix is never planted. Three "different"
+mixes in a sweep returned byte-identical results, which is what exposed it.
+Tiles are now indexed by position in the tile list.
+
+### Sells first in the market order list (v7) — the largest single win
+Both players share one descending price curve **per order index**. A sell at
+index 0 clears above a sell the opponent placed at index 3, and truncation at 10
+orders drops the tail. The old order was HIRE, BUY_LAND, SELL, BUY_SEED — so on
+hours 0-3 every sale sat behind three hires, and overflow dropped sales rather
+than hires.
+
+Reordering to sells, seeds, feed, livestock, land, hires: **20/20, $27,271 vs
+$15,412**. Cost: nothing. (Subagent finding.)
+
+### Dynamic crop planner (v8)
+Each empty tile is assigned the crop with the best profit per tile-day, priced
+at the market we will actually sell into: `market_price(crop, projected + yield)`.
+Quoting at post-harvest inventory is what stops the farm piling into one crop —
+each tile allocated pushes the next tile's quote down that crop's glut curve.
+The forecast also subtracts the town's drain over the crop's lifespan, which is
+exactly computable from `unlocked_shops`.
+
+Beats the best fixed mix 16/20. The drain forecast must be discounted, because
+the opponent is producing into the same market:
+
+```
+KAGG_DRAIN_FACTOR   wins vs v7   mean
+0.25                16/20        26582   <- chosen
+0.5                 16/20        26315
+0                   15/20        25168
+1.0                 10/20        24645
+```
+
+### Per-product hold/dump (v9)
+The hold decision was one global flag over the whole shed. Melon starts falling
+the moment either farm sells one, so every melon-triggered dump also liquidated
+the strawberry and milk that climb all season. Now each product is judged on its
+own drift. 16/20 against v8. (Subagent finding.)
+
+### Livestock, reversed (v10) — the v4 rejection was a bug, not economics
+Four separate defects were starving the animal pipeline:
+
+1. **`CARE` and `COLLECT_FERTILIZER` were priority 7 and 6**, below `PLANT` and
+   `BUILD`. `CARE` banks one unit per fed day and pays out on the next
+   production, so on a cow (interval 2) it is a **3x** on milk. It almost never
+   fired.
+2. **Each tile emitted only its most urgent job per turn.** An animal wants four
+   actions a day; lower-priority crop work pulled the unit off the tile between
+   them. Tiles now emit every pending job at once.
+3. **A deadlock on placement.** `PLACE` was gated on the animal being in the
+   shed — but picking it up empties the shed slot, so the animal being carried to
+   the pasture could never be placed. Two pastures stood empty all season with
+   two cows sitting in the shed. Availability now counts shed plus every unit's
+   hands.
+4. Fertilizer was never collected, and nothing in the game drains fertilizer —
+   the curve is untouched all season.
+
+After the fixes, a cow mix beat the crop-only planner **20/20**. Sweeping the
+herd against `agents/v9_peritem.py`:
+
+```
+COW   herd=3    0/12   27191        SHEEP herd=3    9/12   29230
+COW   herd=4   12/12   32404        SHEEP herd=4    6/12   27226
+COW   herd=5    7/12   28432        SHEEP herd=5    0/12   16459
+COW   herd=6    3/12   23501        GOOSE herd=3    3/16   18223
+```
+
+Four cows, verified over 20 seeds: **19/20 against v9, $32,713 vs $25,063.**
+Goose is the animal `CARE` helps least (2x, not 3x) and egg has the flattest
+curve — which is exactly what v4 tested in five of six runs.
+
+## Ideas tested and rejected in this round
+
+- **Water only when it pays.** A plant dies only after two dry days running, so
+  watering every other day keeps it alive; and for unfertilized ongoing crops
+  watering never adds yield at all. Cut work from 906 to 695 actions — and lost
+  11/20. Idle time rose to 39.7%. The saved labour had no use, and skipping a
+  day means a single missed critical watering kills the plant. Daily watering is
+  free insurance.
+- **Task-centric assignment** (each task, in priority order, takes the nearest
+  able unit). Cut movement from 56.1% to 48.5% and lost 7/20. Same reason.
+- **Land, again**, now with the water saving freeing labour: still 0/10 at every
+  quadrant count.
+- **Livestock inside the dynamic planner.** Letting the value model bid for every
+  tile floods the farm with animals it cannot pay for, and a tile reserved for an
+  unaffordable animal simply sits empty (mean $9,858 vs $30,552). A fixed
+  four-tile reservation works; a bidding model does not.
+- **Wheat arbitrage**, previously on the lead list. `BUY_PRODUCT` deposits into
+  the shed, so 100 wheat occupies the entire 100-slot shed for 17 days and every
+  harvest in that window is discarded at the end-of-day drop. The round trip is
+  priced to net zero; only the town's drain between buy and sell pays, roughly
+  $1,200. A single lost melon harvest costs more. It is a shed-denial attack on
+  ourselves. (Subagent finding.)
+
+## Still open
+
+- **Melon as a race.** No shop demands melon, so whoever sells first takes the
+  pie. Both farms holding 112 melons: selling first is worth $26,883, selling
+  second $7,822. The current trailing 3-day drift reacts too slowly. A forward
+  model — `town_drain − forecast combined supply`, both computable — would dump
+  melon on sight.
+- **Opponent sales are exactly observable.** For every product except wheat and
+  fertilizer, `BUY_PRODUCT` is illegal, so
+  `delta_inventory = our_sells + their_sells − town_drain`, and all three other
+  terms are known. Their tiles give their future harvests exactly. This is
+  inference, not estimation.
+- **The carrot hinge as an option.** Carrot's `hinge` curve gives p90 $116 and
+  p99 $377 at day 29, and the signal is readable on day 3: if the first shop is a
+  pet cafe the expected carrot price nearly doubles. Carrot's 3-day cycle means
+  tiles can be converted late. Needs 40 seeds to measure — the payoff is
+  tail-heavy.
+- **Distance-aware cash-out.** Step 718 (day 29, hour 22) is the last actionable
+  turn. A unit 8 steps out leaving at hour 17 arrives at hour 25 and its whole
+  load is lost, while units next to the shed idle for five hours. Sweeping
+  `KAGG_CASHOUT_HOUR` showed no signal yet, because little ripens on day 29.
