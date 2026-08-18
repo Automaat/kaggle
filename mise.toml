@@ -1,0 +1,22 @@
+[tools]
+python = "3.12"
+uv = "latest"
+
+[env]
+_.python.venv = { path = ".venv", create = true, uv_create_args = ["--python", "3.12"] }
+
+[tasks.install]
+description = "Sync python deps"
+run = "uv sync"
+
+[tasks.play]
+description = "Run one match: mise run play [agent_a] [agent_b] [seed]"
+run = "uv run python tools/play.py"
+
+[tasks.bench]
+description = "Run N seeded matches against a baseline"
+run = "uv run python tools/bench.py"
+
+[tasks.replay]
+description = "Render the last replay to HTML"
+run = "uv run python tools/render.py"
