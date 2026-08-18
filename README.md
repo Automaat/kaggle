@@ -38,32 +38,35 @@ Built-in opponents: `pass`, `random`, `starter`. Any path to a `.py` file with a
 | `tests/` | Pins the local price model to the environment |
 | `EXPERIMENTS.md` | Every idea tried and how it scored |
 
-## Current agent (v10)
+## Current agent (v16)
 
-**Dynamic planner.** Every empty tile is assigned the crop with the best profit
-per tile-day, priced at the market we will actually sell into — `market_price`
+**Dynamic planner.** Every empty tile gets the crop with the best profit per
+tile-day, priced at the market we will actually sell into — `market_price`
 quoted at post-harvest inventory, so each tile allocated pushes the next tile's
-quote down that crop's glut curve. The forecast subtracts the town's drain over
-the crop's lifespan, which `unlocked_shops` gives exactly.
+quote down that crop's glut curve, and the town's drain over the crop's lifespan
+is subtracted from the forecast.
 
-**Four cows**, fed, cared for and milked daily, with their fertilizer collected.
-`CARE` banks a unit per fed day and pays out on the next production, so it is a
-3x on a cow; nothing in the game drains fertilizer, so that curve stays intact
-all season.
+**Forward supply forecast, not price history.** Both farms' tiles are public and
+the crop tables are fixed, so remaining supply is a hard ceiling. Against the
+town's drain that gives `scarcity = drain * days_left - supply` per product:
+hold while it is positive, dump otherwise. This replaced a trailing 3-day price
+drift that reacted three days late.
 
-**Sells lead the market order list.** Both players share one descending price
-curve per order index, and truncation drops the tail — so a sale must never sit
-behind a hire.
+**Fertilizer as an input.** An ongoing crop yields 2 instead of 1 per scheduled
+production when fertilized and watered, and one application covers three days —
+so two applications double a strawberry from 4 units to 8. Animals produce
+fertilizer free and nothing in the game drains it.
 
-**Hold or dump per product, never globally.** Melon falls the moment either farm
-sells one; strawberry and milk climb all season.
+**A herd of 4 cows and 3 sheep**, fed, cared for and harvested daily. `CARE`
+banks a unit per fed day and pays out on the next production, a 3x on a cow.
+Milk and wool sit on independent curves.
 
-Hires 8 farm hands over the first four hours. A plant already on one dry day
-outranks every other task, because it dies tonight. On the final day farming
-stops at hour 17 and every unit walks to the shed — produce still in hand when
-the season ends is worth nothing.
+**Sells lead the market order list, steepest curve first.** Both players share
+one descending price curve per order index and truncation drops the tail, so a
+sale must never sit behind a hire — and the item that loses most to being second
+in line goes first.
 
-Beats `starter` 20/20 seeds (mean **$48,780** vs $3,590), v9 19/20, v3 20/20.
+Beats `starter` 20/20 seeds (mean **$53,960** vs $3,569) and v10 20/20.
 
 ## Sweeping mixes
 
@@ -97,12 +100,16 @@ players share one market, so the opponent's strength moves both means together.
 
 See [EXPERIMENTS.md](EXPERIMENTS.md) for the full list. The open leads, in order:
 
-1. Treat melon as a race. No shop demands it, so whoever sells first takes the
-   pie: on 112 melons each, selling first is worth $26,883 and second $7,822.
-2. Opponent sales are exactly observable, not estimated — `BUY_PRODUCT` is
-   illegal for most products, so their sells fall out of the inventory delta.
-3. The carrot `hinge` as an option: p99 is $377 a carrot, and the signal is
-   readable on day 3.
+1. A Lagrangian whole-season planner. The problem is a concave separable
+   knapsack in tile-days, so it has a water-filling solution — no search needed.
+   The current planner only allocates tiles that are empty today.
+2. The melon race: depth is 158 units for both players combined, and a
+   fertilized first wave caps at age 8 instead of 10.
+3. Robustness. Benchmarks are nearly all self-play; a melon rusher and a
+   fertilized strawberry farm are untested opponents worth writing.
+
+Note that effect sizes are now inside the noise: sd is about $11k on a mean of
+$45k, so 20 seeds resolve nothing below roughly 10%.
 
 Land and wheat arbitrage were built or costed and rejected. Labour is **not** the
 constraint — a third of unit-turns are already idle. See
@@ -111,5 +118,5 @@ constraint — a third of unit-turns are already idle. See
 ## Submit
 
 ```bash
-uv run kaggle competitions submit kaggriculture -f main.py -m "v10 dynamic planner + cows"
+uv run kaggle competitions submit kaggriculture -f main.py -m "v16 forecast + fertilizer"
 ```

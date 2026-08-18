@@ -80,7 +80,6 @@ SHED_CAP = 100
 SHED_TARGET = int(os.environ.get("KAGG_SHED_TARGET", "70"))  # Leave room for a day of harvest before overflow is discarded.
 MIN_CASH = int(os.environ.get("KAGG_MIN_CASH", "400"))
 LAST_DAY = 29
-LIQUIDATION_DAYS = int(os.environ.get("KAGG_LIQ_DAYS", "4"))  # Days before the end to start unwinding held stock.
 LAST_HOUR = 22  # Step 718 is the last turn the market clears; 718 % 24 == 22.
 CASHOUT_HOUR = int(os.environ.get("KAGG_CASHOUT_HOUR", "17"))  # Last day only: stop farming, carry everything to the shed.
 SHED_TILE = (4, 4)
@@ -145,10 +144,7 @@ def _supply_forecast(farms, day):
                         continue
                     remaining = LIFESPAN[crop] - (day - tile["planted_day"])
                     if remaining <= days_left:
-                        # A fertilized ongoing crop yields 2 per production, not
-                        # 1, and the flag is public on every opponent tile.
-                        fertilized = crop in PRODUCTION_AGES and tile.get("fertilized_until_day", -1) >= day
-                        supply[crop] = supply.get(crop, 0) + EXPECTED_YIELD[crop] * (2 if fertilized else 1)
+                        supply[crop] = supply.get(crop, 0) + EXPECTED_YIELD[crop]
     return supply
 
 
@@ -228,15 +224,10 @@ def _sell_orders(shed, inventory, money, day, player, cash_needed, feed_reserve,
     dumps.sort(reverse=True)
     orders = [["SELL", item, count] for _loss, item, count in dumps]
 
-    kept_total = sum(c for _, _, c in keepers)
-    quota = _hold_quota(kept_total, money + raised, keepers[0][0] if keepers else 0, cash_needed)
-    # Both farms dumping into the same 24 turns floors strawberry after 62 units
-    # and milk after 76. Start unwinding a few days out so the curve recovers
-    # between sales.
-    days_left = LAST_DAY - day + 1
-    if 0 < days_left <= LIQUIDATION_DAYS:
-        quota = max(quota, math.ceil(kept_total / days_left))
-    quota = min(quota, kept_total)
+    quota = _hold_quota(
+        sum(c for _, _, c in keepers), money + raised,
+        keepers[0][0] if keepers else 0, cash_needed,
+    )
     for price, item, count in keepers:
         if quota <= 0:
             break

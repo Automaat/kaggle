@@ -31,9 +31,8 @@ PRODUCTION_AGES = {
 }
 FERTILIZE_DAYS = 3  # A FERTILIZE covers today and the next two days.
 PLANNER = os.environ.get("KAGG_PLANNER", "dynamic")
-# Herd composition, as animal:count. Milk, wool and egg sit on independent price
-# curves, so a mixed herd saturates three of them instead of glutting one.
-HERD_SPEC = os.environ.get("KAGG_HERD_SPEC", "COW:4,SHEEP:3")
+LIVESTOCK = os.environ.get("KAGG_LIVESTOCK", "COW")
+HERD = int(os.environ.get("KAGG_HERD", "4"))
 
 SHOPS = {
     "BAKERY": ["EGG", "WHEAT"],
@@ -80,8 +79,6 @@ SHED_CAP = 100
 SHED_TARGET = int(os.environ.get("KAGG_SHED_TARGET", "70"))  # Leave room for a day of harvest before overflow is discarded.
 MIN_CASH = int(os.environ.get("KAGG_MIN_CASH", "400"))
 LAST_DAY = 29
-LIQUIDATION_DAYS = int(os.environ.get("KAGG_LIQ_DAYS", "4"))  # Days before the end to start unwinding held stock.
-LAST_HOUR = 22  # Step 718 is the last turn the market clears; 718 % 24 == 22.
 CASHOUT_HOUR = int(os.environ.get("KAGG_CASHOUT_HOUR", "17"))  # Last day only: stop farming, carry everything to the shed.
 SHED_TILE = (4, 4)
 MIN_LAND_PAYBACK_DAYS = 8  # A quadrant unlocked later than this cannot repay itself.
@@ -145,10 +142,7 @@ def _supply_forecast(farms, day):
                         continue
                     remaining = LIFESPAN[crop] - (day - tile["planted_day"])
                     if remaining <= days_left:
-                        # A fertilized ongoing crop yields 2 per production, not
-                        # 1, and the flag is public on every opponent tile.
-                        fertilized = crop in PRODUCTION_AGES and tile.get("fertilized_until_day", -1) >= day
-                        supply[crop] = supply.get(crop, 0) + EXPECTED_YIELD[crop] * (2 if fertilized else 1)
+                        supply[crop] = supply.get(crop, 0) + EXPECTED_YIELD[crop]
     return supply
 
 
@@ -211,32 +205,19 @@ def _sell_orders(shed, inventory, money, day, player, cash_needed, feed_reserve,
     held.sort()
 
     dumping = day >= LAST_DAY
-    dumps, keepers, raised = [], [], 0
+    orders, keepers, raised = [], [], 0
     for price, item, count in held:
         if dumping or scarcity.get(item, 0) <= count:
             # Falling price: the best sale of this product is the one made now.
-            after = market_price(item, inventory.get(item, MARKET_I0) + count)
-            dumps.append(((price - after) * count, item, count))
+            orders.append(["SELL", item, count])
             raised += price * count
         else:
             keepers.append((price, item, count))
 
-    # Steepest curve first. Two sells of one item at the same order index split
-    # the curve evenly, but an order at index 0 clears the whole top of the
-    # curve before the opponent's index-3 order starts. The item that loses the
-    # most to being second in line goes first.
-    dumps.sort(reverse=True)
-    orders = [["SELL", item, count] for _loss, item, count in dumps]
-
-    kept_total = sum(c for _, _, c in keepers)
-    quota = _hold_quota(kept_total, money + raised, keepers[0][0] if keepers else 0, cash_needed)
-    # Both farms dumping into the same 24 turns floors strawberry after 62 units
-    # and milk after 76. Start unwinding a few days out so the curve recovers
-    # between sales.
-    days_left = LAST_DAY - day + 1
-    if 0 < days_left <= LIQUIDATION_DAYS:
-        quota = max(quota, math.ceil(kept_total / days_left))
-    quota = min(quota, kept_total)
+    quota = _hold_quota(
+        sum(c for _, _, c in keepers), money + raised,
+        keepers[0][0] if keepers else 0, cash_needed,
+    )
     for price, item, count in keepers:
         if quota <= 0:
             break
@@ -280,17 +261,6 @@ def _daily_drain(shops):
         for product in products:
             drain[product] = drain.get(product, 0) + SHOP_TICKS_PER_DAY * multiplier
     return drain
-
-
-def _parse_herd():
-    """Expand "COW:4,SHEEP:3" into the list of animals to reserve tiles for."""
-    herd = []
-    for part in HERD_SPEC.split(","):
-        animal, _, count = part.partition(":")
-        animal = animal.strip().upper()
-        if animal in ANIMALS:
-            herd += [animal] * max(0, int(count or 1))
-    return herd
 
 
 def _crop_value(crop, projected_inv, day):
@@ -340,7 +310,6 @@ def _dynamic_plan(tiles, day, inventory, shops):
     drain = _daily_drain(shops)
     ready = [c for c in CROPS if day + LIFESPAN[c] <= LAST_DAY]
     projected = {c: _harvest_inventory(inventory, drain, LIFESPAN[c]).get(c, MARKET_I0) for c in ready}
-    herd = _parse_herd()
     plan, reserved = {}, 0
     for x, y, tile in tiles:
         if isinstance(tile, dict) and ("animal" in tile or tile.get("kind") in ("COOP", "PASTURE")):
@@ -348,8 +317,8 @@ def _dynamic_plan(tiles, day, inventory, shops):
     for x, y, tile in tiles:
         if tile is not None:
             continue
-        if reserved < len(herd) and day <= LAST_DAY - LIFESPAN[herd[reserved]]:
-            plan[(x, y)] = herd[reserved]
+        if reserved < HERD and day <= LAST_DAY - LIFESPAN[LIVESTOCK]:
+            plan[(x, y)] = LIVESTOCK
             reserved += 1
             continue
         if not ready:
@@ -683,15 +652,7 @@ def agent(obs):
     orders += hires
 
     units = [farm["farmer"]] + list(farm.get("hands", []))
-    def _must_leave(pos):
-        """Per unit, not a global hour.
-
-        A unit eight steps out that leaves when a shed-adjacent one does never
-        arrives, and its whole load is lost; a shed-adjacent unit that leaves
-        early idles for hours on the highest-price day of the season.
-        """
-        walk = abs(pos[0] - SHED_TILE[0]) + abs(pos[1] - SHED_TILE[1])
-        return day >= LAST_DAY and hour >= LAST_HOUR - walk
+    cashing_out = day >= LAST_DAY and hour >= CASHOUT_HOUR
 
     stock = dict(shed)
     for inv in inventories:
@@ -699,7 +660,7 @@ def agent(obs):
             stock[item] = stock.get(item, 0) + n
 
     tasks = []
-    if True:
+    if not cashing_out:
         budget = dict(seeds)
         for x, y, tile in tiles:
             want = plan.get((x, y))
@@ -717,7 +678,7 @@ def agent(obs):
     taken = set()
     for idx, pos in enumerate(units):
         carried = dict(inventories[idx]) if idx < len(inventories) else {}
-        if _must_leave(pos):
+        if cashing_out:
             ops.append(_cashout_op(pos, sum(carried.values())))
             continue
         load = _pickup_op(pos, carried, shed, hungry, unplaced, len(units), board_size, fertilize_jobs)

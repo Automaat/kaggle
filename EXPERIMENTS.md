@@ -21,7 +21,10 @@ down and a weak one lifts both.
 | v7 `agents/v7_orders.py` | Sells first in the market order list | — |
 | v8 `agents/v8_dynamic.py` | Dynamic crop planner replaces the fixed mix | — |
 | v9 `agents/v9_peritem.py` | Per-product hold/dump instead of one global flag | — |
-| v10 `main.py` | Livestock working: 4 cows, care and fertilizer prioritised | 20/20, mean **$48,780** |
+| v10 `agents/v10_livestock.py` | Livestock working: 4 cows, care and fertilizer prioritised | 20/20, mean $48,780 |
+| v11 `agents/v11_forecast.py` | Forward supply forecast replaces trailing price drift | — |
+| v12 `agents/v12_fertilize.py` | FERTILIZE ongoing crops: strawberry and tomato yield doubles | — |
+| v16 `main.py` | Steepness-ordered sells, mixed herd, endgame tidy-ups | 20/20, mean **$53,960** |
 
 v2 beats v1 20/20 ($34,914 vs $5,266). v3 beats v2 20/20 ($26,396 vs $13,810).
 v4 with the default mix is v3: 3/20 wins and matching means is what a mirror
@@ -393,3 +396,117 @@ curve — which is exactly what v4 tested in five of six runs.
   turn. A unit 8 steps out leaving at hour 17 arrives at hour 25 and its whole
   load is lost, while units next to the shed idle for five hours. Sweeping
   `KAGG_CASHOUT_HOUR` showed no signal yet, because little ripens on day 29.
+
+
+---
+
+# Exploration round 3
+
+A third subagent looked for angles not already in this log. Its two best ideas —
+fertilizing ongoing crops and ordering sells by curve steepness — matched what
+the measurements were pointing at, and one of them is the biggest win of the
+round.
+
+## Kept
+
+### Forward supply forecast (v11) — biggest win of the round
+The hold/dump decision used a trailing 3-day price drift, which reacts three
+days after a price starts falling. Both farms' tiles are public and `CROPS`/
+`ANIMALS` are fixed, so the supply still to reach the market is a **hard
+ceiling, not an estimate**. Compared against the town's drain — also exact, from
+`unlocked_shops` — it says directly whether a product's price still has room to
+climb:
+
+```
+scarcity(item) = drain(item) * days_left - remaining_supply(item)
+```
+
+Hold while scarcity exceeds what we hold; dump otherwise.
+
+**20/20 against v10, $43,567 vs $29,874.** Against `starter` it changes almost
+nothing ($48.8k either way) — the gain is entirely in head-to-head play, which
+is what the leaderboard measures.
+
+### FERTILIZE the ongoing crops (v12)
+`_daily_refresh_plants` doubles an ongoing crop's scheduled yield to 2 when the
+tile was fertilized **and** watered that day. One `FERTILIZE` covers three days,
+and strawberry produces at ages 10, 12, 14, 16 — so **two applications double a
+strawberry from 4 units to 8**, same 16-day occupancy. Tomato likewise, at ages
+8, 9, 10, 11.
+
+Fertilizer is free: every animal makes one a day and nothing in the game drains
+it. Selling it nets about $90; spending it on a strawberry returns two more
+strawberries at roughly $240 each.
+
+18/20 against v11.
+
+**Fertilizing one-time crops loses** (1/20). On melon it only moves the
+cap-reaching age from 10 to 8, and melon revenue is capped by depth, not by tile
+turnover — so faster melons just sell into a worse price. Fertilizer is worth
+more on a strawberry or in the market.
+
+### Sells ordered by curve steepness
+`held.sort()` sorted ascending by price, so wheat took order index 0 and melon
+landed at index 2-4. Two sells of one item at the same index split the curve
+evenly, but index 0 clears the whole top before the opponent's index 3 starts.
+Dumps are now ordered by how much they lose to being second in line —
+`(price now - price after selling the lot) * lot`. 14/20.
+
+### Mixed herd
+`LIVESTOCK` was a single string, so every earlier herd sweep varied one animal.
+Milk, wool and egg sit on independent curves, so a mixed herd saturates several
+instead of glutting one. `COW:4,SHEEP:3` measured best, but only 13/24 — inside
+the noise. Kept because the reasoning is sound and it is not worse.
+
+### Opponent fertilizer in the forecast
+`fertilized_until_day` is public on every opponent tile. Without reading it the
+forecast under-counts a fertilizing opponent's supply by 2x — and our own agent
+now fertilizes, so every frozen version is such an opponent.
+
+## Rejected
+
+- **Exact opponent supply inside the planner.** The scarcity model uses it well,
+  but feeding the same forecast into per-tile crop choice made everything look
+  glutted and lost 0/20. Counting only the opponent's farm (our own standing crop
+  is already handled by the marginal pricing loop) recovered to 10/20 — a tie.
+  The 0.25 discount factor stays.
+- **Watering only when it pays** and **task-centric assignment** — see round 2.
+- **Partial-yield late planting.** Valuing a late tile by what it can actually
+  reach before day 29 (a carrot sown on day 27 returns 2 units) lost 5/20.
+- **Per-unit departure time for the cash-out.** Step 718 — day 29, hour 22 — is
+  the last turn the market clears, and a unit 8 steps out that leaves at the same
+  hour as a shed-adjacent one never arrives. Correct in principle, and it scored
+  **identically to the digit across 20 seeds**. Day-29 behaviour changes the
+  final score by exactly zero, because almost nothing ripens that day. Kept, as
+  it costs nothing and matters if the endgame ever fills up.
+- **Spreading the final liquidation over the last days.** Swept 1 to 10 days:
+  identical win rates, means within 2%.
+
+## What the round showed about method
+
+Effect sizes have collapsed relative to the noise. Standard deviation is now
+about $11k on a mean of $45k, so a 20-seed run resolves nothing below roughly
+10%. Everything after v12 in this round is inside that band. Future work needs
+either much larger seed counts or changes big enough to clear it.
+
+## Still open
+
+- **The Lagrangian whole-season planner.** The problem is a concave separable
+  knapsack in tile-days: maximise `sum R_c(Q_c)` subject to
+  `sum n_c * L_c <= 25 * 30`, where `R_c` is concave because price falls
+  monotonically with inventory. That gives a water-filling solution — bisect on
+  the shadow price of a tile-day, invert each curve analytically, then place
+  plantings earliest-deadline-first. The current planner only allocates tiles
+  that are empty today, so it never reserves early tile-days for strawberry
+  (which must be sown by day 13) and never caps a crop's seasonal total.
+- **The melon race.** Melon depth is 158 units for both players combined and 13
+  melon tiles each saturates it exactly. Units 0-78 are worth $17,952; units
+  78-156 are worth $8,522. A fertilized first wave reaches the cap at age 8
+  instead of 10, and that two-day lead is worth up to $9,430.
+- **Adversarial denial** is mostly dead on the arithmetic. Flooring a product
+  needs capacity above its market depth, which is true only for melon. Wheat-feed
+  denial needs 825 units against a 100-slot shed; fertilizer denial raises the
+  price the opponent sells into.
+- **Robustness.** Benchmarks are almost all self-play against frozen versions. A
+  fertilized melon rusher (dump ~150 melons on day 8) or a fertilized strawberry
+  farm would both be untested opponents worth writing.
