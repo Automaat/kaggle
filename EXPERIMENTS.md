@@ -24,7 +24,8 @@ down and a weak one lifts both.
 | v10 `agents/v10_livestock.py` | Livestock working: 4 cows, care and fertilizer prioritised | 20/20, mean $48,780 |
 | v11 `agents/v11_forecast.py` | Forward supply forecast replaces trailing price drift | — |
 | v12 `agents/v12_fertilize.py` | FERTILIZE ongoing crops: strawberry and tomato yield doubles | — |
-| v16 `main.py` | Steepness-ordered sells, mixed herd, endgame tidy-ups | 20/20, mean **$53,960** |
+| v16 `agents/v16_endgame.py` | Steepness-ordered sells, mixed herd, endgame tidy-ups | 20/20, mean $53,960 |
+| v20 `main.py` | Ten bugs found by a source audit | 60/60, mean **$66,374** |
 
 v2 beats v1 20/20 ($34,914 vs $5,266). v3 beats v2 20/20 ($26,396 vs $13,810).
 v4 with the default mix is v3: 3/20 wins and matching means is what a mirror
@@ -510,3 +511,150 @@ either much larger seed counts or changes big enough to clear it.
 - **Robustness.** Benchmarks are almost all self-play against frozen versions. A
   fertilized melon rusher (dump ~150 melons on day 8) or a fertilized strawberry
   farm would both be untested opponents worth writing.
+
+
+---
+
+# Exploration round 4
+
+## First: fix the measurement
+
+Round 3 ended with effect sizes inside the noise. `tools/bench.py` now runs
+paired comparisons — both agents on the same seeds — and reports a Wilson
+interval on the win rate plus a confidence interval on the **per-seed
+difference**. That is roughly ten times more sensitive than comparing unpaired
+means, because the shared market moves both scores together.
+
+The first thing it showed: **v16 was not measurably better than v12**
+(+$834 +/- $1,334 over 60 seeds). Three of that round's four changes were noise,
+exactly as suspected.
+
+Default seed count is now 60. Anything below about $1,400 of difference is not
+resolvable at that size.
+
+## Then: a source audit found ten bugs
+
+A subagent read `main.py` and the simulator line by line looking for defects
+rather than ideas. It found real ones. Ranked by what they cost:
+
+### The entire day-29 harvest was thrown away
+Units left for the shed at `hour >= 22 - walk`, arrived at hour 22, and dropped
+**on step 718 — the last turn the interpreter runs**. The market orders for that
+turn were built from the pre-drop shed, so the goods were never sold. And
+`_tile_task` deliberately force-harvests every ripe tile once `day >= LAST_DAY`,
+so the agent pulled the whole farm into its hands and then binned it.
+
+This also explains the round-3 result that per-unit departure timing "scored
+identically across 20 seeds". It was not evidence the endgame is worthless —
+every departure time lost the load, so shuffling them changed nothing.
+
+Fixed by leaving one turn earlier. With the last-day reserves fix below:
+**+$1,033 +/- $694, significant.**
+
+### The mixed herd never ran
+`_empty_structures` and the `PLACE` picker both took the **first** entry of
+`ANIMALS` matching the structure kind, which for a pasture is always `COW`. So
+with `COW:4,SHEEP:3` the sheep were bought ($1,500), never carried, never
+placed, and never sold — `SHEEP` is not in `MARKET_PARAMS`. Meanwhile the
+pastures still reported as empty, so more cows were bought to fill them.
+
+Both now pick by the remaining herd deficit. This is why v16's "mixed herd"
+measured 13/24: it was inert.
+
+### Livestock was re-bought while in a unit's hands
+A pasture counts as empty until the animal is *placed*, `PICKUP` takes the whole
+shed stock at once, and `PLACE` puts down one per turn — so for several turns the
+agent saw a deficit with an empty shed and bought another wave. About $1,600.
+The correct count (shed plus every unit's hands) was already in scope.
+
+### Wheat and carrot were harvested one watering early
+`WATER` adds a unit inside the bonus window, and the old rule emitted `HARVEST`
+alone the moment `age >= max_yield_day` — before that day's watering. Carrot came
+in at 2 units instead of 3, wheat at 3 instead of 4. **A quarter of every wheat
+and carrot tile**, and `EXPECTED_YIELD` claimed the full figure, so the planner
+also overpriced both. Melon was unaffected: it exits on the yield cap, which is
+only reached after watering.
+
+### The planner priced strawberry and tomato at half
+`_crop_value` used the unfertilized yield while the agent deliberately fertilizes
+every ongoing crop. Strawberry was valued at `(4p - 100)/16` when it actually
+returns `(8p - 100)/16`. The supply forecast ten lines away already applied the
+2x.
+
+### `_fertilize_pays` was off by one
+A production at age `p` is computed during the refresh of day `p-1`, and a
+`FERTILIZE` at age `a` sets the flag through `a+2` — so it doubles productions at
+ages `a+1..a+3`, not `a..a+2`. The old rule fired at strawberry ages 8, 11, 14
+(three applications, one of them wasted on the final production, which it could
+not affect). The correct rule fires at 9 and 13 and still doubles all four.
+
+### The supply forecast double-counted spent tiles
+Any standing ongoing crop contributed its **full** lifetime yield regardless of
+how many productions it had already fired, for both farms. So `_scarcity` saw
+more glut than existed and flipped climbing products into the dump bucket too
+early — undercutting the v11 change that was the previous round's biggest win.
+
+### Last-day reserves were left unsold
+Feed wheat and fertilizer were still held back from the day-29 dump, and
+`_feed_orders` kept buying wheat on day 29, turning cash into unsellable stock.
+
+### Dead code and fragility
+- The whole price-history subsystem (`_drift`, `_record_prices`, `_history`,
+  `DRIFT_WINDOW`) ran every day and **nothing read it** — the forward forecast
+  replaced it in v11. Removed. `_animal_value`, `CASHOUT_HOUR` and `SHED_CAP`
+  were also dead; `CASHOUT_HOUR` was an env knob wired to nothing, so the
+  round-3 sweep of it measured literally nothing.
+- `configuration.marketParams` can override the price curves. The agent read
+  only its frozen copy, so an override would silently mis-price everything with
+  no crash and no signal. Now honoured, with a test.
+- `SHED_TILE` was hardcoded to `(4,4)` while `boardSize` is configurable down to
+  4. Now derived.
+- `_tile_task` had one `None` return in a function whose callers iterate the
+  result. The simulator swallows agent exceptions and substitutes a default
+  action for the rest of the game, so that would have been a silent total loss.
+- `BUY_PRODUCT` and `BUY_ANIMAL` are refused once the shed is full; neither
+  order path checked.
+
+### Result
+**60/60 against `starter`, mean $66,374** (v16: $53,960). Against v16:
+**+$4,991 +/- $1,463, significant**, 80% win rate. `tests/test_tables.py` now
+pins every hand-derived table — crop constants, production ages, animal rates,
+the shop table, the tick rate and the market-param override — to the simulator.
+
+## Also tried this round
+
+- **Adversarial opponents.** `KAGG_PLANNER_1` / `KAGG_MIX_1` turn the agent into
+  a specialist opponent. Against a melon monoculture, a strawberry monoculture
+  and a cow-and-strawberry farm it wins 16/16 each. Specialists are weak: a
+  strawberry monoculture scores $4,042, because strawberry needs 16 days and
+  there is no early cash.
+- **The planner counting its own pipeline.** Re-planning every turn without
+  knowing what it already has growing looks like an obvious gap. Adding it: 42%
+  win rate, not significant. Adding the opponent's too: 0/20. The per-turn
+  marginal pricing already handles it.
+- **Banning crops** to stop melon over-production: banning melon costs
+  -$992 +/- $2,609. Not significant either way.
+- **Herd size** at 4, 6, 8 and 10 cows: all inside the noise. Capital, not tiles,
+  is the limit.
+
+## Where the money actually goes
+
+`tools/revenue.py` reconstructs sales per product from the market inventory
+delta. Combined across both farms in one match:
+
+```
+product      units   revenue   avg $  peak $
+MILK           672    172510     257     289
+STRAWBERRY     431    101935     237     271
+FERTILIZER     174     14198      82     100
+WHEAT          278     12642      45      51
+CARROT         213      9798      46      57
+TOMATO         134      9391      70      81
+EGG            160      9001      56      63
+MELON          197      8303      42     272
+WOOL            29      6384     222     229
+```
+
+Milk and strawberry are the business. Melon sells 197 units at an average of $42
+against a peak of $272 — both farms dump it at the floor. Wool at 29 units was
+the inert-sheep bug.

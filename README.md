@@ -14,7 +14,7 @@ mise run install
 
 ```bash
 uv run python tools/play.py  main.py starter 42     # one match + replay JSON
-uv run python tools/bench.py main.py starter 20     # 20 seeds, win rate + spread
+uv run python tools/bench.py main.py starter 60     # paired, with confidence intervals
 uv run python tools/trace.py main.py starter 42     # per-day money and market prices
 uv run python tools/sweep.py 20                     # compare crop mixes head to head
 uv run pytest -q tests/
@@ -34,11 +34,12 @@ Built-in opponents: `pass`, `random`, `starter`. Any path to a `.py` file with a
 | `tools/sweep.py` | Crop-mix comparison |
 | `tools/param_sweep.py` | Sweeps any `KAGG_*` knob against a fixed opponent |
 | `tools/opstats.py` | Where every unit-turn goes: movement, idle, work |
+| `tools/revenue.py` | Units, revenue and average price per product |
 | `agents/` | Frozen past versions, kept as benchmark opponents |
 | `tests/` | Pins the local price model to the environment |
 | `EXPERIMENTS.md` | Every idea tried and how it scored |
 
-## Current agent (v16)
+## Current agent (v20)
 
 **Dynamic planner.** Every empty tile gets the crop with the best profit per
 tile-day, priced at the market we will actually sell into — `market_price`
@@ -66,7 +67,8 @@ one descending price curve per order index and truncation drops the tail, so a
 sale must never sit behind a hire — and the item that loses most to being second
 in line goes first.
 
-Beats `starter` 20/20 seeds (mean **$53,960** vs $3,569) and v10 20/20.
+Beats `starter` 60/60 seeds (mean **$66,374** vs $3,600) and v16 by
++$4,991 +/- $1,463.
 
 ## Sweeping mixes
 
@@ -108,8 +110,10 @@ See [EXPERIMENTS.md](EXPERIMENTS.md) for the full list. The open leads, in order
 3. Robustness. Benchmarks are nearly all self-play; a melon rusher and a
    fertilized strawberry farm are untested opponents worth writing.
 
-Note that effect sizes are now inside the noise: sd is about $11k on a mean of
-$45k, so 20 seeds resolve nothing below roughly 10%.
+`tools/bench.py` compares **paired** — both agents on the same seeds — and
+reports confidence intervals on the per-seed difference. Differences below about
+$1,400 are not resolvable at the default 60 seeds. Read the interval, not the
+mean.
 
 Land and wheat arbitrage were built or costed and rejected. Labour is **not** the
 constraint — a third of unit-turns are already idle. See
@@ -118,5 +122,5 @@ constraint — a third of unit-turns are already idle. See
 ## Submit
 
 ```bash
-uv run kaggle competitions submit kaggriculture -f main.py -m "v16 forecast + fertilizer"
+uv run kaggle competitions submit kaggriculture -f main.py -m "v20 audit fixes"
 ```
