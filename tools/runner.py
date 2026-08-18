@@ -20,6 +20,14 @@ def load_agent(name):
         from specialists import specialist
 
         return specialist(name.partition(":")[2])
+    if name.startswith("current:"):
+        from specialists import current_specialist
+
+        return current_specialist(name.partition(":")[2])
+    if name.startswith("variant:"):
+        from variants import variant
+
+        return variant(name.partition(":")[2])
     path = Path(name)
     if not path.is_absolute():
         path = ROOT / name

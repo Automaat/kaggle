@@ -37,6 +37,8 @@ def test_animal_constants_match(animal):
     # CARE banks one unit per fed day and pays out on the next production, so
     # the steady rate is (1 + interval) units every `interval` days.
     interval = env.ANIMALS[animal]["interval"]
+    assert main.ANIMALS[animal]["interval"] == interval
+    assert main.ANIMALS[animal]["max_held"] == env.ANIMALS[animal]["max_held"]
     assert main.ANIMALS[animal]["rate"] == pytest.approx((1 + interval) / interval)
 
 

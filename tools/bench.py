@@ -61,7 +61,13 @@ def summarize(candidate, opponent, results):
                   for result in results]
     wins = sum(diff > 0 for diff in game_diffs)
     ties = sum(diff == 0 for diff in game_diffs)
-    lo, hi = _binomial_ci(wins, len(game_diffs))
+    seed_points = [statistics.mean(1.0 if diff > 0 else 0.5 if diff == 0 else 0.0
+                                   for diff in (a - b for a, b in zip(result["candidate"], result["opponent"])))
+                   for result in results]
+    points = statistics.mean(seed_points) if seed_points else 0.0
+    points_margin = (1.96 * statistics.stdev(seed_points) / math.sqrt(len(seed_points))
+                     if len(seed_points) > 1 else 0.0)
+    lo, hi = max(0.0, points - points_margin), min(1.0, points + points_margin)
     margin = (1.96 * statistics.stdev(seed_diffs) / math.sqrt(len(seed_diffs))
               if len(seed_diffs) > 1 else 0.0)
     failures = sum(status != "DONE" for result in results for status in result["statuses"])
@@ -74,6 +80,7 @@ def summarize(candidate, opponent, results):
         "games": len(game_diffs),
         "wins": wins,
         "ties": ties,
+        "points": points,
         "win_lo": lo,
         "win_hi": hi,
         "mean_diff": statistics.mean(seed_diffs) if seed_diffs else 0.0,
@@ -89,7 +96,7 @@ def _print(summary):
           f'({summary["seeds"]} paired seeds {summary["seed_start"]}..{summary["seed_end"]}, '
           f'{summary["games"]} games)')
     print(f'  win rate  : {summary["wins"]}/{summary["games"]} '
-          f'({summary["wins"] / summary["games"]:.0%}, 95% CI '
+          f'(points={summary["points"]:.0%}, seed-clustered 95% CI '
           f'{summary["win_lo"]:.0%}-{summary["win_hi"]:.0%}, ties={summary["ties"]})')
     print(f'  seat-pair : {summary["mean_diff"]:>+9.0f}  +/- {summary["margin"]:.0f}   '
           f'{"SIGNIFICANT" if significant else "not significant"}')
@@ -137,7 +144,9 @@ def main():
         print("pool aggregate")
         total_games = sum(row["games"] for row in summaries)
         total_wins = sum(row["wins"] for row in summaries)
-        print(f"  win rate  : {total_wins}/{total_games} ({total_wins / total_games:.0%})")
+        total_ties = sum(row["ties"] for row in summaries)
+        points = (total_wins + 0.5 * total_ties) / total_games
+        print(f"  win rate  : {total_wins}/{total_games} (points={points:.0%}, ties={total_ties})")
         print(f"  opponents : {sum(row['mean_diff'] > 0 for row in summaries)}/{len(summaries)} positive")
 
 

@@ -27,6 +27,7 @@ down and a weak one lifts both.
 | v16 `agents/v16_endgame.py` | Steepness-ordered sells, mixed herd, endgame tidy-ups | 20/20, mean $53,960 |
 | v20 `main.py` | Ten bugs found by a source audit | 60/60, mean **$66,374** |
 | v21 `main.py` | Expected future shops + correct fertilized projection | held-out +$1,676 +/- $931 vs v20 |
+| v22 `main.py` | Carried feed + exact standing supply | fresh +$3,621 +/- $1,019 vs v21 |
 
 v2 beats v1 20/20 ($34,914 vs $5,266). v3 beats v2 20/20 ($26,396 vs $13,810).
 v4 with the default mix is v3: 3/20 wins and matching means is what a mirror
@@ -713,6 +714,87 @@ remain switchable for future tuning: `KAGG_PARTIAL_SCARCITY`,
 `KAGG_SEASONAL_PLANNER`, `KAGG_HERD_EXPERIMENT`, `KAGG_HERD_START_DAY`,
 `KAGG_HERD_BUY_PER_DAY`, `KAGG_OPPONENT_STOCK`, and
 `KAGG_DAIRY_LAND_COWS`.
+
+---
+
+# Exploration round 6
+
+The benchmark now reports ties as half-points and clusters uncertainty by seed;
+the two seat-swapped games are not treated as independent samples. Variants are
+loaded in isolated modules, preventing `KAGG_*` settings from leaking into the
+opponent. All tuning used new seed ranges starting at 200,000.
+
+## Diagnostics
+
+The working livestock pipeline changed the workload materially:
+
+```
+movement  65.0%   (was 56.1%)
+idle      13.9%   (was 28.5%)
+work      21.1%
+PICKUP      316
+FEED        104
+```
+
+Two bugs explained most of the wasted motion and cash:
+
+- Wheat picked up from the shed disappeared from the feed-purchase calculation,
+  so it was bought again while still in a unit's hands.
+- Scarcity omitted output already held on public tiles and future fertilizer
+  applications the agent itself would make.
+
+## Initial screen
+
+| Experiment | 12 paired seeds vs v21 | Decision |
+| --- | ---: | --- |
+| Count carried feed | +$3,483 +/- $2,559 | validate |
+| Exact standing supply | +$1,795 +/- $1,360 | validate |
+| Earlier fertilizer collection | +$682 +/- $1,043 | reject |
+| Future-shop factor 0.75 | +$814 +/- $1,473 | reject |
+| Drain factor 0.20 | +$430 +/- $935 | reject |
+| Integrated crop revenue | -$25 +/- $304 | reject |
+| Near-shed herd | -$11,808 +/- $3,796 | reject |
+| Ten hands | -$7,834 +/- $3,070 | reject |
+| Animal harvest batching | -$5,187 +/- $2,326 | reject |
+| Duplicate-pickup budget | -$3,391 +/- $2,720 | reject |
+
+Carried feed replicated at +$3,490 +/- $1,653 on a second range and
++$4,228 +/- $997 over 60 untouched seeds. Adding standing-supply accounting
+reached +$4,588 +/- $1,040 before a one-time-crop double-count was removed.
+After wiring the player identity into live scarcity calls, the corrected supply
+increment scored 76% points (+$1,072 +/- $830).
+
+## Herd tournament
+
+The feed fix invalidated every earlier herd sweep. Seven cows beat the old
+4-cow/3-sheep target at 71% points. Larger head-to-head results:
+
+```
+14 cows vs 10 cows   82% points   +1549 +/- 468
+14 cows vs 16 cows   97% points   +7391 +/- 1147
+```
+
+Fourteen cow slots then scored 162/168 games (96% points) across crop-only,
+strawberry-dairy, carrot, melon, land, front-runner and holder specialists.
+Only about seven animals actually reach pastures; promoting `PLACE` completed
+more of the herd but lost -$7,779 +/- $3,647. Purchase caps from 5 to 13 did not
+improve match points. A final fresh range reversed the result: 14 cow slots
+scored only 38% points against v21 while the accounting fixes with the original
+mixed herd scored 84%. The 14-slot policy was rejected as league overfitting.
+
+## Post-herd retuning
+
+With 14 slots, crop harvest batching initially gained +$1,636 +/- $1,209 but
+failed the 60-seed validation (42% points, +$361 +/- $522). Nine or ten hands,
+near-shed placement, fertilizer priority, animal batching, feed reserves of one
+or three days, and cash reserves from $200 to $800 all lost. Shed targets from
+50 through 90 were behaviorally identical.
+
+Final corrected v22 versus reconstructed v21 on seeds 2,200,000..2,200,059:
+
+```
+84% points   +3621 +/- 1019   significant score difference
+```
 
 Milk and strawberry are the business. Melon sells 197 units at an average of $42
 against a peak of $272 — both farms dump it at the floor. Wool at 29 units was

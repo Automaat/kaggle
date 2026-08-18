@@ -44,3 +44,33 @@ def test_partial_scarcity_sells_only_excess(monkeypatch):
         {"STRAWBERRY": 20}, 0,
     )
     assert orders == [["SELL", "STRAWBERRY", 10]]
+
+
+def test_carried_wheat_prevents_redundant_purchase(monkeypatch):
+    monkeypatch.setattr(main, "CARRIED_FEED", True)
+    orders = main._feed_orders(
+        herd=4, shed={"WHEAT": 4}, prices={"WHEAT": 25}, money=1_000, carried_wheat=4,
+    )
+    assert orders == []
+
+
+def test_supply_accounting_includes_stock_and_own_refertilization(monkeypatch):
+    monkeypatch.setattr(main, "SUPPLY_ACCOUNTING", True)
+    tile = {
+        "kind": "PLANT", "crop": "STRAWBERRY", "planted_day": 0,
+        "yield_units": 3, "fertilized_until_day": -1,
+    }
+    farms = [{"tiles": [[tile]]}, {"tiles": [[None]]}]
+    supply = main._supply_forecast(farms, day=10, player=0)
+    assert supply["STRAWBERRY"] == 9
+
+
+def test_crop_batching_waits_until_capacity_would_overflow(monkeypatch):
+    monkeypatch.setattr(main, "BATCH_CROP_HARVEST", True)
+    tile = {
+        "kind": "PLANT", "crop": "STRAWBERRY", "planted_day": 0,
+        "yield_units": 2, "watered_today": True, "fertilized_until_day": 12,
+    }
+    assert ("HARVEST", None) not in main._tile_task(tile, 10, None, {}, {}, {})
+    tile["yield_units"] = 4
+    assert ("HARVEST", None) in main._tile_task(tile, 12, None, {}, {}, {})

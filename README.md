@@ -39,7 +39,7 @@ Built-in opponents: `pass`, `random`, `starter`. Any path to a `.py` file with a
 | `tests/` | Pins the local price model to the environment |
 | `EXPERIMENTS.md` | Every idea tried and how it scored |
 
-## Current agent (v21)
+## Current agent (v22)
 
 **Dynamic planner.** Every empty tile gets the crop with the best profit per
 tile-day, priced at the market we will actually sell into — `market_price`
@@ -61,23 +61,32 @@ include that expected drain instead of pretending today's town lasts forever.
 8 units under the existing fertilizer policy, so every allocation advances the
 planner's projected inventory by 8 rather than the old, inconsistent 4.
 
+**Feed already in transit is inventory.** Wheat carried by a unit no longer
+looks missing to the market planner, eliminating replacement buys while the
+original wheat is walking from the shed to an animal.
+
+**Standing supply includes banked output.** The scarcity forecast counts yield
+already waiting on crop and animal tiles and assumes our ongoing crops receive
+their scheduled future fertilizer applications.
+
 **Fertilizer as an input.** An ongoing crop yields 2 instead of 1 per scheduled
 production when fertilized and watered, and one application covers three days —
 so two applications double a strawberry from 4 units to 8. Animals produce
 fertilizer free and nothing in the game drains it.
 
-**A herd of 4 cows and 3 sheep**, fed, cared for and harvested daily. `CARE`
-banks a unit per fed day and pays out on the next production, a 3x on a cow.
-Milk and wool sit on independent curves.
+**A herd of 4 cows and 3 sheep**, with feed already carried by units included
+in its reserve. Larger all-cow targets won the tuning league but failed fresh
+validation, so the mixed herd remains the default.
 
 **Sells lead the market order list, steepest curve first.** Both players share
 one descending price curve per order index and truncation drops the tail, so a
 sale must never sit behind a hire — and the item that loses most to being second
 in line goes first.
 
-Against frozen v20, the two planner fixes score +$2,176 +/- $910 on development
-seeds and +$1,676 +/- $931 on held-out seeds. The held-out regression pool wins
-229/240 games across v10, v12, v16, melon, strawberry and dairy opponents.
+Against reconstructed v21, v22 scores 84% match points and +$3,621 +/- $1,019
+over 60 fresh paired seeds. Carried-feed accounting alone replicated at
++$4,228 +/- $997; repaired supply accounting scored 76% points and
++$1,072 +/- $830 in its direct ablation.
 
 ## Sweeping mixes
 
@@ -111,9 +120,9 @@ players share one market, so the opponent's strength moves both means together.
 
 See [EXPERIMENTS.md](EXPERIMENTS.md) for the full list. The open leads, in order:
 
-1. Replace the experimental seasonal quotas with a full water-filling planner.
-2. Tune against downloaded leaderboard replays, not only synthetic specialists.
-3. Revisit the all-cow herd; it won 57% held-out but its score interval crossed 0.
+1. Tune against downloaded leaderboard replays, not only synthetic specialists.
+2. Adapt herd composition to realized shops without stranding bought animals.
+3. Model recurrent opponent replanting in the scarcity forecast.
 
 `tools/bench.py` compares **paired** — both agents on the same seeds — and
 reports confidence intervals on the per-seed difference. Differences below about

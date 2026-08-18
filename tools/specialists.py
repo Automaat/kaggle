@@ -31,6 +31,28 @@ PROFILES = {
     },
 }
 
+CURRENT_PROFILES = {
+    "dairy7": {"KAGG_HERD_EXPERIMENT": "COW:7"},
+    "crop_only": {"KAGG_HERD_EXPERIMENT": ""},
+    "strawberry_dairy": {
+        "KAGG_HERD_EXPERIMENT": "COW:8",
+        "KAGG_BAN": "MELON,CARROT,WHEAT",
+    },
+    "carrot": {
+        "KAGG_PLANNER": "fixed",
+        "KAGG_MIX": "CARROT:1",
+        "KAGG_HERD_EXPERIMENT": "",
+    },
+    "melon": {
+        "KAGG_PLANNER": "fixed",
+        "KAGG_MIX": "MELON:1",
+        "KAGG_HERD_EXPERIMENT": "",
+    },
+    "land": {"KAGG_DAIRY_LAND_COWS": "4"},
+    "front_runner": {"KAGG_ALWAYS_SELL": "1"},
+    "holder": {"KAGG_ALWAYS_HOLD": "1"},
+}
+
 
 @contextmanager
 def _environment(values):
@@ -71,4 +93,25 @@ def specialist(profile):
             return module.agent(obs)
 
     agent.__name__ = f"{profile}_specialist"
+    return agent
+
+
+def current_specialist(profile):
+    """Return a current-policy opponent with one deliberate specialization."""
+    if profile not in CURRENT_PROFILES:
+        choices = ", ".join(sorted(CURRENT_PROFILES))
+        raise ValueError(f"unknown current specialist {profile!r}; choose: {choices}")
+    values = CURRENT_PROFILES[profile]
+    module_name = f"kaggriculture_current_specialist_{profile}"
+    with _environment(values):
+        spec = importlib.util.spec_from_file_location(module_name, ROOT / "main.py")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+
+    def agent(obs):
+        with _environment(values):
+            return module.agent(obs)
+
+    agent.__name__ = f"current_{profile}_specialist"
     return agent
