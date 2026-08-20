@@ -1378,3 +1378,46 @@ On the standing twelve-animal herd, four feeder units scored +$1,668 +/- $943 on
 The shed target does not block feed buying. Raising the cap for feed purchases from 70 to the full 100 produced a byte-identical episode.
 
 `replays_kaggle/summarize.py` now tolerates a null entry in a market order list. Some ladder agents emit one, and it crashed the summariser on the forty-four episodes pulled this round.
+
+# Round 19: the melon thesis, priced properly and measured
+
+Melon looks like the worst-valued crop we grow. It appears in **no shop**, so the only drain is the town centre at one unit a day, thirty for the season. Its glut curve is `sq` at `above_target 3.60`, the steepest in the game, over a depth of three hundred shared with the opponent. Round 7 traced it from 256 to 13 by day 15; we sell ninety to a hundred and thirty a season at an average of forty-two against a peak of two hundred and seventy-two. The seed costs eighty and locks a tile for ten days while we hold under six hundred dollars through day eight.
+
+Two independent attacks, both measured, both dropped.
+
+## Replacing a crop a successor would out-earn
+
+`DIG` removes a live plant in one action, so a crashed melon can be cleared and the tile reused mid-season, when labour is not yet the binding constraint. The rule compares the standing crop's remaining earnings per day against the best alternative that fits the days it would free.
+
+Two versions were needed before the measurement meant anything:
+
+- The first compared the standing crop at **today's** price against a replacement priced at the market it would sell into, and excluded nothing. It dug freshly sown strawberries to plant strawberries — a hundred and fifty of them — and scored 23,815 against 58,390 on a single seed.
+- The second quotes both sides the same way and only counts a **different** crop whose lifespan fits the freed days.
+
+The corrected rule still fires on young strawberries rather than crashed melons, because it weighs a marginal standing tile against the *first* tile's rate for the alternative, while the planner walks that rate down the curve for every tile it allocates. Swept at thresholds 1.0, 1.2 and 1.4 against 1.6.0, the best arm confirms at **+$265 +/- $1,005**. Dropped.
+
+## A finance-shaped valuation: horizon, discount and certainty equivalent
+
+`_crop_value` is `(units * price - seed) / LIFESPAN`, which is an equivalent annual annuity at a zero discount rate — the standard way to compare projects of unequal lives, and the right family. Three things it omits, each added as its own knob:
+
+- **Finite horizon.** Over the days that remain a tile is worth the whole cycles that fit, not a rate carried on for ever. At day 14 melon fits once and leaves five idle days; carrot fits five times and leaves none.
+- **Discount rate.** A dollar on day ten buys the next animal; the same dollar on day twenty-six does not.
+- **Certainty equivalent.** Quote the sale with the rival's standing crop already on the market. Their tiles are public and `_farm_supply` returns them exactly. Melon takes the deepest cut.
+
+Against 1.6.0, first round of forty paired seeds each:
+
+| Arm | Points |
+| :--- | ---: |
+| Default | 91% |
+| Rival risk 0.5 | 90%, then 95% |
+| Horizon value | 96% in round two |
+| Discount 0.03 | 82% |
+| Rival risk 1.0 | 86% |
+| Rival risk 1.0 with discount 0.03 | 82% |
+| Discount 0.08 | 75% |
+
+The survivor, a half-weight certainty equivalent, confirms at **+$550 +/- $727**. Dropped.
+
+The pattern across both attacks is the same one round 15 found when seeding the projection with our own standing harvest: the planner's marginal pricing already does most of this work, and every more-correct valuation bolted on top lands inside the noise. The melon diagnosis is right about the crop and wrong about the lever — the loss is realised at the point of **sale**, not at the point of planting, and `_sell_orders` already holds or dumps per product on the forward supply forecast.
+
+All four knobs were removed and `main.py` reproduces 1.6.0 byte for byte.
