@@ -1262,3 +1262,38 @@ Frozen as `agents_1.0.x/v1_5_0_layout.py`, 1.5.0.
 The pool is nine opponents, most of them superseded versions that lose badly. Money against a weak field is dominated by how large the blowouts are, and the layout change trades a little of that for winning more games against a strong one. The competition scores wins.
 
 Ranking on money was adopted in round 10 for a good reason — it is the lower-variance statistic and the sign test throws information away. It is still right for tuning a knob. When money and points disagree across rounds, the head-to-head against the champion is the tiebreak, because it is the only one of the three that matches how the ladder scores.
+
+# Round 15: the second quadrant stops being a labour problem and becomes a market one
+
+With the day plan and the herd beside the shed, two quadrants were retested from the 1.5.0 baseline. One seed, side by side:
+
+```
+              day 20                     final
+50 tiles      37 plants, 0 weeds, 32,771     93,000
+75 tiles      57 plants, 5 weeds, 25,978     70,498
+```
+
+The farm now works the bigger board: fifty-seven plants standing and almost no weeds, where round 9 measured forty-eight plants and thirteen to twenty weeds. The money went the other way, and the crop counts say why. The extra tiles went to strawberry, thirty-six against twenty-three, and strawberry carries `above_target 1.60`. We stopped losing the tiles and started drowning the price.
+
+Five attempts to price that better, all against the pool with a floor of forty paired seeds:
+
+| Attempt | Points |
+| :--- | ---: |
+| Two quadrants, unchanged | 55 to 66% |
+| Charge fertilized output to the glut curve again | 60% |
+| Price the whole harvest down the curve, not the marginal unit | 57 to 60% |
+| Believe half the town drain instead of a quarter | 50% |
+| Ten to twenty-four tiles of wheat on the far quadrant | 45 to 57% |
+| Three quadrants | 32% |
+
+## Pricing a tile against our own standing harvest
+
+`_dynamic_plan` quotes each tile at the market it will sell into and walks the quote down the curve for every tile it allocates in the same pass, which is what keeps a mix mixed. It had one blind spot: the quote starts from today's market inventory and ignores the harvest already growing on our own tiles. Planting the thirty-first strawberry was priced as if the thirty already in the ground did not exist.
+
+Closing that — seeding the projection with `_farm_supply` over our own tiles — is more correct and does not pay: +$1,529 +/- $1,621 at best, interval across zero, and 59% of match points with a second quadrant. Reverted, and recorded because the reasoning is sound and the next person will think of it again.
+
+## Where this leaves the acreage question
+
+The ladder gap is real and unchanged: every strong opponent holds 75 or 100 tiles and we hold 50. What changed this round is the reason we cannot follow them. It is no longer that the far tiles rot. It is that our product mix has nowhere to put the volume, and the volume crops that would absorb it — wheat above all — are worth less per tile than the premium crops they displace, at every share tried.
+
+Two ways out, neither tested yet. Sell into more products at once, so no single curve takes the whole harvest, which means a genuinely wider mix rather than a wheat quota bolted onto the same planner. Or find the execution the ladder leaders have that lets a hundred tiles of strawberry and milk clear at a price we cannot reach.
