@@ -23,7 +23,7 @@ def _one(job):
 
     # Player 1 keeps the defaults: the variable only reaches player 0.
     os.environ["KAGG_ONLY_PLAYER"] = "0"
-    _, rewards, _ = run_match("main.py", os.environ.get("KAGG_OPPONENT", "agents/v4_animals.py"), seed=seed)
+    _, rewards, _ = run_match("main.py", os.environ.get("KAGG_OPPONENT", "agents_0.0.x/v4_animals.py"), seed=seed)
     return value, rewards
 
 
@@ -44,7 +44,7 @@ if __name__ == "__main__":
     for value, rewards in results:
         by_value.setdefault(value, []).append(rewards)
 
-    print(f"{var}   opponent: {os.environ.get("KAGG_OPPONENT", "agents/v4_animals.py")}   seeds: {n}\n")
+    print(f"{var}   opponent: {os.environ.get("KAGG_OPPONENT", "agents_0.0.x/v4_animals.py")}   seeds: {n}\n")
     rows = []
     for value, games in by_value.items():
         mine = [g[0] for g in games]

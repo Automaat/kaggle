@@ -799,3 +799,278 @@ Final corrected v22 versus reconstructed v21 on seeds 2,200,000..2,200,059:
 Milk and strawberry are the business. Melon sells 197 units at an average of $42
 against a peak of $272 — both farms dump it at the floor. Wool at 29 units was
 the inert-sheep bug.
+
+# Round 7: the first real opponent
+
+> Reconstructed on 2026-08-20. An accidental `git reset --hard` during a signing
+> check discarded the uncommitted copy of this log. Rounds 7, 7c and 7d are
+> restored verbatim from the session that wrote them; round 7b's per-variant
+> tables could not be recovered and are summarised instead.
+
+Everything before this round was self-play against our own frozen versions and hand-written specialists. On 2026-08-19 `main.py` (v22) was submitted to Kaggle for the first time. Submission 55630506 validated and played one public episode, 94619184, and **lost**: 47,160 against 49,912 for "Howey do it".
+
+## "Buying land loses" — WRONG, and the refutation is measured
+
+The rejection at the top of this log rested on one structural claim: every tile needs about one action per day whatever is on it, so four quadrants need four times the hands, and the Fibonacci hire cost makes 16 hands cost roughly $4,000 a day.
+
+The opponent ran 100 tiles on **12 hands**, which costs $376 a day.
+
+```
+hands   cost/day
+    8         54
+   10        143
+   12        376
+   16       2583
+   20       6154
+```
+
+Our own model asks for `0.34` hands per tile (`KAGG_HANDS_PER_TILE`). The opponent needed `0.12`. The difference is what sits on the tiles. Wheat is planted, watered, and harvested inside four days and needs nothing else. Geese are fed and harvested in one pass down a row. Strawberry and melon demand daily attention for ten to sixteen days.
+
+So the labour cost of land is not a property of land. It is a property of the crop mix put on it, and every land experiment in this log planted the extra quadrants with our existing high-touch mix.
+
+## The compounding test error
+
+Land was always tested alone, and hands were always tested alone.
+
+- `KAGG_LAND` from 1 to 3 lost at every count, with `MAX_HANDS` capped at 10.
+- Round 6 tested nine and ten hands on 25 tiles and lost -$7,834, because idle hands have nothing to do.
+
+Neither test could have found the winning setting. `want_hands = min(MAX_HANDS, round(tiles * HANDS_PER_TILE))` means buying land without raising `MAX_HANDS` leaves 100 tiles to 10 hands, and raising hands without buying land leaves them idle. **Land, hands and mix have to move together or all three read as losses.**
+
+## Why wheat and eggs beat strawberry and milk at scale
+
+Final prices in the lost episode:
+
+| Product | Day 0 | Day 29 |
+| --- | ---: | ---: |
+| Egg | 50 | 62 |
+| Wheat | 27 | 54 |
+| Strawberry | 128 | 279 |
+| Melon | 256 | 13 |
+| Milk | 169 | 139 |
+
+The opponent produced eggs from 25 geese for half the season and the egg price still **rose**. Egg uses `log` above `I0` at `above_target 0.20`, so it cannot be glutted; bakeries and brunch spots drain it, and there is no floor risk. Wheat doubled because both players buy it as feed while the town drains it.
+
+Our business is strawberry and milk, both `above_target 1.60`. They pay more per unit but the curve punishes volume, which is exactly why extra tiles never paid: we can only scale into products that collapse when scaled.
+
+Melon fell from 256 to 13 by day 15. We planted 18 melons in the opening; that crash is ours.
+
+Round 9 revisits this reading against 26 replays rather than one, and it does not survive: the top of the ladder sells the same premium goods we do.
+
+## What the loss actually says
+
+We lost by $2,752 with 25 tiles against 100. Per tile our engine is roughly four times better. The ceiling is the problem, not the engine.
+
+## Open
+
+1. Re-cost land with wheat and geese as the target product, not the current mix. Land, `MAX_HANDS` and mix must be swept jointly; sweeping any one alone reproduces the old wrong answer.
+2. Measure actions per tile per day by crop, instead of assuming a flat 0.34.
+3. Pull more leaderboard replays and check whether full-land wheat-and-egg is the field's dominant strategy or one player's idea.
+
+## Round 7b: land fails on a labour budget the planner does not have
+
+The round 7 replay said land works. A joint sweep of land and hands against frozen 0.22.0 said it does not, on 12 paired seeds each. Every quadrant count lost, and the diagnostic showed why: 41 of the newly unlocked tiles stood as weeds while `_land_profit` priced them as tended. The per-variant tables were lost with the uncommitted log; rounds 7c and 7d below repeat the measurement with the same conclusion.
+
+## Round 7c: a labour budget, and why land still cannot be tuned into paying
+
+Added `KAGG_LABOUR_BUDGET`. It estimates unit-turns per tile-day per crop, from actual required actions over the crop's occupancy, computes a daily capacity from the hiring ceiling, and stops the planner allocating tiles once projected tending demand passes it. When the budget is on, crops are ranked by value per unit of labour rather than value per tile-day.
+
+12 paired seeds against frozen 0.22.0:
+
+| Variant | Points | Seat-pair | Mean |
+| :--- | ---: | ---: | ---: |
+| budget, one quadrant | 67% | +576 +/- 1,282 | 55,545 |
+| budget, `LAND=1` | 0% | -16,143 +/- 3,424 | 43,852 |
+| budget, `LAND=2` | 0% | -20,344 +/- 1,979 | 37,308 |
+| budget, `LAND=3` | 0% | -22,872 +/- 2,089 | 33,110 |
+
+The budget on its own is mildly positive and unresolved: 67% points but +$576 +/- $1,282. It does not rescue land at any quadrant count or any capacity setting.
+
+### The budget was not the binding constraint
+
+A diagnostic match with the budget on and three quadrants bought: on day 11 the planner holds 50 unlocked tiles and plants 25 of them, leaving 43 empty. It is already restraining itself. Weeds still climb to 42 by day 20.
+
+The real damage is on the other side of the balance sheet:
+
+```
+day 14   land  3 cows, 4 empty pastures, $3,828
+         base  4 cows, 2 sheep,          $11,199
+day 20   land                            $2,024
+         base                            $12,033
+```
+
+The herd never completes. $7,000 of quadrants is bought with the cash that would otherwise have bought four cows and three sheep for $3,100, and milk is where the money is. We buy dirt instead of the business, and then cannot afford to work either.
+
+Round 9 found a second reason the herd never completes, and it was a bug rather than a budget.
+
+### Copying the opponent's engine directly also fails
+
+Banning the premium crops and running geese, which is what episode 94619184's winner did:
+
+| Variant | Points | Seat-pair | Mean |
+| :--- | ---: | ---: | ---: |
+| wheat and geese, one quadrant | 0% | -48,163 +/- 3,361 | 22,744 |
+| wheat and geese, `LAND=2` | 0% | -56,471 +/- 2,730 | 14,761 |
+| wheat and geese, `LAND=3`, 16 geese | 0% | -59,451 +/- 2,755 | 9,780 |
+
+The engine loses by $48,000 **before any land is bought**. This does not refute the strategy. It says our agent cannot execute it: the goose pipeline needs wheat carried from the shed to 25 animals every day, and our logistics were built for seven animals next to the shed.
+
+### Conclusion
+
+Land cannot be made to pay by tuning. Every configuration tested loses, and the two candidate causes are both structural:
+
+1. **Cash sequencing.** Land competes with the herd for the same early money, and the herd wins by a wide margin.
+2. **Animal logistics.** A 25-goose engine is a different feeding problem from a 7-animal herd, and ours does not scale to it.
+
+Both are strategy changes, which is what 1.0.0 is for. Neither is a parameter.
+
+## Round 7d: pricing the quadrant as an investment
+
+`KAGG_LAND_PAYBACK` replaces "buy as soon as affordable" with a return test. When the gate is on, a quadrant is bought only if the profit its tiles can still return before the season ends clears its own price, and only if the cash left over still covers the animals the herd is missing.
+
+The valuation, `_land_profit`, prices tile by tile on the glut curve each previous tile creates, counts only complete crop cycles that fit in the days left, and nets out seed cost. `_land_workable` caps it at the tiles the day has spare unit-turns for, charging each distant tile `KAGG_LAND_WALK` extra turns for the walk, since movement is 65% of all unit-turns.
+
+### What the valuation says
+
+```
+day  5, 25 tiles   $50,504
+day 10, 25 tiles   $27,460
+day 15, 25 tiles   $24,642
+day 18, 25 tiles   $24,642
+```
+
+Against quadrant prices of $1,000, $2,000 and $4,000, every quadrant clears its price by more than an order of magnitude. The gate fires on day 11 and buys all three in three consecutive turns.
+
+### What actually happens
+
+12 paired seeds against `champion` (frozen 0.22.0):
+
+| Variant | Points | Seat-pair | Mean |
+| :--- | ---: | ---: | ---: |
+| payback gate, margin 1 | 0% | -23,404 +/- 2,305 | 30,808 |
+| payback gate, margin 4 | 0% | -23,021 +/- 2,079 | 33,745 |
+| payback gate, margin 10 | 0% | -17,480 +/- 1,468 | 41,667 |
+| payback gate, walk 6, margin 10 | 0% | -11,866 +/- 3,139 | 45,019 |
+
+The result is monotone in how hard the gate is to pass. Every knob that makes land rarer makes the agent richer, and the best configuration is the one closest to never buying.
+
+### The gap is the finding
+
+The model predicts a quadrant returns about $27,000. Buying it costs about $23,000 in final money. That gap is not a pricing error — the price model is the same one the planner already uses to choose crops, and it wins matches with it.
+
+The gap is execution. `_land_profit` values a tile at what a *tended* tile returns. The diagnostic in round 7b showed 41 of the new tiles standing as weeds. The valuation is not wrong about what land is worth; the agent is wrong about what it can do with it.
+
+### What would change the answer
+
+1. Watering and harvesting routed as trips over clusters, not per-unit nearest-job, so a far quadrant costs one walk for five tiles instead of five walks.
+2. An opening that reaches land through a cash crop instead of out of the herd budget.
+3. Only then re-run this gate.
+
+Round 8 did the first of those and land started to pay. Round 9 tested the second and it lost.
+
+### Status: reverted
+
+`main.py` went back to the submitted 0.22.0 byte for byte. The payback gate, the labour budget and their knobs were removed rather than left as dead switches.
+
+
+# Round 8: routing, then land, from measured labour and 26 ladder replays
+
+Tooling first, then four experiments, two of which failed. Every number is paired, seat-swapped, and scored against the regression pool unless it says otherwise. `tools/bandit.py` ran the sweeps: sequential halving with a floor of 40 paired seeds per arm in round one, ranked on the paired money difference, with the survivor confirmed on a fresh block against the standing default.
+
+## What failed
+
+**A sell schedule instead of hold-or-dump.** Releasing stock at the town's daily drain, with the excess spread over the days left, scored 62% points against the pool where the default scored 91%, about -$8,700 a seed. Gating the schedule on whether the town can absorb the backlog before the season ends recovered most of it but still lost: 84% against 91%. A glutted product never recovers, so holding it only sells the same units later at a lower price. Reverted.
+
+**A denial term in the crop planner.** Pricing each tile at our revenue plus what our extra volume takes off the rival's realised price, weighted by their standing supply of that crop. It loses monotonically in the weight: 89% points at 0.5, 90% at 1, 89% at 2, against 91% for the default. Against a mirror the term is symmetric and changes nothing at all, byte-identical episodes even at weight 10. Against a varied pool it pushes the farm toward crops that are already crowded. Reverted.
+
+## What worked
+
+**Trip routing.** A unit now prefers work within two tiles over higher-priority work further away; an emergency watering still outranks the trip. Radius 2 beat radius 1 and 3 and beat a sticky-target variant, and confirmed twice on fresh seeds: +$3,901 +/- $1,837 and +$4,306 +/- $1,309. Against the frozen 0.22.0 it scored 60% points and +$1,775 +/- $557 over 200 held-out paired seeds. Movement fell from 65.0% of unit-turns to 56.8%, work rose from 20.9% to 22.0%, and idle rose from 14.1% to 21.2%. Frozen as `agents_0.0.x/v0_23_0_trips.py`, 0.23.0.
+
+**Land, on the third attempt, once the labour number was measured.** `tools/labour.py` attributes every work action to the tile the unit stands on and divides by the days that tile was occupied:
+
+```
+occupant      ops/tile-day   hands/tile
+COW                   3.22        0.134
+SHEEP                 2.94        0.123
+STRAWBERRY            1.37        0.057
+MELON                 1.20        0.050
+WHEAT                 1.50        0.062
+```
+
+`KAGG_HANDS_PER_TILE` was 0.34 for every tile. Crops need a sixth of that and animals about a third. That single wrong constant is what killed every earlier land test: `want_hands = min(MAX_HANDS, round(tiles * HANDS_PER_TILE))` asked for 17 hands on 50 tiles, and the Fibonacci hire cost makes that unaffordable, so the farm bought dirt it could not staff.
+
+With the measured figure the joint sweep of land, hands and herd finally clears: one quadrant, `HANDS_PER_TILE` 0.2, 12 hands and a herd of 6 cows and 4 sheep confirmed at +$5,614 +/- $2,208 on 80 fresh paired seeds. Against 0.23.0 it scores 72% points and +$5,037 +/- $1,062 over 200 held-out seeds; against the submitted 0.22.0, 80% points and +$6,698 +/- $1,365 over 100 seeds. A second bought quadrant still loses at every hand count tried. Frozen as `agents_1.0.x/v1_0_0_land.py`, 1.0.0.
+
+## What the ladder replays say
+
+`replays_kaggle/` downloads, summarises and reads real episodes. Twenty-six of them, gzipped to about 0.4 MB each:
+
+```
+player                money  tiles  hands  weeds  top sales
+ning gu              145025     75     14      2  melon 144, milk 237, strawberry 313
+Toni Blanco          125048     75     13      0  egg 31, melon 60, milk 200
+CompilingCoder        99602    100     13      1  carrot 32, melon 108, milk 159
+Marcin Skalski        75880     25      8      7  melon 110, milk 118, strawberry 84
+```
+
+This refutes the conclusion round 7 drew from a single episode. The field does not run wheat and eggs: the top of this sample sells melon, milk and strawberry, the same premium goods we sell. What separates them is scale, 50 to 100 tiles against our 25 and 12 to 14 hands against our 8, and tending, with zero to two weed tiles where we carry three to eight on a quarter of the board.
+
+Banning melon, which is what copying the round 7 winner implies, scored 15% points and -$33,366 in the joint sweep. The engine is not the problem; the acreage was.
+
+## Discipline note
+
+A herd of 6 cows and 6 sheep won all three halving rounds at 94%, 98% and 94% points, then failed its confirmation at -$874 +/- $3,170 and was dropped. That is the same league-overfitting failure the herd tournament produced in round 6, and this time the abort rule caught it before it shipped.
+
+# Round 9: why a second bought quadrant still loses, and the herd bug it uncovered
+
+Question from the replays: every strong player on the ladder buys land, most of them two quadrants, so what are we doing wrong at 75 tiles? One real bug came out of it, and five candidate fixes died.
+
+## The bug: bought livestock that was never put down
+
+A diagnostic on the day-by-day state showed 1 cow and 4 sheep sitting in unit inventories from day 12 to the end of the season, with five empty structures standing next to them and $34,000 in the bank. Units picked the animals up every morning, carried them all day, and dropped them back in the shed at nightfall.
+
+`PLACE` sat at priority 7, below watering, harvesting and fertilizer collection, so a carrying unit always found something else to do first. `_animal_orders` then counted the carried animals as held stock and refused to buy replacements, so the herd froze at five of the ten it wanted.
+
+`KAGG_PLACE_PRIORITY` already existed and had been rejected in round 6 at -$7,779. Under 1.0.0 it is worth **+$3,408 +/- $2,099** on 80 fresh paired seeds, 97% match points against 91%. What changed is the board: with a quadrant of land and a measured labour cost, a completed herd has somewhere to live and something to eat. The herd now reaches ten animals by day 24 instead of stalling at five.
+
+Against the frozen 1.0.0 the fix scores 78% points and +$5,456 +/- $809 over 200 held-out paired seeds. Against the submitted 0.22.0, 88% points and +$11,283 +/- $1,606. Frozen as `agents_1.0.x/v1_1_0_herd.py`, 1.1.0.
+
+## Why a second bought quadrant still loses
+
+At 75 tiles the farm rots. Measured on the same seed, one bought quadrant against two:
+
+```
+              plants  animals  weeds  money day 16   final
+one quadrant      32       10      5        $7,687  83,626
+two quadrants     48       10     13        $1,851  70,599
+```
+
+Weeds are not overgrown empty tiles. Tracing every tile transition, 99 of the 127 weeds at two quadrants came from **plants dying of thirst**, against 45 of 53 at one. Death rates per tile-day: 3.1% in the home quadrant, 8.4% and 8.0% in the two bought ones. The leak is small and constant, one to seven plants a day going unwatered at nightfall, and it compounds, because a dead plant costs the crop, a `DIG`, and a replant.
+
+## Five fixes that did not work
+
+| Fix | Result |
+| :--- | :--- |
+| Water only when it pays yield, alternating days otherwise | Deaths unchanged, and a third of all plant-turns sit one dry day from death |
+| One quadrant per unit per turn, weighted by the work in it | 32% points at two quadrants; re-assignment thrashes |
+| Raise the hiring ceiling | 60% at 14 hands, 44% at 16. Hire cost is Fibonacci: 12 hands cost $376 a day, 14 cost $986 |
+| Buy land earlier by cutting the seed reserve | No effect at all, at any reserve from $10 to $80 a tile |
+| Open with wheat or carrot for early cash | Loses monotonically: 92% at six tiles, 88% at ten, 54% at fifteen with two quadrants |
+
+The hiring result explains the fourth: the reserve never binds, because until the first melon harvest on day 10 the farm simply has no money. The fifth says the melon those tiles would have grown is worth more than the land they would have bought sooner.
+
+## Geese, retested now that placement works
+
+Round 7c's goose experiment ran with the placement bug in force, so the geese were bought and never put down. Retested with the fix: 72% points at four geese, 44% at eight beside eight cows, 32% at eight geese. The engine is not held back by placement alone.
+
+## What the ladder actually does at 75 tiles
+
+```
+ning gu      145,025   75 tiles   61 plants   14 animals   0 weeds   str42 mel12 whe7
+Toni Blanco  125,048   75 tiles   64 plants   11 animals   0 weeds   whe35 str28
+Hongjie04     78,031   75 tiles   72 plants    3 animals   0 weeds   str48 mel16 tom7
+chizhu        87,469   50 tiles   37 plants   13 animals   0 weeds   whe29 mel8
+```
+
+Zero weeds, all season, on a board twice ours. They buy the first quadrant between day 4 and day 10 and the second by day 11 to 13, each time spending down to a few hundred dollars, and they run 12 to 14 hands. The gap is not the crop mix and not the hiring ceiling; it is that they can keep 60 to 70 plants watered and we cannot. Until a unit's day is planned as a route rather than as a sequence of nearest jobs, the second bought quadrant stays a loss.

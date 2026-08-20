@@ -8,3 +8,6 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Kaggle replay downloads
+replays_kaggle/episodes/

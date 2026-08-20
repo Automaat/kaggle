@@ -2,7 +2,7 @@
 
 Examples:
   uv run python tools/bench.py main.py starter 60
-  uv run python tools/bench.py main.py --pool agents/v10_livestock.py,specialist:melon --seeds 100 --held-out
+  uv run python tools/bench.py main.py --pool agents_0.0.x/v10_livestock.py,specialist:melon --seeds 100 --held-out
   uv run python tools/bench.py main.py --pool default --seed-start 20000 --seeds 200
 """
 
@@ -19,9 +19,9 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from runner import run_match
 
 DEFAULT_POOL = (
-    "agents/v10_livestock.py",
-    "agents/v12_fertilize.py",
-    "agents/v16_endgame.py",
+    "agents_0.0.x/v10_livestock.py",
+    "agents_0.0.x/v12_fertilize.py",
+    "agents_0.0.x/v16_endgame.py",
     "specialist:melon",
     "specialist:strawberry",
     "specialist:dairy",

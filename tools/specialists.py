@@ -73,7 +73,7 @@ def _load(profile):
     with _environment(PROFILES[profile]):
         # Frozen v20 prevents candidate-only experiment flags from leaking into
         # the benchmark opponent through the shared process environment.
-        spec = importlib.util.spec_from_file_location(module_name, ROOT / "agents/v20_audit.py")
+        spec = importlib.util.spec_from_file_location(module_name, ROOT / "agents_0.0.x/v20_audit.py")
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
         spec.loader.exec_module(module)

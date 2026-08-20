@@ -37,7 +37,7 @@ def _planner(player):
 # Herd composition, as animal:count. Milk, wool and egg sit on independent price
 # curves, so a mixed herd saturates three of them instead of glutting one.
 HERD_SPEC = os.environ.get(
-    "KAGG_HERD_EXPERIMENT", os.environ.get("KAGG_HERD_SPEC", "COW:4,SHEEP:3")
+    "KAGG_HERD_EXPERIMENT", os.environ.get("KAGG_HERD_SPEC", "COW:6,SHEEP:4")
 )
 
 SHOPS = {
@@ -87,7 +87,7 @@ FEEDER_UNITS = int(os.environ.get("KAGG_FEEDER_UNITS", "0"))
 CARE_BEFORE_WATER = _enabled("KAGG_CARE_BEFORE_WATER")
 COLLECT_BEFORE_HARVEST = _enabled("KAGG_COLLECT_BEFORE_HARVEST")
 SUPPLY_ACCOUNTING = _enabled("KAGG_SUPPLY_ACCOUNTING", True)
-PLACE_PRIORITY = _enabled("KAGG_PLACE_PRIORITY")
+PLACE_PRIORITY = _enabled("KAGG_PLACE_PRIORITY", True)
 PICKUP_BUDGET = _enabled("KAGG_PICKUP_BUDGET")
 CARRIED_FEED = _enabled("KAGG_CARRIED_FEED", True)
 BATCH_CROP_HARVEST = _enabled("KAGG_BATCH_CROP_HARVEST")
@@ -97,6 +97,9 @@ MELON_TILE_CAP = int(os.environ.get("KAGG_MELON_TILE_CAP", "0"))
 ALWAYS_SELL = _enabled("KAGG_ALWAYS_SELL")
 ALWAYS_HOLD = _enabled("KAGG_ALWAYS_HOLD")
 ANIMAL_BUY_CAP = int(os.environ.get("KAGG_ANIMAL_BUY_CAP", "0"))
+TRIP_RADIUS = int(os.environ.get("KAGG_TRIP_RADIUS", "2"))
+ROUTE_STICKY = _enabled("KAGG_ROUTE_STICKY")
+DIG_PRIORITY = int(os.environ.get("KAGG_DIG_PRIORITY", "9"))
 
 # Mirrors MARKET_PARAMS in the environment: price(inv) = base +- amp * f(|inv - I0|).
 MARKET_PARAMS = {
@@ -117,10 +120,10 @@ HINGE_GAIN = 8.0
 # Tile mix, as weights over the tile list. Overridable for sweeps.
 DEFAULT_MIX = "MELON:5,STRAWBERRY:3,CARROT:1"
 LAND_PRICES = [1000, 2000, 4000]  # NE, SW, SE, in unlock order.
-MAX_QUADRANTS = int(os.environ.get("KAGG_LAND", "0"))  # Extra quadrants to unlock.
+MAX_QUADRANTS = int(os.environ.get("KAGG_LAND", "1"))  # Extra quadrants to unlock.
 SEED_RESERVE = 80  # Cash per empty tile kept back so a land buy cannot starve planting.
-HANDS_PER_TILE = float(os.environ.get("KAGG_HANDS_PER_TILE", "0.34"))
-MAX_HANDS = int(os.environ.get("KAGG_MAX_HANDS", "10"))
+HANDS_PER_TILE = float(os.environ.get("KAGG_HANDS_PER_TILE", "0.2"))
+MAX_HANDS = int(os.environ.get("KAGG_MAX_HANDS", "12"))
 HIRES_PER_TURN = 3  # Only 10 market orders clear per turn; leave room to sell and sow.
 HIRE_HOURS = 4
 MAX_ORDERS = 10
@@ -150,6 +153,7 @@ def _shape(func, x, t):
 _market_params = None  # Episode overrides, if the configuration supplies any.
 _race_active = False
 _opponent_state = {}
+_routes = {}
 
 
 def _town_consumption(step, shops):
@@ -258,8 +262,8 @@ def market_price(item, inventory, params=None):
     return max(PRICE_FLOOR, round(base + sign * amp * _shape(func, x, t)))
 
 
-def _supply_forecast(farms, day, player=None):
-    """Units of each product both farms will still put on the market this season.
+def _farm_supply(farm, farm_index, day, player=None):
+    """Units of each product one farm will still put on the market this season.
 
     Every tile of both farms is public, and `CROPS`/`ANIMALS` are fixed, so this
     is a hard ceiling on remaining supply rather than an estimate. Compared
@@ -268,45 +272,53 @@ def _supply_forecast(farms, day, player=None):
     """
     days_left = max(0, LAST_DAY - day)
     supply = {}
-    for farm_index, farm in enumerate(farms):
-        for row in farm["tiles"]:
-            for tile in row:
-                if not isinstance(tile, dict):
+    for row in farm["tiles"]:
+        for tile in row:
+            if not isinstance(tile, dict):
+                continue
+            if "animal" in tile:
+                data = ANIMALS[tile["animal"]]
+                if SUPPLY_ACCOUNTING:
+                    supply[data["product"]] = supply.get(data["product"], 0) + tile.get("yield_units", 0)
+                productive = min(days_left, days_left - max(0, data["first_yield_day"] - (day - tile["placed_day"])))
+                product = data["product"]
+                supply[product] = supply.get(product, 0) + max(0, data["rate"] * productive)
+                supply["FERTILIZER"] = supply.get("FERTILIZER", 0) + days_left
+            elif tile.get("kind") == "PLANT":
+                crop = tile["crop"]
+                if crop not in EXPECTED_YIELD:
                     continue
-                if "animal" in tile:
-                    data = ANIMALS[tile["animal"]]
-                    if SUPPLY_ACCOUNTING:
-                        supply[data["product"]] = supply.get(data["product"], 0) + tile.get("yield_units", 0)
-                    productive = min(days_left, days_left - max(0, data["first_yield_day"] - (day - tile["placed_day"])))
-                    product = data["product"]
-                    supply[product] = supply.get(product, 0) + max(0, data["rate"] * productive)
-                    supply["FERTILIZER"] = supply.get("FERTILIZER", 0) + days_left
-                elif tile.get("kind") == "PLANT":
-                    crop = tile["crop"]
-                    if crop not in EXPECTED_YIELD:
-                        continue
-                    age = day - tile["planted_day"]
-                    remaining = LIFESPAN[crop] - age
-                    if (SUPPLY_ACCOUNTING and crop in PRODUCTION_AGES
-                            and tile.get("yield_units", 0) > 0):
-                        supply[crop] = supply.get(crop, 0) + tile["yield_units"]
-                    if remaining <= days_left or (SUPPLY_ACCOUNTING and crop in PRODUCTION_AGES):
-                        # A fertilized ongoing crop yields 2 per production, not
-                        # 1, and the flag is public on every opponent tile.
-                        fertilized = (tile.get("fertilized_until_day", -1) >= day
-                                      or (SUPPLY_ACCOUNTING and farm_index == player
-                                          and crop in PRODUCTION_AGES))
-                        if crop in PRODUCTION_AGES:
-                            # A tile that has already fired most of its
-                            # productions has little supply left to contribute.
-                            left = sum(
-                                1 for p in PRODUCTION_AGES[crop]
-                                if p > age and (not SUPPLY_ACCOUNTING or p - age <= days_left)
-                            )
-                        else:
-                            left = EXPECTED_YIELD[crop]
-                        supply[crop] = supply.get(crop, 0) + left * (2 if fertilized else 1)
+                age = day - tile["planted_day"]
+                remaining = LIFESPAN[crop] - age
+                if (SUPPLY_ACCOUNTING and crop in PRODUCTION_AGES
+                        and tile.get("yield_units", 0) > 0):
+                    supply[crop] = supply.get(crop, 0) + tile["yield_units"]
+                if remaining <= days_left or (SUPPLY_ACCOUNTING and crop in PRODUCTION_AGES):
+                    # A fertilized ongoing crop yields 2 per production, not
+                    # 1, and the flag is public on every opponent tile.
+                    fertilized = (tile.get("fertilized_until_day", -1) >= day
+                                  or (SUPPLY_ACCOUNTING and farm_index == player
+                                      and crop in PRODUCTION_AGES))
+                    if crop in PRODUCTION_AGES:
+                        # A tile that has already fired most of its
+                        # productions has little supply left to contribute.
+                        left = sum(
+                            1 for p in PRODUCTION_AGES[crop]
+                            if p > age and (not SUPPLY_ACCOUNTING or p - age <= days_left)
+                        )
+                    else:
+                        left = EXPECTED_YIELD[crop]
+                    supply[crop] = supply.get(crop, 0) + left * (2 if fertilized else 1)
     return supply
+
+
+def _supply_forecast(farms, day, player=None):
+    """Both farms' remaining supply, summed the way the shared curve sees it."""
+    total = {}
+    for farm_index, farm in enumerate(farms):
+        for product, units in _farm_supply(farm, farm_index, day, player).items():
+            total[product] = total.get(product, 0) + units
+    return total
 
 
 def _expected_shop_daily_drain():
@@ -515,10 +527,11 @@ def _crop_value(crop, projected_inv, day):
     """
     # Ongoing crops get fertilized, which doubles every scheduled production.
     units = EXPECTED_YIELD[crop] * (2 if crop in PRODUCTION_AGES else 1)
+    inventory = projected_inv.get(crop, MARKET_I0)
     if INTEGRATED_CROP_VALUE:
-        revenue = _sale_revenue(crop, projected_inv.get(crop, MARKET_I0), units)
+        revenue = _sale_revenue(crop, inventory, units)
         return (revenue - CROPS[crop]["seed"]) / LIFESPAN[crop]
-    price = market_price(crop, projected_inv.get(crop, MARKET_I0) + units)
+    price = market_price(crop, inventory + units)
     return (units * price - CROPS[crop]["seed"]) / LIFESPAN[crop]
 
 
@@ -887,7 +900,7 @@ def _priority(task):
     priorities = {
         "WATER!": 0, "FEED!": 0, "FEED": 1, "WATER": 2, "CARE": 3,
         "FERTILIZE": 4, "HARVEST": 5, "COLLECT_FERTILIZER": 6, "PLACE": 7,
-        "PLANT": 8, "BUILD": 8, "DIG": 9,
+        "PLANT": 8, "BUILD": 8, "DIG": DIG_PRIORITY,
     }
     if PLACE_PRIORITY:
         priorities["PLACE"] = 1
@@ -910,6 +923,28 @@ def _step_toward(src, dst):
     if sy > dy:
         return ["NORTH"]
     return None
+
+
+def _route_targets(player, step):
+    """Per unit, the tile it was walking to last turn, cleared between episodes."""
+    state = _routes.get(player)
+    if state is None or step <= state["step"]:
+        state = {"step": step, "targets": {}}
+        _routes[player] = state
+    state["step"] = step
+    return state["targets"]
+
+
+def _task_key(prio, dist):
+    """Nearby work before distant work, but never before a dying plant.
+
+    Movement is most of every unit-turn, so a unit that walks past a tile it
+    could have watered pays the walk twice. Priority still wins inside a trip,
+    and an emergency still outranks the trip itself.
+    """
+    if prio == 0:
+        return (0, prio, dist)
+    return (1 if TRIP_RADIUS > 0 and dist <= TRIP_RADIUS else 2, prio, dist)
 
 
 def _act(task, item):
@@ -1107,6 +1142,7 @@ def agent(obs):
 
     ops = []
     taken = set()
+    targets = _route_targets(player, obs.get("step", day * 24 + hour))
     for idx, pos in enumerate(units):
         carried = dict(inventories[idx]) if idx < len(inventories) else {}
         if _must_leave(pos):
@@ -1136,14 +1172,18 @@ def agent(obs):
             if i in taken or not _can_do(task, item, carried):
                 continue
             dist = abs(pos[0] - x) + abs(pos[1] - y)
-            key = (prio, dist)
+            key = _task_key(prio, dist)
+            if ROUTE_STICKY and targets.get(idx) == (x, y) and prio > 0:
+                key = (key[0], -1, dist)
             if best is None or key < best:
                 best, chosen = key, i
         if chosen is None:
+            targets.pop(idx, None)
             ops.append(["PASS"])
             continue
         taken.add(chosen)
         _, x, y, (task, crop) = tasks[chosen]
+        targets[idx] = (x, y)
         ops.append(_step_toward(pos, (x, y)) or _act(task, crop))
 
     market_orders = orders[:MAX_ORDERS]

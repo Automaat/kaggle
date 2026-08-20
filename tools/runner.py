@@ -8,12 +8,15 @@ from kaggle_environments import make
 
 ROOT = Path(__file__).resolve().parent.parent
 BUILTIN = {"pass", "random", "starter"}
+CHAMPION = "agents_1.0.x/v1_1_0_herd.py"
 
 
 def load_agent(name):
     """Resolve a builtin agent name, a callable, or a python file exposing `agent`."""
     if callable(name):
         return name
+    if name == "champion":
+        name = CHAMPION
     if name in BUILTIN:
         return name
     if name.startswith("specialist:"):
