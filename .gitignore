@@ -2,3 +2,5 @@ __pycache__/
 *.py[oc]
 .venv/
 .DS_Store
+
+.claude/worktrees/
