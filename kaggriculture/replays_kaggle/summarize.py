@@ -56,7 +56,7 @@ def _sales(step):
     for seat, seat_step in enumerate(step):
         action = seat_step.get("action") or {}
         for order in (action.get("market") or [])[:MAX_ORDERS]:
-            if len(order) >= 3 and order[0] == "SELL":
+            if isinstance(order, (list, tuple)) and len(order) >= 3 and order[0] == "SELL":
                 sold[seat][order[1]] = sold[seat].get(order[1], 0) + order[2]
     return sold
 

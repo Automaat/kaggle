@@ -1327,3 +1327,54 @@ The strongest opponent on the ladder is not selling cleverly. Reading episode 95
 ## Leftovers swept
 
 Against the 1.5.0 baseline: the melon race scored 79% at either threshold, selling in lots of twelve 78 to 85%, and holding everything until liquidation 12%, all against 90 to 94% for the default. The melon race, unresolved since round 6, is now resolved: it loses.
+
+# Round 17: an equal-acreage loss, and why we cannot copy the herd that caused it
+
+1.5.0 rates 744.5, the best so far, ahead of 1.3.0 at 719.1 and 0.22.0 at 648.4, and takes 15 wins in 28 ladder games with a mean of 75,235 against 71,372.
+
+Most losses still come from opponents holding 75 or 100 tiles. Episode 95267217 does not, and that makes it the useful one: Thái Phạm Công won 119,496 to 82,996 on **fifty tiles each**. The difference was the split between crops and animals.
+
+```
+day 16          us      them
+plants          36        34
+animals         12        16
+day 24 plants   37        26
+day 24 animals  12        17
+sold fertilizer 103       256
+sold milk       136       209
+sold wool        67       168
+```
+
+They gave tiles to animals as the season went on; we kept planting. Fertilizer is free and nothing drains it, so a bigger herd is a larger free income, and milk and wool sit on curves our volume never reaches.
+
+## Copying the herd size fails, and the reason is delivery
+
+Head to head against 1.5.0 over 60 paired seeds:
+
+```
+nine cows, seven sheep              -8,087 +/- 1,857
+nine cows, seven sheep, two geese  -19,906 +/- 2,323
+eleven cows, nine sheep            -12,888 +/- 1,884
+```
+
+The day-by-day trace says why. With sixteen animals the wheat store runs to 2, 3 and then 0 from day 24, and nine or ten animals go unfed with eleven to sixteen missing their `CARE`. None starve — they simply stop producing for the rest of the season.
+
+The feed logic is what starves them. `_feed_orders` targets `herd * FEED_DAYS` and `CARRIED_FEED` counts wheat already in unit inventories toward that target. With twelve units each holding two or three wheat, the accounting reads about thirty units in stock against a target of thirty-two, so the agent buys two at a time while the wheat never reaches the animals. The stock is real; the delivery is not.
+
+Three fixes, all measured head to head:
+
+| Fix, with sixteen animals | Result |
+| :--- | ---: |
+| Stop counting carried wheat as stock | -$14,000 area, worse |
+| Four days of feed reserve instead of two | worse still |
+| Four dedicated feeder units | -$91 +/- $2,799, parity |
+
+Dedicated feeders close almost the whole eight-thousand-dollar gap, which confirms the diagnosis, and still do not make the bigger herd worth having.
+
+On the standing twelve-animal herd, four feeder units scored +$1,668 +/- $943 on one hundred seeds and +$1,065 +/- $1,069 on a fresh block. The interval crosses zero on the confirmation, so under the acceptance rule it is dropped rather than kept.
+
+## Two more angles closed
+
+The shed target does not block feed buying. Raising the cap for feed purchases from 70 to the full 100 produced a byte-identical episode.
+
+`replays_kaggle/summarize.py` now tolerates a null entry in a market order list. Some ladder agents emit one, and it crashed the summariser on the forty-four episodes pulled this round.
