@@ -3,6 +3,7 @@
 import copy
 import math
 import os
+from collections import Counter
 
 CROPS = {
     "WHEAT": {"seed": 10, "first_yield_day": 2, "max_yield_day": 4, "max_yield": 6, "ongoing": False},
