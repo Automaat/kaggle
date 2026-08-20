@@ -1074,3 +1074,69 @@ chizhu        87,469   50 tiles   37 plants   13 animals   0 weeds   whe29 mel8
 ```
 
 Zero weeds, all season, on a board twice ours. They buy the first quadrant between day 4 and day 10 and the second by day 11 to 13, each time spending down to a few hundred dollars, and they run 12 to 14 hands. The gap is not the crop mix and not the hiring ceiling; it is that they can keep 60 to 70 plants watered and we cannot. Until a unit's day is planned as a route rather than as a sequence of nearest jobs, the second bought quadrant stays a loss.
+
+# Round 10: one experiment per idea, then the mixture
+
+Eight single-idea sweeps under the 1.1.0 baseline, each a separate `tools/bandit.py` run with a floor of 40 paired seeds per arm and the survivor confirmed on a fresh block. The baseline was held fixed across all eight so the ideas stay comparable, and only then were the winners mixed.
+
+| Idea | Result |
+| :--- | :--- |
+| Selling: exact sell order, partial scarcity, sell lots | Default wins. Exact sell order is a near no-op, the other two lose |
+| Liquidation and cash floor | **`KAGG_LIQ_DAYS=6` confirmed, +$2,644 +/- $811** |
+| Forecast factors: drain, future shops | Best arm failed confirmation at +$1,800 +/- $2,201 |
+| Planner: integrated value, seasonal quotas, melon cap, projection | **`KAGG_EFFECTIVE_PROJECTION=0` confirmed, +$4,791 +/- $2,039** |
+| Logistics: pickup budget, feeder units, feed days, shed target | Best arm failed confirmation at -$1,111 +/- $2,195 |
+| Batching and ordering | **`KAGG_CARE_BEFORE_WATER=1` confirmed, +$2,652 +/- $2,080** |
+| Melon race and opponent stock | **`KAGG_OPPONENT_STOCK=1` confirmed, +$4,533 +/- $1,559** |
+| Hands: more hands, higher hiring ceiling | Default wins. 0.28 hands per tile with a 14-hand ceiling scores 79% |
+
+The projection result is worth naming: charging fertilized output to the glut curve was a 0.22.0 improvement, and on a bigger board it now costs money. A parameter that paid on 25 tiles does not have to pay on 50.
+
+## The mixture
+
+Seven combinations of the four winners, halving down over 120 paired seeds and confirmed on 100 fresh ones:
+
+```
+LIQ_DAYS=6 + EFFECTIVE_PROJECTION=0 + OPPONENT_STOCK=1   +9,685 +/- 1,843   CONFIRMED
+```
+
+The three compose almost additively, +$9,685 against a sum of individual effects of about $11,900. `CARE_BEFORE_WATER` drops out: every mixture containing it scored below the same mixture without it.
+
+Against 1.1.0 the mixture takes 80% and 82% of match points on two independent 100-seed blocks, at +$7,039 +/- $1,655 and +$7,738 +/- $1,593. On the regression pool it is positive against all eight opponents at 97% of match points. Frozen as `agents_1.0.x/v1_2_0_market.py`, 1.2.0.
+
+## Two measurement repairs
+
+The incident that cost this repository its uncommitted work also reverted `tools/bench.py` to an older regression pool: three superseded agents and three specialists, with neither the champion nor `v20_audit` in it. Every sweep in this round ran against that weaker pool, which is why match points saturate near 100% in the tables above. The pool now carries the champion, the earlier 1.x versions, the submitted 0.22.0, `v20_audit`, `v16_endgame` and the three specialists.
+
+A first reading of the mixture against the champion reported +$77,553 with 400 wins in 400 games. It does not reproduce: two fresh 100-seed blocks give +$7,039 and +$7,738. The number was an artifact and is recorded here so it is not quoted later.
+
+# Round 11: five shots at the tending gap, all missed
+
+The ladder had just priced the problem, so this round aimed at it directly. Seventeen episodes of 1.1.0 gave 9 wins and 8 losses, and the day-20 picture separates them cleanly:
+
+```
+              day 20        wins            losses
+   our plants               34.3            32.5
+   their plants             26.7            40.9
+   our weeds                 3.8             4.9
+   their weeds               4.2             1.1
+   our money              19,495          18,071
+   their money            13,952          23,994
+   their tiles              66.7            62.5
+```
+
+We beat the players who buy a bigger board and leave it half empty, and we lose to the ones who turn 62 tiles into 41 plants. Our own 50 tiles carry 33. So the target is productive tiles, not acreage, and not weeds on their own: mid-season weed counts are close, 4.3 against 2.8. The season-peak counts that look alarming, 14 against 13, are mostly the last three days when both sides stop tending.
+
+Five experiments against the 1.2.0 baseline, each its own sweep, floor of 40 paired seeds, survivor confirmed on a fresh block:
+
+| Idea | Result |
+| :--- | :--- |
+| Water the tiles where water buys yield first, ordinary survival watering after | Default wins the sweep outright |
+| Cap planted tiles at 30, 34, 38 or 42 so the day can cover them | Best arm confirmed at +$462 +/- $1,550, dropped |
+| Dig weeds sooner: priority 5, 6 or 7 instead of last | Best arm confirmed at +$1,247 +/- $2,045, dropped |
+| Cap melon tiles at 8, 12 or 16 | Best arm confirmed at -$149 +/- $1,435, dropped |
+| Plant sooner (priority 6 or 4) or free tiles by shrinking the herd | Best arm confirmed at -$178 +/- $2,251, dropped |
+
+Nothing shipped. All four knobs were removed again and the default reproduces byte for byte.
+
+The read: the knob-level tending ideas are exhausted. Watering earlier, digging earlier, planting earlier and planting less all fail because they move work between tiles without creating any, and the day is already full, with 57% of unit-turns spent on movement. The next real gain has to come from the structural change the 1.0.x plan has carried since the start: a unit's day planned as a route over a cluster, which creates tending capacity rather than reshuffling it.

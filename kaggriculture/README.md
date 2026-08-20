@@ -53,7 +53,7 @@ Agents follow semantic versioning. `0.N.0` is the historical line: one minor per
 
 A **major** bump means the strategy itself changed, not that it was tuned. 1.0.0 is the first such change: the farm buys a quadrant, staffs it with 12 hands and runs a larger herd, which no amount of tuning had ever made pay. It comes from measuring the labour cost of a tile and from 26 real ladder replays, not from another self-play sweep.
 
-## Current agent (1.1.0)
+## Current agent (1.2.0)
 
 **A second quadrant of board, staffed.** One extra quadrant is bought, hands are capped at 12, and the herd is 6 cows and 4 sheep. Land had lost every previous test because `KAGG_HANDS_PER_TILE` was 0.34 for every tile: on 50 tiles that asks for 17 hands, which the Fibonacci hire cost makes unaffordable, so the farm bought dirt it could not staff. `tools/labour.py` measured the real figure — 1.2 to 1.5 work ops per tile-day for crops, about 3 for animals, so 0.05 to 0.13 hands per tile. At 0.2 the joint sweep of land, hands and herd clears by +$5,614 +/- $2,208 on fresh paired seeds.
 
@@ -61,9 +61,13 @@ A **major** bump means the strategy itself changed, not that it was tuned. 1.0.0
 
 **Livestock placement outranks tending.** `PLACE` sat below watering, so units picked animals up every morning, carried them all day and never put them down, while `_animal_orders` counted the carried animals as stock and stopped buying. The herd froze at five of the ten it wanted. Placement first takes it to ten by day 24, worth +$3,408 +/- $2,099. The same switch lost $7,779 in round 6, before there was land to put a herd on.
 
+**Opponent-aware selling and a longer unwind.** The hidden-shed estimator is on, so a product the rival is sitting on gets sold before they dump it; liquidation starts six days out instead of four; and fertilized output is no longer charged to the glut curve, a 0.22.0 rule that paid on 25 tiles and costs money on 50. Together +$9,685 +/- $1,843 on fresh paired seeds, and 80% of match points against 1.1.0.
+
 **Everything else is 0.22.0**, unchanged: dynamic planner priced on the glut curve, forward supply forecast, future shops priced before they unlock, fertilizer as an input, carried feed counted as inventory, sells leading the order list steepest-curve first.
 
-Against 0.22.0, 1.1.0 scores 88% match points and +$11,283 +/- $1,606 over 100 paired seeds. Against 1.0.0 it scores 78% and +$5,456 +/- $809 over 200 held-out seeds.
+Against 1.1.0, 1.2.0 takes 80% and 82% of match points on two independent 100-seed blocks. Against the submitted 0.22.0, 1.1.0 already scored 88% and +$11,283 +/- $1,606. On the regression pool 1.2.0 is positive against all eight opponents.
+
+On the ladder, 1.1.0 rated 689.3 against 639.7 for 0.22.0, with 9 wins in 17 episodes. Round 11 reads those games: we beat players who buy a bigger board and leave it half empty, and lose to players who turn 62 tiles into 41 plants where our 50 carry 33.
 
 **What did not work**, all reverted and recorded in rounds 8 and 9: a sell schedule releasing stock at the town's drain rate, a denial term pricing a tile at what our volume takes off the rival's price, alternate-day watering, one quadrant per unit, a higher hiring ceiling, a smaller seed reserve, a cash-crop opening, and geese.
 
