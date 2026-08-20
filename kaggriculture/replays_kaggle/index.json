@@ -1069,5 +1069,69 @@
       "Ashutosh Ghodasara"
     ],
     "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95114120": {
+    "episode": 95114120,
+    "file": "episode-95114120-replay.json.gz",
+    "rewards": [
+      68296.0,
+      70223.0
+    ],
+    "seed": 944622729,
+    "steps": 720,
+    "submission": 55644368,
+    "teams": [
+      "Marcin Skalski",
+      "Dziriyin wa9il"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95116422": {
+    "episode": 95116422,
+    "file": "episode-95116422-replay.json.gz",
+    "rewards": [
+      79086.0,
+      20102.0
+    ],
+    "seed": 252323201,
+    "steps": 720,
+    "submission": 55644368,
+    "teams": [
+      "Marcin Skalski",
+      "Hubbahub"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95118698": {
+    "episode": 95118698,
+    "file": "episode-95118698-replay.json.gz",
+    "rewards": [
+      69685.0,
+      58007.0
+    ],
+    "seed": 1292414003,
+    "steps": 720,
+    "submission": 55644368,
+    "teams": [
+      "Marcin Skalski",
+      "Anatoliy_Fomin"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95120982": {
+    "episode": 95120982,
+    "file": "episode-95120982-replay.json.gz",
+    "rewards": [
+      90210.0,
+      105048.0
+    ],
+    "seed": 1223923565,
+    "steps": 720,
+    "submission": 55644368,
+    "teams": [
+      "Marcin Skalski",
+      "Zubatch"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
   }
 }

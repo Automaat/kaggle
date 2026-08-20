@@ -1140,3 +1140,47 @@ Five experiments against the 1.2.0 baseline, each its own sweep, floor of 40 pai
 Nothing shipped. All four knobs were removed again and the default reproduces byte for byte.
 
 The read: the knob-level tending ideas are exhausted. Watering earlier, digging earlier, planting earlier and planting less all fail because they move work between tiles without creating any, and the day is already full, with 57% of unit-turns spent on movement. The next real gain has to come from the structural change the 1.0.x plan has carried since the start: a unit's day planned as a route over a cluster, which creates tending capacity rather than reshuffling it.
+
+# Round 12: three textbook mechanisms, none of them news to the planner
+
+The question behind this round: the farm sells melon, strawberry and milk before anything else, and round 9's replay read already said that is not the mistake — the field sells the same three. But is "premium first" actually optimal, or just what a greedy per-tile pricing model happens to produce? Three ideas came from named results in resource-allocation and market-microstructure theory, each implemented as its own `KAGG_*` flag and swept with a floor of 40 paired seeds, survivor confirmed on a fresh block, same discipline as round 10 and 11.
+
+| Idea | Mechanism | Result |
+| :--- | :--- | :--- |
+| `KAGG_HERD_WATERFILL` | Let livestock bid for a tile against every crop by the same $/tile-day the planner already prices crops with, instead of reserving the first N empty tiles for the fixed herd list | Round 1 arm led at +$29,238 vs +$25,840 (91% vs 90%), confirmed at **-$1,003 +/- $1,935**, dropped |
+| `KAGG_COURNOT_PLANT` | Price a planting at the inventory both farms' standing tiles will have pushed it to by harvest, not just the town's drain, so a crop the rival is already growing heavily prices lower before it actually gluts | Round 1 arm led at +$26,137 vs +$25,840 (88% vs 90%), confirmed at **-$2,641 +/- $2,110**, dropped |
+| `KAGG_AC_LIQUIDATION` | Replace the uniform end-game sell-down (`kept_total / days_left`) with a front-loaded hyperbolic schedule, `frac = 1 - sinh(kappa*(d-1))/sinh(kappa*d)`, on the theory that the risk being hedged is the rival dumping first, not price volatility | Default won round 1 outright, confirmed at **+$0 +/- $0**, dropped |
+
+All three flags were removed again; the default reproduces byte for byte.
+
+**Water-filling and the Cournot term chase noise the model already resolves.** Both ideas assumed the planner is leaving money on the table by not accounting for something — the herd's own diminishing marginal value, the rival's standing supply. But `_crop_value` already quotes each tile at the inventory its own prior tiles this turn pushed it to, which is a one-farm water-fill by construction, and the herd reservation is capped at ten animals precisely because the animal-value curve saturates fast. Neither addition moved the *outcome* mix enough to clear noise at 100 seeds; both pointed the wrong way on the confirmation block, which is what an idea correcting a real but small mispricing looks like next to an idea correcting nothing.
+
+**The liquidation curve is rarely the binding constraint.** At kappa 0.3 the front-loaded schedule does ask for meaningfully more than a sixth of the shed on the first day of the six-day window — the CI being exactly $0 wide says the two agents played identical actions on most of the confirmation block. `_hold_quota`'s cash-needed and shed-capacity forced sales, plus the opponent-dump threshold from round 10, already clear most held stock before the linear or the hyperbolic ramp is ever consulted. A schedule only matters when something is actually being held back, and by day 24 little is.
+
+**The standing answer holds.** Round 9's replay read said the gap to the top of the ladder is acreage and tending, not crop selection, and this round is the same conclusion from the opposite direction: three mechanisms built to make crop and herd selection smarter than "premium first, land permitting" found nothing to correct. The planner's greedy per-tile pricing is already close enough to the theoretical water-fill and Cournot-adjusted solutions that the gap doesn't clear measurement noise.
+
+# Round 12: the day plan that finally pays, and a benchmark that was lying
+
+The ladder had said the same thing four times: in every loss the opponent held 75 tiles and we held 50, while our own utilisation was the better of the two, 84 to 96 per cent against their 56 to 91. Copying their composition failed once more first. A wheat rotation reserve, which is what the two 120,000-dollar opponents ran, scored +$1,223 +/- $2,116 on its own and lost monotonically beside a second quadrant: 72% of match points at twelve wheat tiles, 51% at twenty, 34% at thirty. A herd of 22 or 28 animals on two quadrants, which is what Zubatch ran with 29, scored 36% and 16%.
+
+## The day plan
+
+`ROUTE_CLUSTERS` gives each unit a strip of the working board for the whole day. Three details decide whether it pays:
+
+- Split the tiles that carry work, not the acreage. Splitting the board evenly leaves a unit standing in bare ground while the next strip drowns.
+- Fix the assignment for the day. Recomputing it per turn is what made the quadrant experiment in round 9 thrash at 32% of match points.
+- Make the strip a preference, not a fence. A hard restriction leaves a unit fiddling with a low-priority job while a plant dies two strips away; a one-tile distance penalty keeps priority global and still holds units in their neighbourhood.
+
+Confirmed at **+$7,140 +/- $2,085** against the pool, 98% of match points against 92%. Against the frozen 1.2.0 it takes 75% of match points and +$4,476 +/- $834 over 200 held-out paired seeds, and it is positive against all nine pool opponents at 97%. Frozen as `agents_1.0.x/v1_3_0_clusters.py`, 1.3.0.
+
+## The benchmark was measuring against `starter`
+
+Twice in this session a run reported a four-figure win rate: 400 games to nil, +$77,553, and later 200 to nil at +$78,642. The first was recorded as an unreproducible artifact. It was not an artifact. `tools/bench.py` defaults its opponent when none is named, and the copy that came back through a merge defaults it to `starter` rather than `champion`. Every bench call without an explicit opponent was scoring against the tutorial agent, whose mean is about 3,500 — exactly the opponent mean those runs reported.
+
+Nothing that shipped rests on those numbers: every version gate in rounds 8 to 12 was either a `bandit.py` confirmation against the pool or a bench call with the opponent named. The default is now `champion` again.
+
+The lesson for the log: a benchmark that cannot lose is not reporting a strong agent, it is reporting a weak opponent. The header line names the opponent on every run, and it should be read.
+
+## One more repair
+
+Editing `main.py` while a sweep runs in the background makes the worker processes import a half-written file. It produced a round of results where every arm, including the unmodified default, scored 1% of match points. Those results were discarded and the sweep re-run on a stable tree.

@@ -20,6 +20,7 @@ from runner import run_match
 
 DEFAULT_POOL = (
     "champion",
+    "agents_1.0.x/v1_2_0_market.py",
     "agents_1.0.x/v1_1_0_herd.py",
     "agents_1.0.x/v1_0_0_land.py",
     "agents_0.0.x/v0_22_0_supply.py",
@@ -129,7 +130,7 @@ def main():
         opponents = (DEFAULT_POOL if args.pool == "default" else
                      tuple(part.strip() for part in args.pool.split(",") if part.strip()))
     else:
-        opponents = (args.opponent or "starter",)
+        opponents = (args.opponent or "champion",)
     jobs = [(args.candidate, opponent, seed)
             for opponent in opponents for seed in range(start, start + n)]
     with ProcessPoolExecutor(max_workers=args.workers) as pool:

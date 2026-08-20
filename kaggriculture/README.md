@@ -53,7 +53,7 @@ Agents follow semantic versioning. `0.N.0` is the historical line: one minor per
 
 A **major** bump means the strategy itself changed, not that it was tuned. 1.0.0 is the first such change: the farm buys a quadrant, staffs it with 12 hands and runs a larger herd, which no amount of tuning had ever made pay. It comes from measuring the labour cost of a tile and from 26 real ladder replays, not from another self-play sweep.
 
-## Current agent (1.2.0)
+## Current agent (1.3.0)
 
 **A second quadrant of board, staffed.** One extra quadrant is bought, hands are capped at 12, and the herd is 6 cows and 4 sheep. Land had lost every previous test because `KAGG_HANDS_PER_TILE` was 0.34 for every tile: on 50 tiles that asks for 17 hands, which the Fibonacci hire cost makes unaffordable, so the farm bought dirt it could not staff. `tools/labour.py` measured the real figure — 1.2 to 1.5 work ops per tile-day for crops, about 3 for animals, so 0.05 to 0.13 hands per tile. At 0.2 the joint sweep of land, hands and herd clears by +$5,614 +/- $2,208 on fresh paired seeds.
 
@@ -61,11 +61,13 @@ A **major** bump means the strategy itself changed, not that it was tuned. 1.0.0
 
 **Livestock placement outranks tending.** `PLACE` sat below watering, so units picked animals up every morning, carried them all day and never put them down, while `_animal_orders` counted the carried animals as stock and stopped buying. The herd froze at five of the ten it wanted. Placement first takes it to ten by day 24, worth +$3,408 +/- $2,099. The same switch lost $7,779 in round 6, before there was land to put a herd on.
 
+**A day plan per unit.** Each unit gets a strip of the *working* board — the tiles that carry a plant or an animal — fixed for the whole day, and pays a one-tile penalty for taking work outside it. Splitting acreage instead of work leaves a unit idle in bare ground; recomputing the split every turn makes it thrash, which is how the same idea scored 32% in round 9. Worth +$7,140 +/- $2,085 against the pool and 75% of match points against 1.2.0.
+
 **Opponent-aware selling and a longer unwind.** The hidden-shed estimator is on, so a product the rival is sitting on gets sold before they dump it; liquidation starts six days out instead of four; and fertilized output is no longer charged to the glut curve, a 0.22.0 rule that paid on 25 tiles and costs money on 50. Together +$9,685 +/- $1,843 on fresh paired seeds, and 80% of match points against 1.1.0.
 
 **Everything else is 0.22.0**, unchanged: dynamic planner priced on the glut curve, forward supply forecast, future shops priced before they unlock, fertilizer as an input, carried feed counted as inventory, sells leading the order list steepest-curve first.
 
-Against 1.1.0, 1.2.0 takes 80% and 82% of match points on two independent 100-seed blocks. Against the submitted 0.22.0, 1.1.0 already scored 88% and +$11,283 +/- $1,606. On the regression pool 1.2.0 is positive against all eight opponents.
+Against 1.2.0, 1.3.0 takes 75% of match points and +$4,476 +/- $834 over 200 held-out seeds, and is positive against all nine pool opponents. Against 1.1.0, 1.2.0 took 80% and 82% on two independent blocks. Against the submitted 0.22.0, 1.1.0 already scored 88% and +$11,283 +/- $1,606. On the regression pool 1.2.0 is positive against all eight opponents.
 
 On the ladder, 1.1.0 rated 689.3 against 639.7 for 0.22.0, with 9 wins in 17 episodes. Round 11 reads those games: we beat players who buy a bigger board and leave it half empty, and lose to players who turn 62 tiles into 41 plants where our 50 carry 33.
 
@@ -76,6 +78,8 @@ On the ladder, 1.1.0 rated 689.3 against 639.7 for 0.22.0, with 9 wins in 17 epi
 `tools/bench.py` compares **paired** — both agents on the same seeds, seats swapped — and reports confidence intervals on the per-seed difference. The margin shrinks with `sqrt(seeds)`: about $1,400 at 60 seeds, $800 at 200, $550 at 400. A match costs 1.5 s and the bench uses every core, so 200 paired seeds (400 games) run in about 75 s. Run 200 by default and 400 before a version bump; read the interval, not the mean.
 
 Judge candidates on **win rate against a fixed opponent**, not mean money: both players share one market, so the opponent's strength moves both means together.
+
+Read the opponent on the header line of every bench run. A merge once restored a copy of `bench.py` whose default opponent was `starter`, and two runs in one session reported 400-0 and 200-0 before anyone noticed they were beating the tutorial agent.
 
 The champion is the gate, not the whole test. It is a mirror, so a candidate can win the mirror by exploiting the champion's own glut curve and still lose to a different strategy. Confirm every kept change on `--pool default --held-out` before freezing a new version.
 

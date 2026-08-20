@@ -3,7 +3,6 @@
 import copy
 import math
 import os
-from collections import Counter
 
 CROPS = {
     "WHEAT": {"seed": 10, "first_yield_day": 2, "max_yield_day": 4, "max_yield": 6, "ongoing": False},
@@ -100,6 +99,8 @@ ALWAYS_HOLD = _enabled("KAGG_ALWAYS_HOLD")
 ANIMAL_BUY_CAP = int(os.environ.get("KAGG_ANIMAL_BUY_CAP", "0"))
 TRIP_RADIUS = int(os.environ.get("KAGG_TRIP_RADIUS", "2"))
 ROUTE_STICKY = _enabled("KAGG_ROUTE_STICKY")
+ROUTE_CLUSTERS = _enabled("KAGG_ROUTE_CLUSTERS", True)
+ZONE_PENALTY = int(os.environ.get("KAGG_ZONE_PENALTY", "1"))
 
 # Mirrors MARKET_PARAMS in the environment: price(inv) = base +- amp * f(|inv - I0|).
 MARKET_PARAMS = {
@@ -154,6 +155,7 @@ _market_params = None  # Episode overrides, if the configuration supplies any.
 _race_active = False
 _opponent_state = {}
 _routes = {}
+_day_plans = {}
 
 
 def _town_consumption(step, shops):
@@ -525,7 +527,6 @@ def _crop_value(crop, projected_inv, day):
     the farm piling into one crop: each tile allocated pushes the next tile's
     quote for that crop down its glut curve.
     """
-    # Ongoing crops get fertilized, which doubles every scheduled production.
     units = EXPECTED_YIELD[crop] * (2 if crop in PRODUCTION_AGES else 1)
     inventory = projected_inv.get(crop, MARKET_I0)
     if INTEGRATED_CROP_VALUE:
@@ -590,7 +591,7 @@ def _dynamic_plan(tiles, day, inventory, shops, board_size=10):
         elif isinstance(tile, dict) and tile.get("kind") == "PLANT" and tile.get("crop") in standing:
             standing[tile["crop"]] += 1
     allocated = {crop: 0 for crop in CROPS}
-    half = board_size // 2
+    half = int(board_size / 2)
     herd_positions = {}
     if NEAR_SHED_HERD:
         candidates = sorted(
@@ -935,6 +936,38 @@ def _route_targets(player, step):
     return state["targets"]
 
 
+def _snake_order(tiles, board_size):
+    """Tiles in a boustrophedon sweep, so neighbours stay neighbours in the list."""
+    return sorted(tiles, key=lambda pos: (pos[1], pos[0] if pos[1] % 2 == 0 else board_size - pos[0]))
+
+
+def _cluster_plan(player, day, step, tiles, units, board_size):
+    """Split the board into one contiguous strip per unit, once a day.
+
+    Deciding this per turn is what made the quadrant experiment thrash: the
+    assignment moved under the units while they walked. A strip that holds for
+    the whole day gives a unit a neighbourhood to work, and the walk out is paid
+    once rather than every time the task list reshuffles.
+    """
+    state = _day_plans.get(player)
+    if (state is not None and step >= state["step"]
+            and state["day"] == day and state["units"] == units):
+        state["step"] = step
+        return state["zones"]
+    # Split the tiles that carry work, not the acreage: a strip of bare ground
+    # leaves its unit idle while the next strip drowns.
+    working = [(x, y) for x, y, tile in tiles
+               if isinstance(tile, dict) and (tile.get("kind") == "PLANT" or "animal" in tile)]
+    positions = _snake_order(working, board_size)
+    zones = {}
+    if positions and units > 0:
+        size = max(1, -(-len(positions) // units))
+        for index, pos in enumerate(positions):
+            zones[pos] = min(units - 1, index // size)
+    _day_plans[player] = {"day": day, "units": units, "zones": zones, "step": step}
+    return zones
+
+
 def _task_key(prio, dist):
     """Nearby work before distant work, but never before a dying plant.
 
@@ -1143,6 +1176,8 @@ def agent(obs):
     ops = []
     taken = set()
     targets = _route_targets(player, obs.get("step", day * 24 + hour))
+    zones = (_cluster_plan(player, day, obs.get("step", day * 24 + hour), tiles, len(units), board_size)
+             if ROUTE_CLUSTERS else {})
     for idx, pos in enumerate(units):
         carried = dict(inventories[idx]) if idx < len(inventories) else {}
         if _must_leave(pos):
@@ -1172,6 +1207,12 @@ def agent(obs):
             if i in taken or not _can_do(task, item, carried):
                 continue
             dist = abs(pos[0] - x) + abs(pos[1] - y)
+            zone = zones.get((x, y)) if zones else None
+            # A strip is a preference, not a fence: work still goes to whoever
+            # is nearest, but a unit pays a few tiles of penalty for leaving the
+            # neighbourhood it was given for the day.
+            if zone is not None and zone != idx and prio > 0:
+                dist += ZONE_PENALTY
             key = _task_key(prio, dist)
             if ROUTE_STICKY and targets.get(idx) == (x, y) and prio > 0:
                 key = (key[0], -1, dist)
