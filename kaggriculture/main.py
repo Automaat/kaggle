@@ -99,7 +99,6 @@ ALWAYS_HOLD = _enabled("KAGG_ALWAYS_HOLD")
 ANIMAL_BUY_CAP = int(os.environ.get("KAGG_ANIMAL_BUY_CAP", "0"))
 TRIP_RADIUS = int(os.environ.get("KAGG_TRIP_RADIUS", "2"))
 ROUTE_STICKY = _enabled("KAGG_ROUTE_STICKY")
-DIG_PRIORITY = int(os.environ.get("KAGG_DIG_PRIORITY", "9"))
 
 # Mirrors MARKET_PARAMS in the environment: price(inv) = base +- amp * f(|inv - I0|).
 MARKET_PARAMS = {
@@ -900,7 +899,7 @@ def _priority(task):
     priorities = {
         "WATER!": 0, "FEED!": 0, "FEED": 1, "WATER": 2, "CARE": 3,
         "FERTILIZE": 4, "HARVEST": 5, "COLLECT_FERTILIZER": 6, "PLACE": 7,
-        "PLANT": 8, "BUILD": 8, "DIG": DIG_PRIORITY,
+        "PLANT": 8, "BUILD": 8, "DIG": 9,
     }
     if PLACE_PRIORITY:
         priorities["PLACE"] = 1
