@@ -64,7 +64,7 @@ def _enabled(name, default=False):
 
 
 # Replicated winners default on; unresolved or losing experiments stay opt-in.
-EFFECTIVE_PROJECTION = _enabled("KAGG_EFFECTIVE_PROJECTION", True)
+EFFECTIVE_PROJECTION = _enabled("KAGG_EFFECTIVE_PROJECTION")
 FUTURE_SHOPS = _enabled("KAGG_FUTURE_SHOPS", True)
 FUTURE_SHOP_FACTOR = float(os.environ.get("KAGG_FUTURE_SHOP_FACTOR", "1"))
 PARTIAL_SCARCITY = _enabled("KAGG_PARTIAL_SCARCITY")
@@ -78,7 +78,7 @@ MELON_QUOTA = int(os.environ.get("KAGG_MELON_QUOTA", "13"))
 STRAWBERRY_QUOTA = int(os.environ.get("KAGG_STRAWBERRY_QUOTA", "5"))
 HERD_START_DAY = int(os.environ.get("KAGG_HERD_START_DAY", "0"))
 HERD_BUY_PER_DAY = int(os.environ.get("KAGG_HERD_BUY_PER_DAY", "99"))
-OPPONENT_STOCK = _enabled("KAGG_OPPONENT_STOCK")
+OPPONENT_STOCK = _enabled("KAGG_OPPONENT_STOCK", True)
 OPPONENT_DUMP_THRESHOLD = int(os.environ.get("KAGG_OPPONENT_DUMP_THRESHOLD", "12"))
 DAIRY_LAND_COWS = int(os.environ.get("KAGG_DAIRY_LAND_COWS", "0"))
 DAIRY_LAND_START_DAY = int(os.environ.get("KAGG_DAIRY_LAND_START_DAY", "10"))
@@ -130,7 +130,7 @@ MAX_ORDERS = 10
 SHED_TARGET = int(os.environ.get("KAGG_SHED_TARGET", "70"))  # Leave room for a day of harvest before overflow is discarded.
 MIN_CASH = int(os.environ.get("KAGG_MIN_CASH", "400"))
 LAST_DAY = 29
-LIQUIDATION_DAYS = int(os.environ.get("KAGG_LIQ_DAYS", "4"))  # Days before the end to start unwinding held stock.
+LIQUIDATION_DAYS = int(os.environ.get("KAGG_LIQ_DAYS", "6"))  # Days before the end to start unwinding held stock.
 LAST_HOUR = 22  # Step 718 is the last turn the market clears; 718 % 24 == 22.
 
 MIN_LAND_PAYBACK_DAYS = 8  # A quadrant unlocked later than this cannot repay itself.

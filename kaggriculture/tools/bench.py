@@ -19,8 +19,10 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from runner import run_match
 
 DEFAULT_POOL = (
-    "agents_0.0.x/v10_livestock.py",
-    "agents_0.0.x/v12_fertilize.py",
+    "champion",
+    "agents_1.0.x/v1_0_0_land.py",
+    "agents_0.0.x/v0_22_0_supply.py",
+    "agents_0.0.x/v20_audit.py",
     "agents_0.0.x/v16_endgame.py",
     "specialist:melon",
     "specialist:strawberry",
