@@ -1184,3 +1184,50 @@ The lesson for the log: a benchmark that cannot lose is not reporting a strong a
 ## One more repair
 
 Editing `main.py` while a sweep runs in the background makes the worker processes import a half-written file. It produced a round of results where every arm, including the unmodified default, scored 1% of match points. Those results were discarded and the sweep re-run on a stable tree.
+
+# Round 13: the herd the day plan can now afford, and why feed is bought
+
+The three losses under 1.3.0 all showed the same two columns: they held 75 or 100 tiles against our 50, and they sold 194 to 298 fertilizer against our 95. Fertilizer is free — an animal makes one a day and nothing else in the game consumes it — so the second column is a headcount, not a policy. They ran 13 to 15 animals; we ran 10.
+
+A herd of seven cows and five sheep confirmed at **+$4,106 +/- $2,307**, 97% of match points against 92%, and holds at 67% and +$3,718 +/- $1,019 against 1.3.0 over 200 held-out paired seeds. The same size lost in round 10 under 1.1.0. What changed is the day plan: twelve animals need feeding and collecting every day, and that is only affordable once a unit works a neighbourhood instead of crossing the farm.
+
+Collection itself is not the gap. Measured over one season: 206 animal-days, 162 collections, 59 of those spent fertilizing crops, 102 sold. Promoting `COLLECT_FERTILIZER` above harvesting was swept and lost.
+
+## Why the feed is bought rather than grown
+
+The agent buys 168 wheat a season, about $7,158, at a price that climbs from $33 to $53 because both farms buy feed while the town drains it. Growing it looks obvious and it is not:
+
+| Variant | Points |
+| :--- | ---: |
+| Eight tiles of wheat | 74% |
+| Eight tiles of wheat, six days of feed reserve | 50% |
+| Six days of feed reserve alone | 46% |
+| A second quadrant with eight tiles of wheat | 40% |
+| A second quadrant, twelve tiles of wheat, six days of reserve | 20% |
+
+Eight wheat tiles do cut the feed bill, from 168 units to 132, about $1,600. They cost more than that in premium tiles displaced.
+
+The reserve result has a harder cause, and it is the shed. Capacity is 100 items and **everything above it is discarded at the end-of-day drop**. Peak shed occupancy per three days, one season:
+
+```
+default, two days of feed     3   9  12  17  33  38  43  82  77  59
+six days of feed              3  21  21  28  55  66  96 100 100 100
+six days plus own wheat       5  16  47  60  68  97 100 100 100 100
+```
+
+A longer feed reserve pins the shed at the cap for the last third of the season, so every harvest after that is thrown away, and purchases are refused for three times as many turns. The two-day reserve is not an oversight; it is what the shed can hold.
+
+Frozen as `agents_1.0.x/v1_4_0_herd.py`, 1.4.0.
+
+## Strategies from the ladder that still do not transfer
+
+A wheat-first farm, which two of the 120,000-dollar opponents run, was played head to head against the champion over three seeds:
+
+```
+all wheat, fixed planner        12,325  vs  90,547
+wheat 3 : strawberry 1          18,838  vs  77,534
+dynamic planner, melon banned   43,329  vs  68,204
+default                         53,393  vs  54,606
+```
+
+The volume crops only pay on a board we cannot yet keep alive.
