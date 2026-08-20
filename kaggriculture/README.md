@@ -34,6 +34,7 @@ Built-in opponents: `pass`, `random`, `starter`, `champion`. Any path to a `.py`
 | `tools/bench.py`       | Parallel seeded benchmark, paired and seat-swapped             |
 | `tools/bandit.py`      | Picks a configuration by sequential halving, with a seed floor |
 | `tools/labour.py`      | Unit-turns per tile-day, by crop and by animal                 |
+| `tools/losses.py`      | Units lost: dead plants, unharvested yield, shed overflow      |
 | `tools/trace.py`       | Per-day price and money trace                                  |
 | `tools/sweep.py`       | Crop-mix comparison                                            |
 | `tools/param_sweep.py` | Sweeps any `KAGG_*` knob against a fixed opponent              |

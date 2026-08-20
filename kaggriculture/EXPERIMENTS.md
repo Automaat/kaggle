@@ -1297,3 +1297,33 @@ Closing that — seeding the projection with `_farm_supply` over our own tiles �
 The ladder gap is real and unchanged: every strong opponent holds 75 or 100 tiles and we hold 50. What changed this round is the reason we cannot follow them. It is no longer that the far tiles rot. It is that our product mix has nowhere to put the volume, and the volume crops that would absorb it — wheat above all — are worth less per tile than the premium crops they displace, at every share tried.
 
 Two ways out, neither tested yet. Sell into more products at once, so no single curve takes the whole harvest, which means a genuinely wider mix rather than a wheat quota bolted onto the same planner. Or find the execution the ladder leaders have that lets a hundred tiles of strawberry and milk clear at a price we cannot reach.
+
+# Round 16: measuring the loss instead of counting weeds
+
+Weeds are a symptom and a poor one: a tile that dies empty costs nothing, and most of the season-peak weed count comes from the last three days when both farms stop tending. `tools/losses.py` counts units instead — yield that died with a plant, yield still standing when the season closes, produce discarded by the shed, and animals that starved and left.
+
+One seed, one quadrant against two:
+
+```
+                                  50 tiles   75 tiles
+units lost with dead plants             14         37
+units left standing at close            27         42
+units discarded by the shed              6          0
+animals starved and left                 0          0
+```
+
+About 32 units of extra loss, call it $8,000. The gap on that seed is $22,000, so the losses are real and are not the story.
+
+The story is in what never got produced. With the same twelve animals on both boards we sold 185 milk and 129 fertilizer on 50 tiles, and 151 milk and 102 fertilizer on 75. Prices were within a few percent of each other, so this is not the market saturating, which is what round 15 concluded and got wrong. The extra crops take unit-turns from the herd, and an animal that misses its `CARE` loses a unit on its next production.
+
+Promoting animal work directly does not recover it: with two quadrants, collecting before harvesting scored 60% of match points, caring before watering 57%, both together 48%, against 91% for the one-quadrant default.
+
+## Two angles closed
+
+The ten-order cap never binds. Across a full season the agent places 0.78 orders a turn and reaches ten on zero turns of 719, so nothing is being truncated.
+
+The strongest opponent on the ladder is not selling cleverly. Reading episode 95178049 day by day, Rohan Jain and this agent both hold strawberry until day 20 to 22 while the price climbs from 128 to 268, then unwind into it. He sells 18, 42, 40, 50, 37, 26 on the even days; we sell 23, 24, 29, 29, 17. Same timing, same curve, twice the volume, because he farms twice the board. There is no sell-side trick to copy.
+
+## Leftovers swept
+
+Against the 1.5.0 baseline: the melon race scored 79% at either threshold, selling in lots of twelve 78 to 85%, and holding everything until liquidation 12%, all against 90 to 94% for the default. The melon race, unresolved since round 6, is now resolved: it loses.
