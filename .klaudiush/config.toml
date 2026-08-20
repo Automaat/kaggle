@@ -1,0 +1,9 @@
+# Project override. This is a personal repository with no reviewers, so a pull
+# request adds a step and no safety. Direct pushes to main are allowed here.
+# Every other global validator stays on: signed commits, conventional commit
+# messages, the force-push block and the --no-verify block.
+
+[validators.git.push]
+enabled = true
+severity = "error"
+blocked_branches = []
