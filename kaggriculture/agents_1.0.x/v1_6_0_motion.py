@@ -102,7 +102,6 @@ ROUTE_STICKY = _enabled("KAGG_ROUTE_STICKY")
 UNDERFOOT = _enabled("KAGG_UNDERFOOT", True)
 BUDGET_PLAN = _enabled("KAGG_BUDGET_PLAN", True)
 DIAGONAL_STEP = _enabled("KAGG_DIAGONAL_STEP", True)
-LATE_PLANT = _enabled("KAGG_LATE_PLANT")
 ROUTE_CLUSTERS = _enabled("KAGG_ROUTE_CLUSTERS", True)
 ZONE_PENALTY = int(os.environ.get("KAGG_ZONE_PENALTY", "1"))
 
@@ -524,27 +523,7 @@ def _desired_herd():
     return _parse_herd() + ["COW"] * DAIRY_LAND_COWS
 
 
-def _partial_yield(crop, days):
-    """Units a planting returns when only `days` are left before the last day.
-
-    The planting gate asks for a whole lifespan, but yield starts long before
-    that: wheat delivers from age two of four, carrot from two of three. Late
-    in the season a short crop still pays, and the tile is otherwise bare.
-    """
-    if days <= 0:
-        return 0
-    if crop in PRODUCTION_AGES:
-        fired = [p for p in PRODUCTION_AGES[crop] if p <= days]
-        return len(fired) * 2
-    data = CROPS[crop]
-    if days < data["first_yield_day"]:
-        return 0
-    window_start = (data["max_yield_day"] + 1) // 2
-    bonus = max(0, min(days, data["max_yield_day"]) - window_start + 1)
-    return min(data["max_yield"], 1 + bonus)
-
-
-def _crop_value(crop, projected_inv, day, days_left=None):
+def _crop_value(crop, projected_inv, day):
     """Profit per tile-day, priced at the market we will actually sell into.
 
     Quoting at post-harvest inventory rather than today's price is what stops
@@ -553,11 +532,6 @@ def _crop_value(crop, projected_inv, day, days_left=None):
     """
     units = EXPECTED_YIELD[crop] * (2 if crop in PRODUCTION_AGES else 1)
     span = LIFESPAN[crop]
-    if days_left is not None and days_left < span:
-        units = _partial_yield(crop, days_left)
-        span = max(1, days_left)
-        if units <= 0:
-            return float("-inf")
     inventory = projected_inv.get(crop, MARKET_I0)
     if INTEGRATED_CROP_VALUE:
         revenue = _sale_revenue(crop, inventory, units)
@@ -610,12 +584,7 @@ def _dynamic_plan(tiles, day, inventory, shops, board_size=10, budget=None):
     tile reserved for an unaffordable animal simply sits empty.
     """
     banned = set(os.environ.get("KAGG_BAN", "").upper().split(",")) - {""}
-    days_left = LAST_DAY - day
-    if LATE_PLANT:
-        ready = [c for c in CROPS
-                 if c not in banned and _partial_yield(c, days_left) > 0]
-    else:
-        ready = [c for c in CROPS if day + LIFESPAN[c] <= LAST_DAY and c not in banned]
+    ready = [c for c in CROPS if day + LIFESPAN[c] <= LAST_DAY and c not in banned]
     projected = {c: _projected_inventory(inventory, shops, day, LIFESPAN[c]).get(c, MARKET_I0) for c in ready}
     herd = _parse_herd() if day >= HERD_START_DAY else []
     plan, reserved = {}, 0
@@ -663,7 +632,7 @@ def _dynamic_plan(tiles, day, inventory, shops, board_size=10, budget=None):
         if SEASONAL_PLANNER:
             best = _seasonal_crop(eligible, standing, allocated, projected, day)
         else:
-            best = max(eligible, key=lambda c: _crop_value(c, projected, day, days_left if LATE_PLANT else None))
+            best = max(eligible, key=lambda c: _crop_value(c, projected, day))
         if BUDGET_PLAN and budget is not None:
             budget -= CROPS[best]["seed"]
         plan[(x, y)] = best
