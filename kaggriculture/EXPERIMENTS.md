@@ -1421,3 +1421,64 @@ The survivor, a half-weight certainty equivalent, confirms at **+$550 +/- $727**
 The pattern across both attacks is the same one round 15 found when seeding the projection with our own standing harvest: the planner's marginal pricing already does most of this work, and every more-correct valuation bolted on top lands inside the noise. The melon diagnosis is right about the crop and wrong about the lever — the loss is realised at the point of **sale**, not at the point of planting, and `_sell_orders` already holds or dumps per product on the forward supply forecast.
 
 All four knobs were removed and `main.py` reproduces 1.6.0 byte for byte.
+
+# Round 20: does livestock land compete with crop land
+
+A rules audit against the upstream source (`kaggle_environments/envs/kaggriculture/kaggriculture.py`, not just `RULES.md`) turned up one documentation bug and no agent gap: `RULES.md`'s shop table is missing `WHEAT` on the Ice Cream Shop, but both the real source and `main.py`'s own `SHOPS` dict already have it. Everything else cross-checked — wheat-for-feed, fertilizer-from-animals, the CARE payout rule, the single-product-shop 2x multiplier — was already handled correctly.
+
+The one open question the audit raised: `_dynamic_plan` reserves the herd's tiles by a fixed count from day 0 (`NEAR_SHED_HERD`), never bidding them against crops the way `_crop_value` prices crop tiles. Three angles, all measured with `tools/bandit.py` against the pool.
+
+## Herd size: the reservation is undersized, not oversized
+
+Sweeping `KAGG_HERD_SPEC` down from the standing `COW:7,SHEEP:5` (40 paired seeds, round one):
+
+| Herd | Diff vs pool | Points |
+| :--- | ---: | ---: |
+| `COW:7,SHEEP:5` (default) | +26,772 | 91% |
+| `COW:5,SHEEP:4` | +26,062 | 84% |
+| `COW:3,SHEEP:2` | +17,801 | 78% |
+| no herd | -9,693 | 15% |
+
+Shrinking the herd loses monotonically, so livestock is not crowding out crop land today. Sweeping up found the opposite: `COW:8,SHEEP:7` (15 animals) beat the default in round one and **confirmed on a fresh 100-seed block at +$3,959 +/- $2,406, 92% vs 86% points**. Cheap, real, not yet applied to `main.py`'s default.
+
+## Delaying the reservation (`HERD_START_DAY`) loses, but for the wrong reason
+
+`HERD_START_DAY=2/4/6` all scored **identically** — 60% points, +14,529 diff, byte-for-byte the same across all three — against the default's 91%. The knob does not do what it sounds like: `_animal_orders`'s `wanted` is read from the current tile plan, so before the threshold day no tile is animal-designated and **no animal is bought either**, not just unplaced. The three settings tie because whatever day the first quick crop is actually harvested is the real gate, not the knob. Delaying purchase by 2-6 days of a season where animals produce "forever while fed" costs more than the idle early tiles were worth. Dropped as tested; the buy-timing and tile-timing decisions need to be separated to test the real hypothesis.
+
+## Decoupling buy timing from tile timing (`KAGG_EAGER_HERD`), built and dropped
+
+Built in worktree branch `worktree-eager-herd` (not merged): `_animal_orders` requests the full herd deficit (`_herd_deficit`) from day 0 regardless of the tile plan, and `_dynamic_plan` only converts a tile to a structure once an animal is actually sitting bought-and-unhoused in the shed, claiming the nearest currently-empty tile to the shed rather than a tile reserved in advance. Land fills with fast crops first; animals move in as land and cash allow.
+
+Two iterations, both against the pool, both losing:
+
+| Variant | Points | Diff vs pool |
+| :--- | ---: | ---: |
+| v1 — first empty tile in board order | 57% | -14,000-ish |
+| v2 — nearest-to-shed empty tile (matches `NEAR_SHED_HERD` geometry) | 64% | -13,317 |
+
+`tools/losses.py` on seed 1 vs champion explains it: dead-plant tiles rose from 48 to 65 and shed overflow appeared (8 units discarded, was 0) under the eager variant. The tile a unit is allowed to work is fixed for the whole day by 1.3.0's day-plan/routing system; letting `_dynamic_plan` flip empty tiles between crop-eligible and animal-eligible on every call reshuffles that working set mid-day, the same thrashing round 9 already measured at 32% for a different mid-day-replan idea. The idea needs a routing fix — freeze the working-tile geometry once a day, same as everything else does — before it can be measured fairly. Not attempted this round.
+
+**Kept: nothing applied yet.** `COW:8,SHEEP:7` is a confirmed, low-risk win sitting unshipped. The eager-buy idea is real but blocked on the day-plan system, not on the herd-vs-crop economics.
+
+# Round 20: what a tile actually costs
+
+`_crop_value` charges one thing: the seed. Two real costs never appear in it.
+
+**Fertilizer.** For the ongoing crops the valuation doubles `units`, which is the benefit of fertilizing, and never charges the price. Fertilizer is free from the herd, but it is also a good we sell — ninety-five to a hundred and three units a season — so every application is a sale forgone. Strawberry needs about two applications to take four units to eight, roughly $120 at the traded price against a seed of $100. The cost basis of a strawberry tile is more than double what the planner believes.
+
+**Labour.** `tools/labour.py` measured work per tile-day per crop in round 8: wheat 1.34, tomato 1.29, strawberry 1.26, melon 1.19, carrot 1.11. Multiplied by occupancy that is twenty unit-turns for a strawberry against three for a carrot, a seven-fold spread the valuation ignores entirely. Round 7c built a labour *budget*, a cap on the total, and reverted it at +$576 +/- $1,282; charging labour as a *cost* changes the ranking between crops instead of capping the sum, which is a different thing and had not been tried.
+
+Both were added and swept against 1.6.0. On a single seed all three arms beat the default handsomely — 86,165 and 96,603 against 62,825 — which is exactly the kind of result the confirmation step exists to catch.
+
+| Arm | Points |
+| :--- | ---: |
+| Fertilizer charged | 94% in round two |
+| Wage 5 per unit-turn | 92% |
+| Fertilizer plus wage 10 | 88% |
+| Default | 91% |
+| Wage 10 | 91% |
+| Wage 20 | 92% |
+
+The survivor, charging fertilizer, confirms at **-$395 +/- $2,013**. Dropped.
+
+This is the fourth valuation refinement in three rounds to land inside the noise, after our own standing supply in round 15 and the horizon, discount and certainty-equivalent terms in round 19. The planner's marginal pricing — walking the quote down the glut curve for every tile it allocates in the same pass — appears to dominate whatever these terms add. The remaining lever on crop choice is not a better price for a tile; it is what happens to the harvest afterwards.
