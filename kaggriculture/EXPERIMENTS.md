@@ -1231,3 +1231,34 @@ default                         53,393  vs  54,606
 ```
 
 The volume crops only pay on a board we cannot yet keep alive.
+
+# Round 14: the farm was laid out backwards
+
+Read off the replays, at day 20, mean walking distance from the shed:
+
+```
+player                money  animals  animals@   crops@
+Jeff Marc E. Cadet  156,992       18       1.3      4.4
+Rohan Jain          154,165       16       1.0      3.6
+YoungCheol Son      145,122       14       1.2      4.7
+ning gu             145,025       14       1.2      4.6
+Toni Blanco         125,048       11       1.8      4.0
+Ashutosh Ghodasara  123,188       10       1.2      4.2
+us (1.4.0)           53,432       11       5.9      3.3
+```
+
+Every strong player keeps the herd against the shed and farms the far tiles. We did the exact opposite: animals at 5.9, crops at 3.3.
+
+The mechanism is in the rules rather than in the prices. An animal wants three or four actions a day, and **every feeding starts with a PICKUP at the shed**, so a distant animal costs a round trip per feed. A crop wants one or two actions and carries nothing. Distance is cheap for a plant and expensive for an animal, and we had it the wrong way round.
+
+`KAGG_NEAR_SHED_HERD` already existed, off by default, from an early round that tested it before there was land, a day plan or a twelve-animal herd. Turned on now it moves the herd to 2.3 from the shed and the crops out to 4.6, and against 1.4.0 it takes **82% of match points, CI 78 to 87, at +$4,925 +/- $712** over 200 held-out paired seeds. On the pool it is positive against all eleven opponents.
+
+Frozen as `agents_1.0.x/v1_5_0_layout.py`, 1.5.0.
+
+## The sweep nearly threw it away
+
+`bandit.py` ranks arms on the paired money difference, and on that statistic the default beat this change in both rounds: +$28,073 against +$26,802, then +$26,974 against +$24,749. Match points said the opposite in both rounds, 94% against 88% and 92% against 84%, and the head-to-head against the champion settled it at 82%.
+
+The pool is nine opponents, most of them superseded versions that lose badly. Money against a weak field is dominated by how large the blowouts are, and the layout change trades a little of that for winning more games against a strong one. The competition scores wins.
+
+Ranking on money was adopted in round 10 for a good reason — it is the lower-variance statistic and the sign test throws information away. It is still right for tuning a knob. When money and points disagree across rounds, the head-to-head against the champion is the tiebreak, because it is the only one of the three that matches how the ladder scores.

@@ -1,4 +1,4 @@
-"""Kaggriculture submission entrypoint. Must expose `agent(obs)`."""
+"""Frozen 1.5.0. Animals beside the shed, crops on the far tiles."""
 
 import copy
 import math
