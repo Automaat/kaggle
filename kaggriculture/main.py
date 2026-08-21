@@ -107,6 +107,7 @@ FINAL_EARLY_RETURN = _enabled("KAGG_FINAL_EARLY_RETURN", True)
 PROTECT_UNDERFOOT = _enabled("KAGG_PROTECT_UNDERFOOT", True)
 FEED_DEADLINE = _enabled("KAGG_FEED_DEADLINE", True)
 PICKUP_ON_DEMAND = _enabled("KAGG_PICKUP_ON_DEMAND", True)
+SEED_BUY_BATCH = int(os.environ.get("KAGG_SEED_BUY_BATCH", "1"))
 ROUTE_CLUSTERS = _enabled("KAGG_ROUTE_CLUSTERS", True)
 ZONE_PENALTY = int(os.environ.get("KAGG_ZONE_PENALTY", "1"))
 
@@ -786,14 +787,16 @@ def _fertilizer_orders(need, stock, shed, prices, money):
 
 
 def _seed_orders(wanted, money):
-    """Buy exactly the seeds the empty tiles are planned to hold, dearest first."""
+    """Buy the dearest missing seeds, capped per market turn."""
     orders = []
     budget = money
+    remaining = SEED_BUY_BATCH
     for crop, need in sorted(wanted.items(), key=lambda kv: -CROPS[kv[0]]["seed"]):
-        take = min(need, int(budget // CROPS[crop]["seed"]))
+        take = min(need, int(budget // CROPS[crop]["seed"]), remaining)
         if take > 0:
             orders.append(["BUY_SEED", crop, take])
             budget -= take * CROPS[crop]["seed"]
+            remaining -= take
     return orders
 
 

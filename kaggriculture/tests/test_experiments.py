@@ -109,3 +109,9 @@ def test_owned_seed_is_free_in_plan_budget(monkeypatch):
         seeds={"MELON": 1},
     )
     assert plan[(0, 0)] == "MELON"
+
+
+def test_seed_order_batch_limits_units(monkeypatch):
+    monkeypatch.setattr(main, "SEED_BUY_BATCH", 3)
+    orders = main._seed_orders({"MELON": 5, "CARROT": 5}, 1_000)
+    assert sum(order[2] for order in orders) == 3

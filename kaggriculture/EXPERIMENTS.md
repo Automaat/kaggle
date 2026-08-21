@@ -1824,3 +1824,76 @@ The regression-pool gate used forty more paired seeds per opponent. The agent wa
 **Kept:** reserve urgent executable work for the unit already on its tile, and count owned seeds as zero-cost items in the crop planner's cash budget.
 
 Frozen as `agents_1.0.x/v1_11_0_urgent_seed_budget.py`, 1.11.0.
+
+# Round 29: buy seeds at the pace they can be planted
+
+The 1.11.0 loss profile still showed 30 to 35 plants turning to weeds per season, up to four animals escaping, occasional shed overflow, and 13% to 14% idle unit-turns. The crop deaths lost only 3 to 10 units on the sampled seeds, but they identified a mismatch between buying seeds and completing the work they create.
+
+Every screen below used forty seat-swapped paired seeds against frozen 1.11.0.
+
+## Task and accounting changes
+
+| Change | Result | Points | Decision |
+| :--- | ---: | ---: | :--- |
+| Reserve every underfoot task for the unit on the tile | -$133 +/- $1,125 | 57% | drop |
+| Put `FEED!` before `WATER!` | +$230 +/- $295 | 50% | drop |
+| Let any shed unit pick up wheat for urgent feed | -$112 +/- $757 | 51% | drop |
+| Reserve only the seed bill that the current balance can buy | +$346 +/- $605 | 50% | drop |
+
+Protecting all work on one tile overcommits the local unit. Animal escape is not caused by the ordering of the two emergency classes or by a shed unit ignoring urgent feed outside its strip. The desired seed bill is also a useful reserve even when the current turn cannot buy it all.
+
+## Stop planting late
+
+| First blocked hour | Result | Points |
+| ---: | ---: | ---: |
+| 18 | -$394 +/- $1,299 | 42% |
+| 19 | +$798 +/- $1,140 | 55% |
+| 20 | +$1,800 +/- $1,473 | 66% |
+| 21 | +$676 +/- $1,135 | 68% |
+| 22 | +$170 +/- $961 | 46% |
+| 23 | +$127 +/- $766 | 64% |
+
+Hour 20 confirmed on one hundred fresh paired seeds at **+$1,757 +/- $851 and 64% points**. It does not compose with the stronger seed-purchase change below and was removed from the final package.
+
+## Buy seeds in small batches
+
+The existing order bought the full planned deficit of each crop. The dynamic plan can change before those seeds are planted, leaving paid inventory behind and creating work faster than the day can finish it.
+
+Initial screens found +$1,888 +/- $1,405 for a batch of four and +$360 +/- $1,054 for eight. A second block found +$2,642 +/- $991 for two and +$852 +/- $936 for six. A common fresh block then selected the batch size:
+
+| Maximum seeds per market turn | Result | Points |
+| ---: | ---: | ---: |
+| 1 | +$2,981 +/- $1,296 | 70% |
+| 2 | +$1,698 +/- $1,181 | 64% |
+| 3 | +$1,260 +/- $1,148 | 59% |
+| 4 | +$1,751 +/- $1,323 | 68% |
+
+One seed per turn confirmed on one hundred new paired seeds at **+$3,570 +/- $811 and 84% points**.
+
+## Shed and labour controls
+
+| Change | Result | Points | Decision |
+| :--- | ---: | ---: | :--- |
+| Shed target 50 | +$382 +/- $662 | 48% | drop |
+| Shed target 60 | +$289 +/- $621 | 50% | drop |
+| Shed target 65 | +$308 +/- $618 | 50% | drop |
+| Hand cap 10 | $0 +/- $0 | 50% | drop |
+| Hand cap 11 | $0 +/- $0 | 50% | drop |
+| Hand cap 8 | -$9,441 +/- $1,969 | 2% | drop |
+| Hand cap 9 | -$1,178 +/- $1,231 | 41% | drop |
+
+Fifty tiles already calculate a target of ten hired hands, so caps ten and eleven are inert. The idle turns are necessary peak capacity, not excess labour. Lower shed targets sell slightly earlier but do not resolve a material loss.
+
+## Combination and mechanism check
+
+Adding the confirmed hour-20 planting stop to the one-seed batch scored **+$23 +/- $865 and 41% points** directly against the batch alone on one hundred new paired seeds. The two mechanisms overlap, so only the batch remains.
+
+On seed 42 the final seed inventory fell from three units to one. Yield lost with dead plants fell from ten units to one, although the number of tiles that became weeds rose from 33 to 37. The gain is not cosmetic weed reduction. Buying at planting pace prevents mature-value loss and avoids filling the shed with seeds for a plan that changes before execution.
+
+## Release gate
+
+The cleaned one-change agent beat frozen 1.11.0 on two hundred untouched paired seeds at **+$3,447 +/- $655 and 78% points**, with 314 wins in 400 games and no failures.
+
+The regression-pool gate used forty more paired seeds per opponent. The agent was positive against all eighteen opponents, won 1,394 of 1,440 games for 97% points, and had no failures. Against 1.11.0 inside that gate it scored +$3,525 +/- $1,396.
+
+**Kept:** buy at most one seed per market turn.
