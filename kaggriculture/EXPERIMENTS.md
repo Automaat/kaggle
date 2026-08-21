@@ -2199,3 +2199,46 @@ So the single seed was not representative, and the $156 an op is not collectable
 ## Where this leaves the board
 
 Full utilisation of seventy-five tiles is not blocked by ground, hiring, crop choice or herd size. It is blocked by unit-turns, the farm already spends every one of them from day 12, and the two ways to buy more — payroll and walking — are priced above what they return. The quadrant is worth buying and leaving partly bare; it is not yet worth filling.
+
+# Round 33: four more ways to buy a unit-turn, and what a turn actually earns
+
+Round 32 established the ceiling is unit-turns and that payroll cannot buy them. This round tried to free turns instead of buying them, and measured what each turn returns.
+
+## Realized value per work-op
+
+Attributing every work action to the tile the unit stands on, and every sale to its source, over one season on the reference seed:
+
+```
+source        ops   units   revenue   $/op
+STRAWBERRY    849     239    57,631     68
+COW           565     211    45,147     80
+SHEEP         263      94    17,650     67
+MELON         168      84    21,654    129
+CARROT         10       5       327     33
+```
+
+Strawberry consumes **45% of all work actions and returns the least per action** of the three big earners. Melon returns nearly twice as much per action and takes an eighth of the work. The theoretical table in round 32 put a cow first at $156 an op; realised, it is $80, because the three ops a day exclude the walk and the wheat carried.
+
+## Ranking crops by work rather than by time
+
+`_crop_value` divides profit by `LIFESPAN` — value per tile-day. That is the right metric when ground is scarce. Ours is not: turns are. Dividing by `OPS_PER_TILE_DAY * LIFESPAN` instead ranks a tile by what it returns per action.
+
+This is not round 20's labour charge, which subtracted a wage; a ratio and a subtraction pick different crops when the constraint binds.
+
+On the reference seed it pays **125,215 against 104,225**, the largest single-seed gain in many rounds. Over sixty paired seeds it takes 93% of match points against the default's 92%, and head to head over 200 held-out seeds it settles at **-$438 +/- $339**. Significant, and negative. Dropped.
+
+The single seed was not representative. The planner already walks each crop's quote down its own glut curve as it allocates, so shifting the ranking toward melon mostly moves the farm further down the one curve that has no shop demand behind it.
+
+## Three ways to free turns, all measured
+
+| Change | Result |
+| :--- | :--- |
+| Collect fertilizer only up to what the fertilize jobs will spread | 97,833 on the seed against 104,225; the collection is worth more than the turn |
+| Batch animal harvests against `max_held` rather than every production | 109,663 on the seed, 92% of match points against 90%, then **-$1,277 +/- $482** head to head |
+| Batch crop harvests | 98,504 on the seed |
+
+Batched animal harvest is the interesting failure: a cow holds six and makes 1.5 a day, so harvesting every fourth day instead of every second saves 35 actions a season. It reads as a win on money-ranked sweeps and loses the head-to-head, which is the third time this round that the three measures disagreed.
+
+## Method note
+
+Money-ranked sweeps, match points and the head-to-head disagreed on both surviving candidates. Round 14 set the rule for that case — the head-to-head against the champion decides, because it is the only one of the three that scores the way the ladder does — and it rejected both. Without that rule this round would have shipped two regressions.
