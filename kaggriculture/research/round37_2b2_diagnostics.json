@@ -1,0 +1,18 @@
+{
+  "candidate": "agents_2.0.x/round37_2b2_sticky_goal",
+  "seed": 42,
+  "seat": 0,
+  "opponent": "agents_1.0.x/v1_13_0_rl_routing.py",
+  "rebuilds": 0,
+  "persisted_selections": 33,
+  "priority_pauses": 337,
+  "safety_pauses": 373,
+  "frozen_fallbacks": 2746,
+  "turns_with_persistence": 29,
+  "absent_goals": 1830,
+  "unavailable_fallbacks": 781,
+  "unrouted_fallbacks": 1965,
+  "unit_growths": 255,
+  "enrollments": 1965,
+  "day_resets": 29
+}

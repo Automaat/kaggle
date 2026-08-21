@@ -2969,3 +2969,31 @@ uv run python tools/equivalence.py agents_2.0.x/round37_2b1_local_fallback --bas
 All 208 tests pass. A seed-42 diagnostic reduced complete rebuilds from 478 to 80. It recorded 63 persisted selections, 297 unavailable-goal fallbacks and 3,713 unrouted-unit fallbacks. Fifty empty-route invalidations show that full queue construction still has short lifetime.
 
 Decision: reject the local fallback arm. It improves runtime over strict invalidation but still exceeds both runtime gates and leaves new hands without routes. Do not run score selection. Test local route enrollment without complete queue rebuilding as a separate arm.
+
+## Stage 37.2B2 experiment: sticky single goal
+
+Status: rejected on total runtime before score selection.
+
+Hypothesis: a worker needs only one stable current goal to stop cell-by-cell route changes. Enroll the exact frozen 1.14.0 selection when a worker first reaches the selector. Keep it while it remains available and has the same nonzero priority and safety class as the current frozen choice. Enroll a new frozen goal only after the old goal disappears. Never build a complete suffix queue.
+
+Candidate: `agents_2.0.x/round37_2b2_sticky_goal/`. Direct control: Stage 37.2B1 commit `8f14caf`. Frozen comparator: `agents_1.0.x/v1_14_0_central_herd.py`.
+
+Timing command:
+
+```bash
+uv run python tools/equivalence.py agents_2.0.x/round37_2b2_sticky_goal --baseline agents_1.0.x/v1_14_0_central_herd.py --seed-start 3739400 --seeds 20 --workers 8 --timing-only --output research/round37_2b2_timing.json
+```
+
+| Gate | Result |
+|:---|---:|
+| Complete episodes | 40 |
+| Failures | 0 |
+| Candidate mean call | 0.948 ms |
+| Baseline mean call | 0.693 ms |
+| p99 overhead | 0.544 ms |
+| Candidate worst call | 37.786 ms |
+| Summed wall-time ratio | 1.368x |
+
+All 219 tests pass. A seed-42 diagnostic recorded zero complete queue rebuilds, 1,965 local goal enrollments and 33 persisted selections on 29 turns. Priority and safety guards paused persistence 710 times.
+
+Decision: reject the unindexed sticky-goal implementation. Its p99 overhead passes, but total runtime exceeds 1.25x. Repeated task lookup is linear in both route count and graph size. Test an action-equivalent indexed implementation as a separate performance arm before score selection.
