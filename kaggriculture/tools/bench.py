@@ -20,6 +20,7 @@ from runner import run_match
 
 DEFAULT_POOL = (
     "champion",
+    "agents_1.0.x/v1_10_0_endgame_loads.py",
     "agents_1.0.x/v1_9_0_endgame.py",
     "agents_1.0.x/v1_8_0_loads.py",
     "agents_1.0.x/v1_7_0_lastday.py",

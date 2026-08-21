@@ -1822,3 +1822,5 @@ The cleaned two-change agent beat frozen 1.10.0 on two hundred untouched paired 
 The regression-pool gate used forty more paired seeds per opponent. The agent was positive against all seventeen opponents, won 1,335 of 1,360 games for 98% points, and had no failures. Against the current champion inside that gate it scored +$5,826 +/- $1,736.
 
 **Kept:** reserve urgent executable work for the unit already on its tile, and count owned seeds as zero-cost items in the crop planner's cash budget.
+
+Frozen as `agents_1.0.x/v1_11_0_urgent_seed_budget.py`, 1.11.0.
