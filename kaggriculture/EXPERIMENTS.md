@@ -2824,3 +2824,42 @@ uv run --offline python tools/bench.py agents_2.0.x/round37_0_shell.tar.gz champ
 ```
 
 Across 20 games it recorded three wins, three losses and fourteen ties: exactly 50% points. The paired money difference was `$0 +/- $0`, candidate mean money was `$71,380`, and both agents completed every game. This directly confirms that seat order and the wrapper do not change the 1.14.0 policy result.
+
+## Stage 37.1 experiment: shadow task graph
+
+Status: accepted locally. The plan was registered before implementation in `/tmp/agent2-stage37-1-plan.md` and reviewed by `plan-critic`. The review is archived as `2026-08-21-204942-agent2-shadow-task-graph.md`.
+
+Hypothesis: stable task identity can be added without changing any 1.14.0 action. This is infrastructure for isolated route experiments, not a score claim.
+
+Candidate: `agents_2.0.x/round37_1_task_graph/`. Frozen comparator: `agents_1.0.x/v1_14_0_central_herd.py`. Root `main.py` and the comparator remain byte-identical with SHA-256 `86951703eac27253938500eac664650c1e927d1b86b26ed84be008f24739d699`.
+
+The private frozen module exposes its exact sorted task list through a wrapper around `_protected_underfoot_tasks`. The wrapper first delegates to frozen behavior and then copies the task tuples. `BaselinePolicy.decide` converts them after the action returns. Disabled capture produces an empty graph and never reuses prior tasks.
+
+`TaskId(day, x, y, operation, item, ordinal)` stays stable while the same task exists. `TaskNode` preserves priority, position and frozen source order. `TaskGraph` uses immutable tuple storage. `EpisodeState` records the action and matching graph together. Duplicate observations preserve both; episode reset replaces the private baseline module and graph.
+
+This is smaller than the original Stage 37.1 roadmap. Deadlines, resources, effects and dependency edges remain separate experiments. Internal experiment stages do not produce Kaggle archives. This avoids incorrect Stage 37.0 manifest metadata. The final combined candidate will repeat the deterministic archive and real Kaggle loader gates.
+
+Exact differential command:
+
+```bash
+uv run python tools/equivalence.py agents_2.0.x/round37_1_task_graph --seed-start 3730000 --seeds 100 --workers 8 --output research/round37_1_equivalence.json
+```
+
+| Gate | Result |
+|:---|---:|
+| Complete episodes | 200 |
+| Compared calls | 143,800 |
+| Action mismatches | 0 |
+| Failures | 0 |
+| Candidate mean money | $81,048 |
+| Frozen 1.13.0 opponent mean money | $79,047 |
+| Candidate mean call | 0.909 ms |
+| Baseline mean call | 0.757 ms |
+| p99 overhead | 0.251 ms |
+| Candidate worst call | 38.317 ms |
+| Summed agent CPU ratio | 1.200x |
+| Candidate cold directory import mean | 10.538 ms |
+
+All 174 tests pass. New tests cover stable IDs, duplicate ordinals, immutable graph storage, exact action preservation, observation immutability, duplicate calls, episode reset and disabled capture.
+
+Decision: accept Stage 37.1. It meets zero-difference and runtime gates. Start 37.2A from this commit in a new worktree. Do not merge it into root `main.py`.
