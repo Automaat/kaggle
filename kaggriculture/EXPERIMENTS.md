@@ -2997,3 +2997,53 @@ uv run python tools/equivalence.py agents_2.0.x/round37_2b2_sticky_goal --baseli
 All 219 tests pass. A seed-42 diagnostic recorded zero complete queue rebuilds, 1,965 local goal enrollments and 33 persisted selections on 29 turns. Priority and safety guards paused persistence 710 times.
 
 Decision: reject the unindexed sticky-goal implementation. Its p99 overhead passes, but total runtime exceeds 1.25x. Repeated task lookup is linear in both route count and graph size. Test an action-equivalent indexed implementation as a separate performance arm before score selection.
+
+## Stage 37.2B3 experiment: indexed sticky goal
+
+Status: rejected on score after passing runtime.
+
+Hypothesis: preserve the exact Stage 37.2B2 behavior while removing repeated linear task lookup and unused diagnostic copies. This isolates the score effect of a stable current goal from implementation cost.
+
+Candidate: `agents_2.0.x/round37_2b3_indexed_sticky/`. Behavior control: Stage 37.2B2 commit `cace998`. Frozen score comparator: `agents_1.0.x/v1_14_0_central_herd.py`.
+
+The final implementation indexes tasks by stable identifier and frozen source order. It stores only selector-call count, unit count and selected goals. It does not copy candidate lists, protected tasks, inventories or unused unassigned-task diagnostics.
+
+Exact behavior checks against Stage 37.2B2 covered 240 complete episodes and 172,560 calls across seed blocks `3,739,700..3,739,799` and `3,739,900..3,739,919`. They recorded zero action mismatches and zero failures.
+
+Final timing command:
+
+```bash
+uv run python tools/equivalence.py agents_2.0.x/round37_2b3_indexed_sticky --baseline agents_1.0.x/v1_14_0_central_herd.py --seed-start 3739920 --seeds 20 --workers 8 --timing-only --output research/round37_2b3_timing.json
+```
+
+| Runtime gate | Result |
+|:---|---:|
+| Complete episodes | 40 |
+| Failures | 0 |
+| Candidate mean call | 0.933 ms |
+| Baseline mean call | 0.755 ms |
+| p99 overhead | 0.316 ms |
+| Candidate worst call | 23.949 ms |
+| Summed wall-time ratio | 1.235x |
+
+The first indexed timing pass was 1.283x. Removing unused selector and inventory copies reduced the final ratio below 1.25x. Both timing files remain in `research/`.
+
+Score screen:
+
+```bash
+uv run python tools/bench.py agents_2.0.x/round37_2b3_indexed_sticky agents_1.0.x/v1_14_0_central_herd.py --seed-start 3740000 --seeds 40 --workers 8
+```
+
+| Score gate | Result |
+|:---|---:|
+| Games | 80 |
+| Wins / ties | 27 / 0 |
+| Points | 33.75% |
+| Seed-clustered 95% point interval | 21%-47% |
+| Mean paired money delta | -$742 +/- $1,459 |
+| Candidate mean money | $72,244 |
+| Failures | 0 |
+
+All 230 tests pass.
+
+Decision: reject sticky goals. The implementation meets runtime limits, but it loses the registered score screen. The frozen selector's cell-by-cell changes are often useful reactions, not only route thrash. Do not confirm or combine this arm. Resource chains and operation bundles must be tested separately from frozen 1.14.0 rather than stacked on this negative arm.

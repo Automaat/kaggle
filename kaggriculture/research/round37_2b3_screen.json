@@ -1,0 +1,17 @@
+{
+  "candidate": "agents_2.0.x/round37_2b3_indexed_sticky",
+  "opponent": "agents_1.0.x/v1_14_0_central_herd.py",
+  "seed_start": 3740000,
+  "seed_end": 3740039,
+  "seeds": 40,
+  "games": 80,
+  "wins": 27,
+  "ties": 0,
+  "points": 0.3375,
+  "points_ci_low": 0.21,
+  "points_ci_high": 0.47,
+  "mean_paired_money_delta": -742,
+  "money_margin_95": 1459,
+  "candidate_mean_money": 72244,
+  "failures": 0
+}
