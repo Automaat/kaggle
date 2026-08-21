@@ -2298,3 +2298,5 @@ The extra 40 placements are early replacements after the known day-9 feed shock,
 Regression pool over 10 paired seeds per opponent, 400 games total: 390 wins, 98% points, all 20 opponents positive, and no failures. The candidate beats frozen 1.13.0 in this pool by +$2,758 +/- $2,691 and is positive against every earlier release and specialist.
 
 Selected candidate: land-first ordering and central future-herd placement default on. All rejected Round 35 timing limits and feed gates were removed. The cleaned default is score-identical to the tested two-flag candidate over a final five-seed equivalence check. The suite passes 140 tests and Ruff.
+
+Frozen as `agents_1.0.x/v1_14_0_central_herd.py`, 1.14.0.

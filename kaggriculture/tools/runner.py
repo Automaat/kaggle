@@ -8,7 +8,7 @@ from kaggle_environments import make
 
 ROOT = Path(__file__).resolve().parent.parent
 BUILTIN = {"pass", "random", "starter"}
-CHAMPION = "agents_1.0.x/v1_13_0_rl_routing.py"
+CHAMPION = "agents_1.0.x/v1_14_0_central_herd.py"
 
 
 def load_agent(name):
