@@ -23,7 +23,7 @@ class LoadedAgent:
         self.temporary_directory = temporary_directory
         self.__name__ = getattr(agent, "__name__", "agent")
 
-    def __call__(self, obs):
+    def __call__(self, obs, configuration=None):
         return self.agent(obs)
 
 

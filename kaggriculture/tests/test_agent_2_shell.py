@@ -10,7 +10,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tools")
 
 from artifact import load_artifact
 from package_agent import build_archive
-from runner import load_agent
+from runner import load_agent, run_match
 
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -181,6 +181,14 @@ def test_existing_loader_forms_remain_available():
     assert callable(load_agent("specialist:melon"))
     assert callable(load_agent("current:melon"))
     assert callable(load_agent("variant:KAGG_LAND=1"))
+
+
+def test_runner_executes_two_loaded_file_agents():
+    opponent = ROOT / "agents_1.0.x/v1_13_0_rl_routing.py"
+    _environment, rewards, statuses = run_match(str(BASELINE), str(opponent), seed=42)
+    assert statuses == ["DONE", "DONE"]
+    assert rewards[0] > 3000
+    assert rewards[1] > 3000
 
 
 def test_packed_artifact_is_deterministic_and_executable(tmp_path):
