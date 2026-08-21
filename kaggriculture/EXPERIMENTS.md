@@ -2814,3 +2814,13 @@ All 168 tests pass. They include both saved replay seats, market-parameter overr
 An initial run was invalid because `LoadedAgent` accepted only the observation while the local Kaggle runner passed observation and configuration to callable objects. It made the opponent return default actions. The run was discarded, the callable contract was fixed in `215fa5a`, and a regression test now requires two loaded file agents to finish with active policies. The full registered block above was rerun after that fix.
 
 Decision: accept Stage 37.0 as the behavior-equivalent local foundation. It changes no game decision and earns no score claim over 1.14.0. Root `main.py` remains byte-identical to frozen 1.14.0. Stage 37.1 can branch from the final result commit. Kaggle validation and any root release remain external gates; neither was performed in this stage.
+
+## Stage 37.0 direct mirror smoke test
+
+The packed shell played frozen 1.14.0 directly on ten new paired seeds:
+
+```bash
+uv run --offline python tools/bench.py agents_2.0.x/round37_0_shell.tar.gz champion --seed-start 3710000 --seeds 10 --workers 8
+```
+
+Across 20 games it recorded three wins, three losses and fourteen ties: exactly 50% points. The paired money difference was `$0 +/- $0`, candidate mean money was `$71,380`, and both agents completed every game. This directly confirms that seat order and the wrapper do not change the 1.14.0 policy result.
