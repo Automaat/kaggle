@@ -25,14 +25,15 @@ def _plain(value):
 
 
 def _one(job):
-    candidate_path, baseline_path, opponent_path, seed, seat = job
+    candidate_path, baseline_path, opponent_path, seed, seat, mode = job
     start = time.perf_counter_ns()
     candidate = load_agent(candidate_path)
     candidate_import_ns = time.perf_counter_ns() - start
     start = time.perf_counter_ns()
     baseline = load_agent(baseline_path)
     baseline_import_ns = time.perf_counter_ns() - start
-    mismatches = []
+    actions_compared = mode == "exact"
+    mismatches = [] if actions_compared else None
     candidate_times = []
     baseline_times = []
     steps = []
@@ -48,7 +49,7 @@ def _one(job):
         baseline_action = baseline(baseline_obs)
         baseline_times.append(time.perf_counter_ns() - start)
         steps.append(step)
-        if candidate_action != baseline_action and not mismatches:
+        if actions_compared and candidate_action != baseline_action and not mismatches:
             mismatches.append({
                 "seed": seed,
                 "seat": seat,
@@ -70,6 +71,8 @@ def _one(job):
     return {
         "seed": seed,
         "seat": seat,
+        "mode": mode,
+        "actions_compared": actions_compared,
         "mismatches": mismatches,
         "candidate_times_ns": candidate_times,
         "baseline_times_ns": baseline_times,
@@ -94,7 +97,11 @@ def _percentile(values, percentile):
 def summarize(results, candidate, baseline, opponent):
     candidate_times = [value for result in results for value in result["candidate_times_ns"]]
     baseline_times = [value for result in results for value in result["baseline_times_ns"]]
-    mismatches = [item for result in results for item in result["mismatches"]]
+    actions_compared = all(result["actions_compared"] for result in results)
+    mismatches = (
+        [item for result in results for item in result["mismatches"]]
+        if actions_compared else None
+    )
     failures = sum(status != "DONE" for result in results for status in result["statuses"])
     first_candidate = [result["candidate_times_ns"][0] for result in results]
     first_baseline = [result["baseline_times_ns"][0] for result in results]
@@ -122,12 +129,14 @@ def summarize(results, candidate, baseline, opponent):
         "candidate": candidate,
         "baseline": baseline,
         "opponent": opponent,
+        "mode": "exact" if actions_compared else "timing-only",
+        "actions_compared": actions_compared,
         "seed_start": min(result["seed"] for result in results),
         "seed_end": max(result["seed"] for result in results),
         "seeds": len({result["seed"] for result in results}),
         "episodes": len(results),
         "calls": len(candidate_times),
-        "mismatches": len(mismatches),
+        "mismatches": len(mismatches) if mismatches is not None else None,
         "first_mismatch": mismatches[0] if mismatches else None,
         "failures": failures,
         "candidate_reward_mean": statistics.mean(candidate_rewards),
@@ -161,6 +170,13 @@ def summarize(results, candidate, baseline, opponent):
     }
 
 
+def _should_fail(summary):
+    return bool(
+        summary["failures"]
+        or (summary["actions_compared"] and summary["mismatches"])
+    )
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("candidate")
@@ -170,9 +186,11 @@ def main():
     parser.add_argument("--seeds", type=int, default=1)
     parser.add_argument("--workers", type=int, default=os.cpu_count())
     parser.add_argument("--output")
+    parser.add_argument("--timing-only", action="store_true")
     args = parser.parse_args()
+    mode = "timing-only" if args.timing_only else "exact"
     jobs = [
-        (args.candidate, args.baseline, args.opponent, seed, seat)
+        (args.candidate, args.baseline, args.opponent, seed, seat, mode)
         for seed in range(args.seed_start, args.seed_start + args.seeds)
         for seat in (0, 1)
     ]
@@ -185,7 +203,7 @@ def main():
         output = Path(args.output)
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(encoded + "\n")
-    if summary["mismatches"] or summary["failures"]:
+    if _should_fail(summary):
         raise SystemExit(1)
 
 

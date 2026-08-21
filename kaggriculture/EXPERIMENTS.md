@@ -2897,3 +2897,19 @@ uv run python tools/equivalence.py agents_2.0.x/round37_2a_rebuild_queue --seed-
 All 182 tests pass. They cover immutable queue accounting, exact action preservation, duplicate calls, reset, disabled hooks, training-selector call count, exception abort, route-tail distance and stable ties. A seed-42 diagnostic rebuilt 719 plans, with a maximum measured suffix build of 5.603 ms.
 
 Decision: reject rebuilding complete queues every turn. It violates the 1.25x CPU and 2 ms p99-overhead gates despite exact actions and no timeout risk. Keep this branch as the direct control. Stage 37.2B may reuse the builder only if persistence reduces rebuild frequency and total CPU below the gate.
+
+## Stage 37.D0 tooling: timing intentional policy changes
+
+Status: accepted. This stage changes no agent. The approved reduced plan is archived as `2026-08-21-213056-agent2-timing-only-runner.md`. A broader safety-runner plan was rejected because existing loss probes observe some terminal values before the final action.
+
+`tools/equivalence.py --timing-only` calls candidate and frozen baseline once on independent copies of each candidate-trajectory observation. It returns only the candidate action. It reports `actions_compared=false`, `mismatches=null` and `first_mismatch=null`, while keeping all wall-time and failure fields. Exact comparison remains the default and keeps its mismatch exit gate.
+
+Timing smoke:
+
+```bash
+uv run python tools/equivalence.py agents_1.0.x/v1_13_0_rl_routing.py --baseline agents_1.0.x/v1_14_0_central_herd.py --opponent pass --seed-start 3731900 --seeds 2 --workers 2 --timing-only --output research/round37_d0_timing_smoke.json
+```
+
+The intentionally different policies completed four episodes with zero failures. Timing-only reported no action-comparison claim. Candidate and baseline received 2,876 timed calls each. A separate exact smoke on Stage 37.2A reported `actions_compared=true`, zero mismatches and zero failures.
+
+All 186 tests pass. New tests protect exact-mode mismatch behavior, timing-only nullable mismatch fields, failure exit decisions and real paired call counts. Timing fields remain wall-clock measurements despite the historical `agent_cpu_ratio` field name. The shadow baseline timing follows the candidate trajectory.
