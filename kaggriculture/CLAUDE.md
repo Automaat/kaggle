@@ -3,7 +3,7 @@
 Agent for the Kaggle [Kaggriculture](https://www.kaggle.com/competitions/kaggriculture) simulation competition.
 Two farms share one 10x10 board and one market for 30 days (720 turns, 24 per day). Most coins wins.
 
-`main.py` is the submission. It must keep a top-level `agent(obs)`. Nothing else is uploaded.
+`main.py` is the current 1.x submission. Agent 2 candidates use a `.tar.gz` archive with root `main.py` and helper files. Every entrypoint must keep a top-level `agent(obs)`.
 
 ## Language
 
@@ -28,6 +28,8 @@ uv run python tools/play.py main.py champion 42      # one match, writes replays
 uv run python tools/bench.py main.py                 # paired, seat-swapped, all cores
 uv run python tools/bench.py main.py --pool default --held-out
 uv run python tools/bandit.py --grid KAGG_LAND=1,2 --floor 40
+uv run python tools/package_agent.py agents_2.0.x/round37_0_shell /tmp/agent.tar.gz
+uv run python tools/equivalence.py /tmp/agent.tar.gz --seeds 100
 uv run pytest -q tests/
 ```
 
@@ -47,7 +49,7 @@ Opponents: `pass`, `random`, `starter`, `champion`, or a path to a `.py` with `a
 
 Semantic. A **minor** bump is a tuning round. A **major** bump means the strategy itself changed.
 
-Freezing a version: copy `main.py` to `agents_1.0.x/vX_Y_Z_<name>.py`, keep it as a benchmark opponent, and record the measurement in `EXPERIMENTS.md`.
+Freezing a 1.x version: copy `main.py` to `agents_1.0.x/vX_Y_Z_<name>.py`. Freezing a 2.x candidate: keep its source directory and deterministic archive digest. Keep every frozen version as a benchmark opponent and record the measurement in `EXPERIMENTS.md`.
 
 ## Knobs
 
@@ -60,6 +62,7 @@ The ladder is the only gate that is not our own mirror. Submit weekly.
 
 ```bash
 uv run kaggle competitions submit kaggriculture -f main.py -m "<version> <what changed>"
+uv run kaggle competitions submit kaggriculture -f /tmp/agent.tar.gz -m "<version> <what changed>"
 uv run python replays_kaggle/fetch.py       # sync new episodes, idempotent
 uv run python replays_kaggle/view.py --ladder
 ```
@@ -71,6 +74,6 @@ An episode `info` carries the `seed`, and `tools/runner.py` takes the same seed,
 
 ## Writing agent code
 
-- One file, standard library only at run time. `kaggle-environments` is for the harness, not for `main.py`.
+- One file or one `.tar.gz` archive, standard library only at run time. `kaggle-environments` is for the harness, not for submission code.
 - Keep the per-turn budget clear. Ladder turns run at about 1.5 ms mean and 70 ms on the first turn.
 - The agent must never raise. A crash forfeits the episode.

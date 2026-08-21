@@ -2705,3 +2705,79 @@ Before each stage starts, its subplan records the accepted predecessor commit, e
 
 - Best initial planning horizon: one day or several days with a committed current day.
 - Minimum optional-task value change that justifies route-suffix revaluation.
+
+## Stage 37.0 execution plan: equivalent shell
+
+Status: registered before implementation. This stage changes structure only.
+
+Accepted predecessor: `c8429be`, which adds the reviewed Round 37 roadmap on top of the byte-identical 1.14.0 policy. The fixed behavior comparator remains `b74a3ea:agents_1.0.x/v1_14_0_central_herd.py`.
+
+The candidate is developed in `agents_2.0.x/round37_0_shell/`. It becomes immutable only after the gate, commit, manifest and archive digest are recorded. Root `main.py` stays on 1.14.0. The archive contains root `main.py`, `agent_2/*.py`, `frozen/v1_14_0_central_herd.py` and `MANIFEST.json`.
+
+Every arrow in the import graph means "imports":
+
+```text
+main -> adapter -> policy
+policy -> model, state, baseline
+model -> domain
+state -> domain
+baseline -> domain
+```
+
+`domain` imports no internal module. All package imports are eager. Stage 37.0 does not create `economy`, `layout`, `tasks`, `safety`, `scheduler` or `executor`; their interfaces need evidence from later stages.
+
+Exact interfaces:
+
+- `domain.py`: frozen `World(step, player, identity, data)` and recursive immutable value types;
+- `model.py`: `normalize_observation(obs) -> World` and `thaw(world) -> dict`, with lossless unknown-field round trip and no input mutation;
+- `state.py`: `EpisodeState.observe(world) -> ObservationEvent` and `EpisodeState.record(action) -> None`; the policy owns this state;
+- `baseline.py`: `BaselinePolicy(path)`, `BaselinePolicy.reset() -> None` and `BaselinePolicy.act(obs) -> dict`; each reset executes the exact frozen source in a new private module object that is never added to `sys.modules`;
+- `policy.py`: `Agent2Policy(baseline_path)`, `Agent2Policy.act(obs) -> dict`; it owns `EpisodeState` and `BaselinePolicy` and delegates every new observation to 1.14.0;
+- `adapter.py`: `create_agent(baseline_path) -> Callable` and a fresh deep copy of every returned action;
+- candidate `main.py`: import the adapter module, create one private policy callable, then define top-level `agent(obs)` as the last callable and define no callable after it;
+- `tools/artifact.py`: `load_artifact(path) -> LoadedAgent` and safe extraction shared by the runner and tests;
+- `tools/runner.py`: keep callable, builtin, `champion`, specialist, current specialist, variant, relative `.py` and absolute `.py` behavior; delegate directories and `.tar.gz` files to `tools/artifact.py`;
+- `tools/package_agent.py`: deterministic `build_archive(source, output, metadata) -> Manifest`;
+- `tools/equivalence.py`: both-seat shadow comparison before each candidate action is applied;
+- external tests: normalization, duplicate calls, reset, import isolation, loader compatibility, safe extraction and exact packed-artifact execution.
+
+Artifact loading has one exact lifecycle. Save and remove every existing `agent_2` and `agent_2.*` entry from `sys.modules`, prepend the artifact root, load `main.py` under a unique generated module name, retain the new package module objects and extraction directory in `LoadedAgent`, remove the new public package entries, restore the saved entries and restore `sys.path` in `finally`. All runtime package imports must complete during load. A failed load performs the same restoration. Two same-stem files never reuse a root module name.
+
+Implementation order:
+
+1. Freeze the baseline hash and add the minimal executable wrapper.
+2. Add isolated directory loading and run action differential tests.
+3. Add lossless immutable normalization in shadow mode and rerun differential tests.
+4. Add policy-owned episode state and rerun differential tests.
+5. Add duplicate-call and rollback handling and rerun differential tests.
+6. Add the manifest, safe `.tar.gz` creation and loading.
+7. Test the packed artifact through both the custom runner and the installed Kaggle loader.
+
+Observation identity is the recursive typed value of private state, public state, optional fields and unknown fields. It preserves list order and integer versus float values. It excludes only `remainingOverageTime`, which is runtime budget metadata rather than simulator state; lossless normalized data still preserves it. An identical repeated observation returns a deep copy of the cached action without advancing baseline state. A changed observation at a non-increasing step resets both `EpisodeState` and the private baseline module, then processes the observation. A forward step, including a skipped step, continues the episode. This rule handles aborted matches and same-step conflicts without raising. An identical step-zero retry is idempotent; after later progress, step zero resets. Each loader call creates a fresh root module, package graph and policy instance. Mid-episode fallback and action repair are not used.
+
+Registered equivalence seed block: `3,700,000..3,700,099`. The opponent is `agents_1.0.x/v1_13_0_rl_routing.py`, SHA-256 `48ab8827d0e1e342f5b4f670a615b8eff7be9af9434789022778b6349180dc15`. Each seed runs one complete episode with the candidate in each seat. Before applying every candidate action, `tools/equivalence.py` passes the same untouched observation to a separately loaded frozen 1.14.0 policy and requires the same action. The first mismatch saves seed, seat, step, observation, both actions and module identities. Saved replay observations and a market-parameter override form separate differential tests. Selection does not use this stage because behavior must be exactly equal.
+
+Pass gates:
+
+- zero returned-action, observation, reward or status mismatches across the registered block;
+- identical final scores in every corresponding episode;
+- zero crashes and no input observation mutation;
+- repeated and sequential episodes do not share state;
+- two seats, two same-stem paths, two extracted copies and two package versions do not share modules or policy objects during interleaved calls;
+- all old loader forms and representative runner callers remain compatible;
+- deterministic archive bytes and SHA-256 across two builds;
+- safe extraction rejects absolute paths, `..`, links, devices, duplicate members, more than 100 members and more than 2 MB extracted data;
+- an external test suite loads only declared archive files from a clean directory absent from `sys.path` and runs complete episodes through the custom and installed Kaggle loaders;
+- installed `kaggle-environments` is exactly 1.32.7 and its configuration matches replay 96047508, including `townCenterSellInterval=24`;
+- cold import, first call, warm call, day-boundary call and full-episode timing are recorded on the same machine for candidate and baseline;
+- warm-call p99 overhead is at most 2 ms, summed agent CPU time is at most 1.25 times baseline, worst call stays below 750 ms and there are zero one-second timeouts;
+- the existing 140 tests and all new candidate tests pass;
+- `README.md` and `CLAUDE.md` describe both the current one-file 1.x agent and the Agent 2 archive workflow.
+
+Any mismatch rejects the shell. Rollback is branch deletion because root `main.py` and frozen 1.14.0 remain unchanged. Existing tests and historical tools keep importing root 1.14.0; candidate-specific tests load the nested or packed entrypoint directly.
+
+The frozen artifact is a deterministic gzip-compressed POSIX tar with sorted paths, fixed mode `0644`, UID and GID zero, empty owner names, tar timestamps zero and gzip timestamp zero. It excludes caches, bytecode, links and unrelated files. `MANIFEST.json` schema 1 records stage, candidate version, source commit, baseline commit and hash, Python version, exact environment version, simulator configuration and for each non-manifest member its path, size, mode and SHA-256. It contains no absolute path. Manifest verification occurs before import.
+
+The artifact becomes accepted only after a signed conventional commit and a Kaggle validation submission. The validation is an external release gate and does not permit merging this candidate into root `main.py`.
+
+Stage-specific unresolved questions: none after these contracts are implemented.

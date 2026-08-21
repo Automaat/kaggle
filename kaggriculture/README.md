@@ -19,16 +19,19 @@ uv run python tools/bench.py main.py --pool default --held-out
 uv run python tools/bandit.py --grid KAGG_LAND=1,2 --floor 40
 uv run python tools/trace.py main.py starter 42
 uv run python tools/labour.py main.py champion
+uv run python tools/package_agent.py agents_2.0.x/round37_0_shell /tmp/agent.tar.gz
+uv run python tools/equivalence.py /tmp/agent.tar.gz --seeds 100
 uv run pytest -q tests/
 ```
 
-Built-in opponents: `pass`, `random`, `starter`, `champion`. Any path to a `.py` file with an `agent(obs)` works. `champion` resolves to `runner.CHAMPION`, the frozen current best — every candidate is judged against it, not against `starter`.
+Built-in opponents: `pass`, `random`, `starter`, `champion`. A callable, `.py` file, Agent 2 directory or `.tar.gz` archive works. `champion` resolves to `runner.CHAMPION`, the frozen current best — every candidate is judged against it, not against `starter`.
 
 ## Layout
 
 | Path                   | Role                                                           |
 |:-----------------------|:---------------------------------------------------------------|
-| `main.py`              | The submission. Must keep an `agent(obs)` at the root.         |
+| `main.py`              | Current one-file 1.x submission with root `agent(obs)`.        |
+| `agents_2.0.x/`        | Agent 2 package candidates and frozen source directories       |
 | `tools/runner.py`      | Match harness shared by the scripts                            |
 | `tools/play.py`        | Single match, writes `replays/*.json`                          |
 | `tools/bench.py`       | Parallel seeded benchmark, paired and seat-swapped             |

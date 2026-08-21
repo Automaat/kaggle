@@ -1,10 +1,10 @@
 """Shared helpers to run Kaggriculture episodes locally."""
 
-import importlib.util
-import sys
 from pathlib import Path
 
 from kaggle_environments import make
+
+from artifact import load_artifact
 
 ROOT = Path(__file__).resolve().parent.parent
 BUILTIN = {"pass", "random", "starter"}
@@ -34,11 +34,7 @@ def load_agent(name):
     path = Path(name)
     if not path.is_absolute():
         path = ROOT / name
-    spec = importlib.util.spec_from_file_location(path.stem, path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[path.stem] = module
-    spec.loader.exec_module(module)
-    return module.agent
+    return load_artifact(path)
 
 
 def run_match(agent_a, agent_b, seed=None, debug=False):

@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "kaggle-environments>=1.32.7",
+    "kaggle-environments==1.32.7",
 ]
 
 [dependency-groups]

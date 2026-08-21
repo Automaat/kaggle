@@ -1261,7 +1261,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "kaggle-environments", specifier = ">=1.32.7" }]
+requires-dist = [{ name = "kaggle-environments", specifier = "==1.32.7" }]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=9.1.1" }]
