@@ -84,6 +84,8 @@ OPPONENT_DUMP_THRESHOLD = int(os.environ.get("KAGG_OPPONENT_DUMP_THRESHOLD", "12
 DAIRY_LAND_COWS = int(os.environ.get("KAGG_DAIRY_LAND_COWS", "0"))
 DAIRY_LAND_START_DAY = int(os.environ.get("KAGG_DAIRY_LAND_START_DAY", "10"))
 NEAR_SHED_HERD = _enabled("KAGG_NEAR_SHED_HERD", True)
+CENTRAL_HERD = _enabled("KAGG_CENTRAL_HERD", True)
+LAND_FIRST_HERD = _enabled("KAGG_LAND_FIRST_HERD", True)
 FEEDER_UNITS = int(os.environ.get("KAGG_FEEDER_UNITS", "0"))
 CARE_BEFORE_WATER = _enabled("KAGG_CARE_BEFORE_WATER")
 COLLECT_BEFORE_HARVEST = _enabled("KAGG_COLLECT_BEFORE_HARVEST")
@@ -603,6 +605,38 @@ def _dairy_positions(tiles, board_size):
     return set(positions[:DAIRY_LAND_COWS])
 
 
+def _central_herd_positions(tiles, board_size, herd):
+    half = board_size // 2
+    initial = sorted(
+        ((x, y) for x, y, _tile in tiles if x < half and y < half),
+        key=lambda position: (
+            abs(position[0] - (half - 1)) + abs(position[1] - (half - 1)),
+            position,
+        ),
+    )
+    if len(tiles) <= half * half:
+        return dict(zip(initial, herd))
+    reserved = sum(
+        isinstance(tile, dict)
+        and ("animal" in tile or tile.get("kind") in ("COOP", "PASTURE"))
+        for _x, _y, tile in tiles
+    )
+    candidates = sorted(
+        ((x, y) for x, y, tile in tiles if tile is None),
+        key=lambda position: (
+            min(
+                abs(position[0] - centre_x) + abs(position[1] - centre_y)
+                for centre_x, centre_y in (
+                    (half - 1, half - 1), (half, half - 1),
+                    (half - 1, half), (half, half),
+                )
+            ),
+            position,
+        ),
+    )
+    return dict(zip(candidates, herd[reserved:]))
+
+
 def _dynamic_plan(tiles, day, inventory, shops, board_size=10, budget=None, seeds=None):
     """Assign each empty tile the crop with the best marginal return at harvest.
 
@@ -626,11 +660,14 @@ def _dynamic_plan(tiles, day, inventory, shops, board_size=10, budget=None, seed
     half = int(board_size / 2)
     herd_positions = {}
     if NEAR_SHED_HERD:
-        candidates = sorted(
-            ((x, y) for x, y, _tile in tiles if x < half and y < half),
-            key=lambda pos: (abs(pos[0] - (half - 1)) + abs(pos[1] - (half - 1)), pos),
-        )
-        herd_positions = dict(zip(candidates, herd))
+        if CENTRAL_HERD:
+            herd_positions = _central_herd_positions(tiles, board_size, herd)
+        else:
+            candidates = sorted(
+                ((x, y) for x, y, _tile in tiles if x < half and y < half),
+                key=lambda pos: (abs(pos[0] - (half - 1)) + abs(pos[1] - (half - 1)), pos),
+            )
+            herd_positions = dict(zip(candidates, herd))
     dairy_positions = _dairy_positions(tiles, board_size) if DAIRY_LAND_COWS > 0 else set()
     for x, y, tile in tiles:
         if tile is not None:
@@ -1245,20 +1282,26 @@ def agent(obs):
         structures[animal] = structures.get(animal, 0) + n
 
     land_orders = _land_orders(farm, day, sum(1 for _, _, t in tiles if t is None))
+    land_first = LAND_FIRST_HERD and land_orders and sum(structures.values()) > 0
+    land_reserve = LAND_PRICES[0] if DAIRY_LAND_COWS > 0 and land_orders else 0
+    if land_first:
+        bought_land = len(farm.get("unlocked_quadrants", ["NW"])) - 1
+        land_reserve = LAND_PRICES[bought_land]
     orders += _sell_orders(
         shed, obs["market"]["inventory"], farm["money"], day, player,
-        seed_bill + MIN_CASH,
+        seed_bill + MIN_CASH + (land_reserve if land_first else 0),
         0 if day >= LAST_DAY else max(0, herd * FEED_DAYS - (carried_wheat if CARRIED_FEED else 0)),
         _scarcity(obs["farms"], obs["town"]["unlocked_shops"], day, player),
         0 if day >= LAST_DAY else fertilize_jobs, opponent_stock,
     )
-    land_reserve = LAND_PRICES[0] if DAIRY_LAND_COWS > 0 and land_orders else 0
-    if DAIRY_LAND_COWS > 0:
+    if DAIRY_LAND_COWS > 0 or land_first:
         orders += land_orders
     orders += _seed_orders(wanted_seeds, farm["money"] - land_reserve, hour)
     if day < LAST_DAY:
         orders += _feed_orders(
-            herd, shed, obs["market"]["prices"], farm["money"] - seed_bill, carried_wheat
+            herd, shed, obs["market"]["prices"],
+            farm["money"] - seed_bill - (land_reserve if land_first else 0),
+            carried_wheat,
         )
         fertilizer_stock = shed.get("FERTILIZER", 0) + sum(
             inv.get("FERTILIZER", 0) for inv in inventories
@@ -1280,12 +1323,14 @@ def agent(obs):
         if ANIMAL_BUY_CAP > 0:
             buy_allowance = ANIMAL_BUY_CAP - herd - sum(held.values())
         orders += _animal_orders(
-            structures, held, farm["money"] - seed_bill - MIN_CASH, buy_allowance
+            structures, held,
+            farm["money"] - seed_bill - MIN_CASH - (land_reserve if land_first else 0),
+            buy_allowance,
         )
     # Hires last: both players share one descending price curve per order index,
     # so a sell at index 0 clears above a sell the opponent placed at index 3.
     # Truncation also drops the tail, and losing a hire beats losing a sale.
-    if DAIRY_LAND_COWS <= 0:
+    if DAIRY_LAND_COWS <= 0 and not land_first:
         orders += land_orders
     orders += hires
 

@@ -111,6 +111,19 @@ def test_owned_seed_is_free_in_plan_budget(monkeypatch):
     assert plan[(0, 0)] == "MELON"
 
 
+def test_central_herd_uses_new_land_for_missing_sheep():
+    herd = ["COW"] * 7 + ["SHEEP"] * 5
+    occupied = {(4, 4), (3, 4), (4, 3), (2, 4), (3, 3), (4, 2), (1, 4)}
+    tiles = [
+        (x, y, {"kind": "PASTURE", "animal": "COW"} if (x, y) in occupied else None)
+        for y in range(5)
+        for x in range(10)
+    ]
+    positions = main._central_herd_positions(tiles, 10, herd)
+    assert list(positions.values()) == ["SHEEP"] * 5
+    assert all(x >= 5 for x, _y in positions)
+
+
 def test_seed_order_batch_limits_units(monkeypatch):
     monkeypatch.setattr(main, "SEED_BUY_BATCH", 3)
     orders = main._seed_orders({"MELON": 5, "CARROT": 5}, 1_000)

@@ -2242,3 +2242,59 @@ Batched animal harvest is the interesting failure: a cow holds six and makes 1.5
 ## Method note
 
 Money-ranked sweeps, match points and the head-to-head disagreed on both surviving candidates. Round 14 set the rule for that case — the head-to-head against the champion decides, because it is the only one of the three that scores the way the ladder does — and it rejected both. Without that rule this round would have shipped two regressions.
+# Round 34: place future livestock near the centre
+
+Frozen 1.13.0 placed every animal in the northwest quadrant. Literal relocation is unavailable: occupied animal structures cannot be dug, and placed animals cannot be picked up or sold. The only safe lever is the position of animals placed after land unlocks.
+
+Central future placement reduced mean distance from 2.249 to 1.857 and used the northeast quadrant, but it was neutral at **+$232 +/- $721** over 100 paired seeds. Rebuilding empty outer structures was also neutral at **+$100 +/- $614**. Holding four or six herd slots until land unlock lost $9,000 to $11,000.
+
+The trace showed why. Central placement puts the final six animals down on day 9 instead of spreading placement over days 9 to 11. The existing feed reserve still sees the old six-animal herd, causing a transient feed shock. Two- and one-day incoming-animal feed reserves lost **-$3,141 +/- $1,203** and **-$2,209 +/- $1,087**. No central-only arm qualified for release.
+
+# Round 35: pace the herd across the land boundary
+
+The baseline is frozen 1.13.0. Round 34 showed that central placement is mechanically effective but turns the final herd expansion into one six-animal burst. Earlier broad timing changes were too expensive: delaying four or six slots lost about $10,000, and reserving feed for every incoming animal lost $2,000 to $3,000.
+
+The following narrower hypotheses were registered before implementation:
+
+1. Keep the opening unchanged, then limit post-land livestock additions to one, two, or three animals per day.
+2. Hold only the final one, two, or three sheep slots for northeast land instead of the rejected four- and six-slot delays.
+3. When first land and livestock compete for the same cash, reserve and order land first so the next livestock batch can use the central ring.
+4. Gate only a post-land purchase burst larger than two animals when available wheat cannot feed the expanded herd for one day.
+
+Each mechanism will run alone on the same seat-swapped seed block. Central placement will be combined only with a mechanism that first improves frozen 1.13.0 independently.
+
+Initial screen against frozen 1.13.0 used 20 paired seeds `743100..743119` and 40 games per arm:
+
+| Arm | Mean paired delta | Points | Result |
+|---|---:|---:|---|
+| Post-land limit 1 per day | -$133 +/- $261 | 50% | neutral-negative |
+| Post-land limit 2 per day | $0 +/- $0 | 50% | inert |
+| Post-land limit 3 per day | $0 +/- $0 | 50% | inert |
+| Hold one sheep for northeast land | -$3,254 +/- $2,288 | 32% | reject |
+| Hold two sheep for northeast land | -$123 +/- $3,082 | 55% | neutral |
+| Hold three sheep for northeast land | -$5,128 +/- $3,914 | 32% | reject |
+| Reserve and order land before livestock | +$1,452 +/- $1,170 | 68% | advance |
+| Gate a post-land burst on one-day feed | $0 +/- $0 | 50% | inert |
+
+The active post-land purchase burst is normally no larger than two, so limits two and three and the feed gate do not fire. Holding even one slot damages production. Land-first is the only arm eligible for fresh-seed confirmation and later combination with central placement.
+
+Land-first confirmed on 100 fresh paired seeds `743200..743299`: **+$1,413 +/- $784**, 64% points, 111 wins and 32 ties over 200 games, with no failures. It qualifies for combination with Round 34's neutral central-placement arm.
+
+The combination screen used 40 paired seeds `743400..743439`. Land-first plus central placement scored **+$2,224 +/- $1,499**, 69% points, against frozen 1.13.0. Against land-first alone, however, central placement added only **+$332 +/- $1,272**, 59% points, which is neutral. The central increment requires a larger direct confirmation before it can be selected.
+
+Central placement then confirmed directly against land-first alone on 100 fresh paired seeds `743500..743599`: **+$1,052 +/- $784**, 58% points, 116 wins over 200 games, with no failures. Both components now have independent positive confirmation.
+
+The combined candidate confirmed against frozen 1.13.0 on 200 fresh paired seeds `743800..743999`: **+$2,068 +/- $668**, 67% points, 268 wins over 400 games, with no failures.
+
+Geometry over 32 fresh episodes `744100..744131`:
+
+| Agent | Northeast placements | Mean central distance | First-land day |
+|---|---:|---:|---:|
+| Frozen 1.13.0 | 0 of 384 | 2.333 | mean 9.25, range 9-11 |
+| Combined candidate | 164 of 424 | 1.514 | day 9 in all episodes |
+
+The extra 40 placements are early replacements after the known day-9 feed shock, not late uneconomic purchases. A traced 15-placement episode bought three replacements on day 12, restored the herd by day 13, and made no later livestock purchase. Existing general feed reserves and standalone pacing arms were already rejected, so this round does not combine them post hoc.
+
+Regression pool over 10 paired seeds per opponent, 400 games total: 390 wins, 98% points, all 20 opponents positive, and no failures. The candidate beats frozen 1.13.0 in this pool by +$2,758 +/- $2,691 and is positive against every earlier release and specialist.
+
+Selected candidate: land-first ordering and central future-herd placement default on. All rejected Round 35 timing limits and feed gates were removed. The cleaned default is score-identical to the tested two-flag candidate over a final five-seed equivalence check. The suite passes 140 tests and Ruff.
