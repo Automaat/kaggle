@@ -1980,3 +1980,65 @@ The regression-pool gate used forty more paired seeds per opponent. The candidat
 Across ten diagnostic episodes, 1.12.0 bought 1.2 seeds per episode at hour 22. The candidate bought none. Both ended with zero seeds on average, so the gain comes from rejecting marginal final-hour work rather than removing visible closing inventory.
 
 **Kept:** do not buy seeds during the final market-clearing hour of each day.
+
+# Round 31: reinforcement-learned task routing
+
+The baseline is the confirmed round-30 candidate. Earlier task-centric routing reduced movement from 56% to 48% and still lost, so movement itself cannot be the reward.
+
+The design was registered before implementation:
+
+1. Keep the economy, task generation, urgent-task class, underfoot protection, carrying constraints, and final return as hard rules.
+2. Let a linear softmax policy rank only tasks inside the best safe class available to a unit.
+3. Use final seat-normalized money difference as the reward, without a direct movement bonus.
+4. Train with policy gradient against the frozen baseline on both player seats.
+5. Train three models separately: basic task features, task features with the daily work zone, and task features with the previous route target.
+6. Embed the winning weights for dependency-free inference and test every trained model against the frozen baseline on untouched seeds.
+
+Only a model that beats the baseline on fresh paired seeds and passes the regression pool may remain.
+
+## Training
+
+The policy uses nineteen features: task priority, raw and zone-adjusted distance, continuation distance, local task density, zone membership, previous-target membership, and one flag for each task kind. A hard safe class still places emergencies before underfoot work, nearby work, and distant work.
+
+Each model trained for eight policy-gradient iterations. Every iteration used ten new seeds in both player seats. Training used a softmax temperature of 0.2; deployed inference uses the highest-scoring allowed task.
+
+The last checkpoints screened on forty fresh paired seeds as follows:
+
+| Model | Result | Points | Decision |
+| :--- | ---: | ---: | :--- |
+| Basic features | -$150 +/- $1,621 | 46% | inspect checkpoints |
+| Daily zone | -$393 +/- $978 | 35% | inspect checkpoints |
+| Zone and previous target | -$1,033 +/- $962 | 31% | drop last checkpoint |
+
+The final checkpoint was not always the best training point. A separate twenty-seed validation block compared selected earlier checkpoints. Basic iterations four and six scored -$748 +/- $2,013 and -$440 +/- $1,644. Zone iteration four scored +$1,387 +/- $1,791. Memory iteration two scored +$773 +/- $1,670.
+
+## Checkpoint confirmation
+
+The two positive validation checkpoints received a common forty-seed screen that was not used for training or selection:
+
+| Checkpoint | Result | Points | Decision |
+| :--- | ---: | ---: | :--- |
+| Zone iteration four | +$1,220 +/- $1,453 | 60% | confirm |
+| Memory iteration two | +$166 +/- $921 | 52% | drop |
+
+The zone checkpoint confirmed on one hundred more fresh paired seeds at **+$1,177 +/- $884 and 57% points**, with 114 wins in 200 games and no failures.
+
+## Movement profile
+
+Ten diagnostic episodes compared the learned policy with the frozen round-30 baseline:
+
+| Unit turns | Baseline | Learned policy |
+| :--- | ---: | ---: |
+| Movement | 49.5% | 48.3% |
+| Work | 31.8% | 31.7% |
+| Idle | 14.9% | 16.2% |
+
+The policy removes 1.2 percentage points of walking without reducing completed work. The reward contained no movement term, so this is an outcome rather than a trained proxy target.
+
+## Release gate
+
+The embedded deterministic policy beat the frozen round-30 baseline on two hundred untouched paired seeds at **+$1,065 +/- $504 and 60% points**, with 239 wins in 400 games and no failures.
+
+The regression-pool gate used forty more paired seeds per opponent. The agent was positive against all nineteen opponents, won 1,462 of 1,520 games for 96% points, and had no failures. Against frozen 1.12.0 inside that gate it scored +$1,375 +/- $1,401 and 65% points.
+
+**Kept:** a terminal-reward policy-gradient task ranker with daily-zone features, using the iteration-four checkpoint.

@@ -121,3 +121,26 @@ def test_seed_orders_stop_before_last_market_hour(monkeypatch):
     monkeypatch.setattr(main, "SEED_BUY_STOP_HOUR", 22)
     assert main._seed_orders({"MELON": 1}, 1_000, 21) == [["BUY_SEED", "MELON", 1]]
     assert main._seed_orders({"MELON": 1}, 1_000, 22) == []
+
+
+def test_route_policy_keeps_best_safe_class(monkeypatch):
+    monkeypatch.setattr(main, "ROUTE_RL_TRAIN", False)
+    monkeypatch.setattr(main, "ROUTE_RL_WEIGHTS", (0.0,) * 19)
+    tasks = [
+        (2, 1, 0, ("WATER", None)),
+        (0, 9, 9, ("WATER!", None)),
+    ]
+    candidates = [
+        (0, 2, 1, 0, ("WATER", None), 1, 1, None, (1, 0)),
+        (1, 0, 9, 9, ("WATER!", None), 18, 18, None, (0, 0)),
+    ]
+    assert main._route_rl_choice(0, 1, candidates, tasks, set(), 0, {}) == 1
+
+
+def test_route_policy_feature_shape(monkeypatch):
+    monkeypatch.setattr(main, "ROUTE_RL_MODE", "memory")
+    tasks = [(2, 1, 1, ("WATER", None)), (5, 2, 1, ("HARVEST", None))]
+    candidate = (0, 2, 1, 1, ("WATER", None), 2, 3, 0)
+    features = main._route_rl_features(candidate, tasks, set(), 0, {0: (1, 1)})
+    assert len(features) == 19
+    assert features[5:7] == (1.0, 1.0)

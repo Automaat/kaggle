@@ -3,6 +3,7 @@
 import copy
 import math
 import os
+import random
 
 CROPS = {
     "WHEAT": {"seed": 10, "first_yield_day": 2, "max_yield_day": 4, "max_yield": 6, "ongoing": False},
@@ -111,6 +112,23 @@ SEED_BUY_BATCH = int(os.environ.get("KAGG_SEED_BUY_BATCH", "1"))
 SEED_BUY_STOP_HOUR = int(os.environ.get("KAGG_SEED_BUY_STOP_HOUR", "22"))
 ROUTE_CLUSTERS = _enabled("KAGG_ROUTE_CLUSTERS", True)
 ZONE_PENALTY = int(os.environ.get("KAGG_ZONE_PENALTY", "1"))
+ROUTE_RL = _enabled("KAGG_ROUTE_RL", True)
+ROUTE_RL_TRAIN = _enabled("KAGG_ROUTE_RL_TRAIN")
+ROUTE_RL_MODE = os.environ.get("KAGG_ROUTE_RL_MODE", "zones")
+ROUTE_RL_TEMPERATURE = float(os.environ.get("KAGG_ROUTE_RL_TEMPERATURE", "1"))
+ROUTE_RL_SEED = int(os.environ.get("KAGG_ROUTE_RL_SEED", "0"))
+ROUTE_RL_WEIGHTS = tuple(
+    float(value) for value in os.environ.get(
+        "KAGG_ROUTE_RL_WEIGHTS",
+        "1.98260991,0.09347249,0.59901971,0.10987049,0.04017883,0.02030121,0,"
+        "-0.09387490,0.09387490,0.01076748,0.05689937,-0.10339602,-0.06968239,"
+        "-0.08871294,0.08973577,-0.03714725,-0.02344201,0.02487270,0.00218397",
+    ).split(",")
+)
+ROUTE_RL_TASKS = (
+    "WATER!", "FEED!", "FEED", "WATER", "CARE", "FERTILIZE",
+    "HARVEST", "COLLECT_FERTILIZER", "PLACE", "PLANT", "BUILD", "DIG",
+)
 
 # Mirrors MARKET_PARAMS in the environment: price(inv) = base +- amp * f(|inv - I0|).
 MARKET_PARAMS = {
@@ -166,6 +184,8 @@ _race_active = False
 _opponent_state = {}
 _routes = {}
 _day_plans = {}
+_route_rl_stats = {}
+_route_rl_rng = {}
 
 
 def _town_consumption(step, shops):
@@ -1023,6 +1043,81 @@ def _task_key(prio, dist):
     return (1 if TRIP_RADIUS > 0 and dist <= TRIP_RADIUS else 2, prio, dist)
 
 
+def _route_rl_features(candidate, tasks, taken, unit_index, targets):
+    task_index, priority, x, y, task, raw_distance, distance, zone = candidate
+    continuations = [
+        abs(x - other_x) + abs(y - other_y)
+        for index, (_priority_value, other_x, other_y, _other_task) in enumerate(tasks)
+        if index != task_index and index not in taken
+    ]
+    continuation = min(continuations, default=0)
+    density = sum(value <= 2 for value in continuations)
+    in_zone = 1.0 if zone in (None, unit_index) else 0.0
+    same_target = 1.0 if targets.get(unit_index) == (x, y) else 0.0
+    if ROUTE_RL_MODE == "basic":
+        in_zone = 0.0
+        same_target = 0.0
+    elif ROUTE_RL_MODE == "zones":
+        same_target = 0.0
+    task_features = [1.0 if task[0] == name else 0.0 for name in ROUTE_RL_TASKS]
+    return (
+        -float(priority), -float(raw_distance), -float(distance), -float(continuation),
+        float(density), in_zone, same_target, *task_features,
+    )
+
+
+def _route_rl_state(player, step):
+    state = _route_rl_stats.get(player)
+    if state is None or step < state["step"]:
+        state = {
+            "step": step,
+            "gradient": [0.0] * len(ROUTE_RL_WEIGHTS),
+            "choices": 0,
+            "entropy": 0.0,
+        }
+        _route_rl_stats[player] = state
+        _route_rl_rng[player] = random.Random(ROUTE_RL_SEED + player * 1_000_003)
+    state["step"] = step
+    return state
+
+
+def _route_rl_choice(player, step, candidates, tasks, taken, unit_index, targets):
+    safe_class = min(candidate[-1] for candidate in candidates)
+    eligible = [candidate for candidate in candidates if candidate[-1] == safe_class]
+    features = [
+        _route_rl_features(candidate[:-1], tasks, taken, unit_index, targets)
+        for candidate in eligible
+    ]
+    scores = [sum(weight * value for weight, value in zip(ROUTE_RL_WEIGHTS, row)) for row in features]
+    if not ROUTE_RL_TRAIN:
+        return eligible[max(range(len(scores)), key=lambda index: scores[index])][0]
+    state = _route_rl_state(player, step)
+    ceiling = max(scores)
+    temperature = max(ROUTE_RL_TEMPERATURE, 1e-6)
+    masses = [math.exp((score - ceiling) / temperature) for score in scores]
+    total = sum(masses)
+    probabilities = [mass / total for mass in masses]
+    draw = _route_rl_rng[player].random()
+    selected = len(probabilities) - 1
+    cumulative = 0.0
+    for index, probability in enumerate(probabilities):
+        cumulative += probability
+        if draw <= cumulative:
+            selected = index
+            break
+    expected = [
+        sum(probability * row[index] for probability, row in zip(probabilities, features))
+        for index in range(len(ROUTE_RL_WEIGHTS))
+    ]
+    for index, value in enumerate(features[selected]):
+        state["gradient"][index] += value - expected[index]
+    state["choices"] += 1
+    state["entropy"] -= sum(
+        probability * math.log(max(probability, 1e-12)) for probability in probabilities
+    )
+    return eligible[selected][0]
+
+
 def _act(task, item):
     if task == "PLANT":
         return ["PLANT", item]
@@ -1273,12 +1368,14 @@ def agent(obs):
             continue
         chosen = None
         best = None
+        candidates = []
         for i, (prio, x, y, (task, item)) in enumerate(tasks):
             if i in taken or not _can_do(task, item, carried):
                 continue
             if protected.get(i, idx) != idx:
                 continue
-            dist = abs(pos[0] - x) + abs(pos[1] - y)
+            raw_dist = abs(pos[0] - x) + abs(pos[1] - y)
+            dist = raw_dist
             zone = zones.get((x, y)) if zones else None
             # A strip is a preference, not a fence: work still goes to whoever
             # is nearest, but a unit pays a few tiles of penalty for leaving the
@@ -1290,10 +1387,22 @@ def agent(obs):
             # away costs three. Only an emergency is worth walking away from.
             if UNDERFOOT and dist == 0 and prio > 0:
                 key = (0, 1, 0)
+            if prio == 0:
+                safe_class = (0, 0)
+            elif key[0] == 0:
+                safe_class = (0, 1)
+            else:
+                safe_class = (key[0], 0)
             if ROUTE_STICKY and targets.get(idx) == (x, y) and prio > 0:
                 key = (key[0], -1, dist)
+            candidates.append((i, prio, x, y, (task, item), raw_dist, dist, zone, safe_class))
             if best is None or key < best:
                 best, chosen = key, i
+        if ROUTE_RL and candidates:
+            chosen = _route_rl_choice(
+                player, obs.get("step", day * 24 + hour), candidates,
+                tasks, taken, idx, targets,
+            )
         if chosen is None:
             targets.pop(idx, None)
             ops.append(["PASS"])
