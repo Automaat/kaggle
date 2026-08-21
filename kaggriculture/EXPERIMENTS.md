@@ -2728,16 +2728,16 @@ baseline -> domain
 
 Exact interfaces:
 
-- `domain.py`: frozen `World(step, player, identity, data)` and recursive immutable value types;
+- `domain.py`: frozen `World(step, player, identity, data, overage_present, overage_value)`;
 - `model.py`: `normalize_observation(obs) -> World` and `thaw(world) -> dict`, with lossless unknown-field round trip and no input mutation;
 - `state.py`: `EpisodeState.observe(world) -> ObservationEvent` and `EpisodeState.record(action) -> None`; the policy owns this state;
 - `baseline.py`: `BaselinePolicy(path)`, `BaselinePolicy.reset() -> None` and `BaselinePolicy.act(obs) -> dict`; each reset executes the exact frozen source in a new private module object that is never added to `sys.modules`;
 - `policy.py`: `Agent2Policy(baseline_path)`, `Agent2Policy.act(obs) -> dict`; it owns `EpisodeState` and `BaselinePolicy` and delegates every new observation to 1.14.0;
-- `adapter.py`: `create_agent(baseline_path) -> Callable` and a fresh deep copy of every returned action;
+- `adapter.py`: `create_agent(baseline_path) -> Callable`; every new action is fresh and the duplicate path returns a deep copy of the cache;
 - candidate `main.py`: import the adapter module, create one private policy callable, then define top-level `agent(obs)` as the last callable and define no callable after it;
 - `tools/artifact.py`: `load_artifact(path) -> LoadedAgent` and safe extraction shared by the runner and tests;
 - `tools/runner.py`: keep callable, builtin, `champion`, specialist, current specialist, variant, relative `.py` and absolute `.py` behavior; delegate directories and `.tar.gz` files to `tools/artifact.py`;
-- `tools/package_agent.py`: deterministic `build_archive(source, output, metadata) -> Manifest`;
+- `tools/package_agent.py`: deterministic `build_archive(source, output, source_commit=None) -> Manifest`;
 - `tools/equivalence.py`: both-seat shadow comparison before each candidate action is applied;
 - external tests: normalization, duplicate calls, reset, import isolation, loader compatibility, safe extraction and exact packed-artifact execution.
 
@@ -2781,3 +2781,36 @@ The frozen artifact is a deterministic gzip-compressed POSIX tar with sorted pat
 The artifact becomes accepted only after a signed conventional commit and a Kaggle validation submission. The validation is an external release gate and does not permit merging this candidate into root `main.py`.
 
 Stage-specific unresolved questions: none after these contracts are implemented.
+
+## Stage 37.0 result: equivalent shell accepted locally
+
+Source commit: `215fa5a64d87ef4dc29b0d54924cab8bb6d2239c`.
+
+Frozen archive: `agents_2.0.x/round37_0_shell.tar.gz`, SHA-256 `d9563beb7f12c9116f200f350aad142abd07a7ff3b80ecde7d0af9d22dcb2ed2`. Two independent builds produced identical bytes. Its manifest records baseline commit `b74a3ea`, baseline SHA-256 `86951703eac27253938500eac664650c1e927d1b86b26ed84be008f24739d699`, Python 3.12.12, `kaggle-environments==1.32.7` and `townCenterSellInterval=24`.
+
+The registered run used the exact archive:
+
+```bash
+uv run --offline python tools/equivalence.py agents_2.0.x/round37_0_shell.tar.gz --seed-start 3700000 --seeds 100 --workers 8 --output research/round37_0_equivalence.json
+```
+
+| Gate | Result |
+|:---|---:|
+| Complete episodes | 200 |
+| Compared calls | 143,800 |
+| Action mismatches | 0 |
+| Failures | 0 |
+| Candidate mean money | $83,822 |
+| Frozen 1.13.0 opponent mean money | $81,616 |
+| Candidate mean call | 0.866 ms |
+| Baseline mean call | 0.747 ms |
+| p99 overhead | 0.179 ms |
+| Candidate worst call | 33.923 ms |
+| Summed agent CPU ratio | 1.159x |
+| Candidate cold archive import mean | 14.611 ms |
+
+All 168 tests pass. They include both saved replay seats, market-parameter overrides, duplicate calls, non-increasing-step reset, sequential policies, two package versions, same-stem paths, failed import cleanup, all loader forms, manifest verification, archive traversal and link rejection, deterministic builds from different paths, and a complete episode through the installed Kaggle loader after extraction.
+
+An initial run was invalid because `LoadedAgent` accepted only the observation while the local Kaggle runner passed observation and configuration to callable objects. It made the opponent return default actions. The run was discarded, the callable contract was fixed in `215fa5a`, and a regression test now requires two loaded file agents to finish with active policies. The full registered block above was rerun after that fix.
+
+Decision: accept Stage 37.0 as the behavior-equivalent local foundation. It changes no game decision and earns no score claim over 1.14.0. Root `main.py` remains byte-identical to frozen 1.14.0. Stage 37.1 can branch from the final result commit. Kaggle validation and any root release remain external gates; neither was performed in this stage.
