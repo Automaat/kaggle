@@ -3744,5 +3744,725 @@
       "Marcin Skalski"
     ],
     "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95949272": {
+    "episode": 95949272,
+    "file": "episode-95949272-replay.json.gz",
+    "rewards": [
+      62824.0,
+      40408.0
+    ],
+    "seed": 567985492,
+    "steps": 720,
+    "submission": 55667073,
+    "teams": [
+      "Marcin Skalski",
+      "Fleo98"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95951542": {
+    "episode": 95951542,
+    "file": "episode-95951542-replay.json.gz",
+    "rewards": [
+      30798.0,
+      68356.0
+    ],
+    "seed": 632211934,
+    "steps": 720,
+    "submission": 55667073,
+    "teams": [
+      "wata",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95953858": {
+    "episode": 95953858,
+    "file": "episode-95953858-replay.json.gz",
+    "rewards": [
+      77924.0,
+      118265.0
+    ],
+    "seed": 1932150404,
+    "steps": 720,
+    "submission": 55667073,
+    "teams": [
+      "Marcin Skalski",
+      "XiweiZhou"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95956167": {
+    "episode": 95956167,
+    "file": "episode-95956167-replay.json.gz",
+    "rewards": [
+      53491.0,
+      46905.0
+    ],
+    "seed": 790389059,
+    "steps": 720,
+    "submission": 55667073,
+    "teams": [
+      "Marcin Skalski",
+      "LitvinKA"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95958463": {
+    "episode": 95958463,
+    "file": "episode-95958463-replay.json.gz",
+    "rewards": [
+      68438.0,
+      71607.0
+    ],
+    "seed": 2013001343,
+    "steps": 720,
+    "submission": 55667073,
+    "teams": [
+      "arao",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95960743": {
+    "episode": 95960743,
+    "file": "episode-95960743-replay.json.gz",
+    "rewards": [
+      62877.0,
+      41073.0
+    ],
+    "seed": 334409995,
+    "steps": 720,
+    "submission": 55667073,
+    "teams": [
+      "Rashi Jain07",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95963034": {
+    "episode": 95963034,
+    "file": "episode-95963034-replay.json.gz",
+    "rewards": [
+      78661.0,
+      98092.0
+    ],
+    "seed": 1915166990,
+    "steps": 720,
+    "submission": 55667073,
+    "teams": [
+      "Marcin Skalski",
+      "Aftxb"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95965336": {
+    "episode": 95965336,
+    "file": "episode-95965336-replay.json.gz",
+    "rewards": [
+      105862.0,
+      118673.0
+    ],
+    "seed": 1938629582,
+    "steps": 720,
+    "submission": 55667073,
+    "teams": [
+      "Marcin Skalski",
+      "RhoenSprudel"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95967645": {
+    "episode": 95967645,
+    "file": "episode-95967645-replay.json.gz",
+    "rewards": [
+      78119.0,
+      84023.0
+    ],
+    "seed": 1209820013,
+    "steps": 720,
+    "submission": 55667073,
+    "teams": [
+      "Marcin Skalski",
+      "Howard lin"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95969940": {
+    "episode": 95969940,
+    "file": "episode-95969940-replay.json.gz",
+    "rewards": [
+      66838.0,
+      76560.0
+    ],
+    "seed": 1169877309,
+    "steps": 720,
+    "submission": 55667073,
+    "teams": [
+      "VIVEK JAMI",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95972232": {
+    "episode": 95972232,
+    "file": "episode-95972232-replay.json.gz",
+    "rewards": [
+      57445.0,
+      43464.0
+    ],
+    "seed": 696135486,
+    "steps": 720,
+    "submission": 55667073,
+    "teams": [
+      "cedric stephan ",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95974529": {
+    "episode": 95974529,
+    "file": "episode-95974529-replay.json.gz",
+    "rewards": [
+      62269.0,
+      41462.0
+    ],
+    "seed": 384973687,
+    "steps": 720,
+    "submission": 55667073,
+    "teams": [
+      "Marcin Skalski",
+      "rsraki"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95976813": {
+    "episode": 95976813,
+    "file": "episode-95976813-replay.json.gz",
+    "rewards": [
+      81547.0,
+      99021.0
+    ],
+    "seed": 1603385627,
+    "steps": 720,
+    "submission": 55667073,
+    "teams": [
+      "christopher athans crow",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95981459": {
+    "episode": 95981459,
+    "file": "episode-95981459-replay.json.gz",
+    "rewards": [
+      81928.0,
+      81928.0
+    ],
+    "seed": 0,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Marcin Skalski",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_VALIDATION"
+  },
+  "95985682": {
+    "episode": 95985682,
+    "file": "episode-95985682-replay.json.gz",
+    "rewards": [
+      57615.0,
+      122524.0
+    ],
+    "seed": 62546250,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Ztrk",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95987957": {
+    "episode": 95987957,
+    "file": "episode-95987957-replay.json.gz",
+    "rewards": [
+      108022.0,
+      26443.0
+    ],
+    "seed": 825453979,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Marcin Skalski",
+      "dimitris_x94"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95990232": {
+    "episode": 95990232,
+    "file": "episode-95990232-replay.json.gz",
+    "rewards": [
+      68836.0,
+      80405.0
+    ],
+    "seed": 307691510,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Bhupin Thapa magar",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95992500": {
+    "episode": 95992500,
+    "file": "episode-95992500-replay.json.gz",
+    "rewards": [
+      53356.0,
+      66935.0
+    ],
+    "seed": 183267576,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "shoaib khan",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95994777": {
+    "episode": 95994777,
+    "file": "episode-95994777-replay.json.gz",
+    "rewards": [
+      79353.0,
+      49933.0
+    ],
+    "seed": 1664966376,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Artem Garbart",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95997067": {
+    "episode": 95997067,
+    "file": "episode-95997067-replay.json.gz",
+    "rewards": [
+      76276.0,
+      45693.0
+    ],
+    "seed": 56845501,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "lungjyuanz",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95999381": {
+    "episode": 95999381,
+    "file": "episode-95999381-replay.json.gz",
+    "rewards": [
+      62192.0,
+      76314.0
+    ],
+    "seed": 1975169515,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Kyoungwon Jeong",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96001662": {
+    "episode": 96001662,
+    "file": "episode-96001662-replay.json.gz",
+    "rewards": [
+      92209.0,
+      76403.0
+    ],
+    "seed": 792082674,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Marcin Skalski",
+      "Aditya Bharadwaj"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96003941": {
+    "episode": 96003941,
+    "file": "episode-96003941-replay.json.gz",
+    "rewards": [
+      58336.0,
+      80305.0
+    ],
+    "seed": 1434326099,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "ghostiee11",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96006233": {
+    "episode": 96006233,
+    "file": "episode-96006233-replay.json.gz",
+    "rewards": [
+      53452.0,
+      78738.0
+    ],
+    "seed": 1500653589,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Marcin Skalski",
+      "llRX"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96008535": {
+    "episode": 96008535,
+    "file": "episode-96008535-replay.json.gz",
+    "rewards": [
+      55632.0,
+      89532.0
+    ],
+    "seed": 610042509,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Marcin Skalski",
+      "Tamizharuvi"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96010820": {
+    "episode": 96010820,
+    "file": "episode-96010820-replay.json.gz",
+    "rewards": [
+      74011.0,
+      60702.0
+    ],
+    "seed": 2127421768,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Rakhansyah",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96013094": {
+    "episode": 96013094,
+    "file": "episode-96013094-replay.json.gz",
+    "rewards": [
+      52576.0,
+      70562.0
+    ],
+    "seed": 1439332357,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Marcin Skalski",
+      "Hoo Woo"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96013367": {
+    "episode": 96013367,
+    "file": "episode-96013367-replay.json.gz",
+    "rewards": [
+      70727.0,
+      69924.0
+    ],
+    "seed": 68786237,
+    "steps": 720,
+    "submission": 55667073,
+    "teams": [
+      "Yaroslav Tanko",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96015406": {
+    "episode": 96015406,
+    "file": "episode-96015406-replay.json.gz",
+    "rewards": [
+      38470.0,
+      54928.0
+    ],
+    "seed": 1780841907,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Marcin Skalski",
+      "Pavel Pakhmutov"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96017696": {
+    "episode": 96017696,
+    "file": "episode-96017696-replay.json.gz",
+    "rewards": [
+      53118.0,
+      94010.0
+    ],
+    "seed": 799490662,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "tora",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96017906": {
+    "episode": 96017906,
+    "file": "episode-96017906-replay.json.gz",
+    "rewards": [
+      82865.0,
+      70117.0
+    ],
+    "seed": 85524168,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "SIDHAARTH SHREE",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96019986": {
+    "episode": 96019986,
+    "file": "episode-96019986-replay.json.gz",
+    "rewards": [
+      113516.0,
+      38082.0
+    ],
+    "seed": 904387369,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Marcin Skalski",
+      "GorillaGhost"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96022279": {
+    "episode": 96022279,
+    "file": "episode-96022279-replay.json.gz",
+    "rewards": [
+      102076.0,
+      126273.0
+    ],
+    "seed": 719305372,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Stanislav Kuznetsov",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96024568": {
+    "episode": 96024568,
+    "file": "episode-96024568-replay.json.gz",
+    "rewards": [
+      104124.0,
+      131000.0
+    ],
+    "seed": 692527443,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Marcin Skalski",
+      "LLE"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96026863": {
+    "episode": 96026863,
+    "file": "episode-96026863-replay.json.gz",
+    "rewards": [
+      39969.0,
+      84573.0
+    ],
+    "seed": 471227803,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Yaseen Shah7897",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96029143": {
+    "episode": 96029143,
+    "file": "episode-96029143-replay.json.gz",
+    "rewards": [
+      71825.0,
+      59463.0
+    ],
+    "seed": 534494147,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Marcin Skalski",
+      "(\u30ce\u25e1 <)"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96031436": {
+    "episode": 96031436,
+    "file": "episode-96031436-replay.json.gz",
+    "rewards": [
+      87877.0,
+      58103.0
+    ],
+    "seed": 1415995019,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Marcin Skalski",
+      "H\u01b0ng Tr\u1ea7n"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96033734": {
+    "episode": 96033734,
+    "file": "episode-96033734-replay.json.gz",
+    "rewards": [
+      87026.0,
+      67641.0
+    ],
+    "seed": 1574625189,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "TheDuck",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96036033": {
+    "episode": 96036033,
+    "file": "episode-96036033-replay.json.gz",
+    "rewards": [
+      125617.0,
+      97644.0
+    ],
+    "seed": 135888982,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "DEMON JI",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96038339": {
+    "episode": 96038339,
+    "file": "episode-96038339-replay.json.gz",
+    "rewards": [
+      99270.0,
+      50627.0
+    ],
+    "seed": 1602942275,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Aditi Salvi",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96040627": {
+    "episode": 96040627,
+    "file": "episode-96040627-replay.json.gz",
+    "rewards": [
+      125289.0,
+      98657.0
+    ],
+    "seed": 1414553267,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Xiangchen Li",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96042808": {
+    "episode": 96042808,
+    "file": "episode-96042808-replay.json.gz",
+    "rewards": [
+      109214.0,
+      98169.0
+    ],
+    "seed": 790358274,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Marcin Skalski",
+      "Rintaro Moriwaki"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96042919": {
+    "episode": 96042919,
+    "file": "episode-96042919-replay.json.gz",
+    "rewards": [
+      44422.0,
+      54198.0
+    ],
+    "seed": 274073499,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Marcin Skalski",
+      "AravindLochan"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96045240": {
+    "episode": 96045240,
+    "file": "episode-96045240-replay.json.gz",
+    "rewards": [
+      89213.0,
+      97948.0
+    ],
+    "seed": 1454014361,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Marcin Skalski",
+      "Hira Norm"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "96047508": {
+    "episode": 96047508,
+    "file": "episode-96047508-replay.json.gz",
+    "rewards": [
+      69212.0,
+      86184.0
+    ],
+    "seed": 1589016979,
+    "steps": 720,
+    "submission": 55669024,
+    "teams": [
+      "Marcin Skalski",
+      "Abhi Kumar Agrawal"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
   }
 }

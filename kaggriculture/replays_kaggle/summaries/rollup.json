@@ -10196,5 +10196,1980 @@
     "tiles": 50,
     "weeds": 6,
     "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 95949272,
+    "hands": 10,
+    "money": 62824.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 3,
+      "FERTILIZER": 141,
+      "MELON": 102,
+      "MILK": 182,
+      "STRAWBERRY": 161,
+      "TOMATO": 9,
+      "WHEAT": 38,
+      "WOOL": 54
+    },
+    "tiles": 50,
+    "weeds": 4,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 11,
+      "SHEEP": 4
+    },
+    "episode": 95949272,
+    "hands": 11,
+    "money": 40408.0,
+    "player": "Fleo98",
+    "sold": {
+      "FERTILIZER": 314,
+      "MELON": 144,
+      "MILK": 253,
+      "WHEAT": 115,
+      "WOOL": 104
+    },
+    "tiles": 25,
+    "weeds": 3,
+    "won": false
+  },
+  {
+    "animals": {},
+    "episode": 95951542,
+    "hands": 13,
+    "money": 30798.0,
+    "player": "wata",
+    "sold": {
+      "FERTILIZER": 92,
+      "MELON": 131,
+      "MILK": 61,
+      "STRAWBERRY": 109,
+      "WHEAT": 110,
+      "WOOL": 135
+    },
+    "tiles": 100,
+    "weeds": 10,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 95951542,
+    "hands": 10,
+    "money": 68356.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 8,
+      "FERTILIZER": 150,
+      "MELON": 131,
+      "MILK": 196,
+      "STRAWBERRY": 164,
+      "TOMATO": 13,
+      "WHEAT": 26,
+      "WOOL": 70
+    },
+    "tiles": 50,
+    "weeds": 3,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 95953858,
+    "hands": 10,
+    "money": 77924.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 10,
+      "FERTILIZER": 156,
+      "MELON": 174,
+      "MILK": 196,
+      "STRAWBERRY": 128,
+      "WHEAT": 50,
+      "WOOL": 44
+    },
+    "tiles": 50,
+    "weeds": 3,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "GOOSE": 8,
+      "SHEEP": 5
+    },
+    "episode": 95953858,
+    "hands": 16,
+    "money": 118265.0,
+    "player": "XiweiZhou",
+    "sold": {
+      "EGG": 221,
+      "FERTILIZER": 248,
+      "MELON": 82,
+      "MILK": 186,
+      "STRAWBERRY": 305,
+      "TOMATO": 53,
+      "WHEAT": 211,
+      "WOOL": 125
+    },
+    "tiles": 100,
+    "weeds": 33,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 95956167,
+    "hands": 10,
+    "money": 53491.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 18,
+      "FERTILIZER": 158,
+      "MELON": 138,
+      "MILK": 212,
+      "STRAWBERRY": 147,
+      "WHEAT": 40,
+      "WOOL": 83
+    },
+    "tiles": 50,
+    "weeds": 3,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 8,
+      "SHEEP": 5
+    },
+    "episode": 95956167,
+    "hands": 12,
+    "money": 46905.0,
+    "player": "LitvinKA",
+    "sold": {
+      "FERTILIZER": 180,
+      "MELON": 109,
+      "MILK": 524,
+      "STRAWBERRY": 340,
+      "WHEAT": 38,
+      "WOOL": 231
+    },
+    "tiles": 75,
+    "weeds": 13,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 3,
+      "GOOSE": 5,
+      "SHEEP": 4
+    },
+    "episode": 95958463,
+    "hands": 11,
+    "money": 68438.0,
+    "player": "arao",
+    "sold": {
+      "EGG": 126,
+      "FERTILIZER": 103,
+      "MELON": 83,
+      "MILK": 60,
+      "STRAWBERRY": 135,
+      "WHEAT": 254.0,
+      "WOOL": 128
+    },
+    "tiles": 75,
+    "weeds": 8,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 95958463,
+    "hands": 10,
+    "money": 71607.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 12,
+      "FERTILIZER": 180,
+      "MELON": 183,
+      "MILK": 197,
+      "STRAWBERRY": 118,
+      "WHEAT": 61,
+      "WOOL": 80
+    },
+    "tiles": 50,
+    "weeds": 4,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 8,
+      "SHEEP": 6
+    },
+    "episode": 95960743,
+    "hands": 14,
+    "money": 62877.0,
+    "player": "Rashi Jain07",
+    "sold": {
+      "CARROT": 12,
+      "FERTILIZER": 147,
+      "MELON": 98,
+      "MILK": 156,
+      "STRAWBERRY": 219,
+      "WHEAT": 282,
+      "WOOL": 148
+    },
+    "tiles": 75,
+    "weeds": 24,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 95960743,
+    "hands": 10,
+    "money": 41073.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 3,
+      "FERTILIZER": 142,
+      "MELON": 96,
+      "MILK": 186,
+      "STRAWBERRY": 194,
+      "TOMATO": 21,
+      "WHEAT": 36,
+      "WOOL": 69
+    },
+    "tiles": 50,
+    "weeds": 2,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 95963034,
+    "hands": 10,
+    "money": 78661.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 3,
+      "FERTILIZER": 165,
+      "MELON": 90,
+      "MILK": 181,
+      "STRAWBERRY": 182,
+      "TOMATO": 32,
+      "WHEAT": 30,
+      "WOOL": 72
+    },
+    "tiles": 50,
+    "weeds": 5,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 8,
+      "SHEEP": 8
+    },
+    "episode": 95963034,
+    "hands": 14,
+    "money": 98092.0,
+    "player": "Aftxb",
+    "sold": {
+      "FERTILIZER": 257,
+      "MELON": 126,
+      "MILK": 221,
+      "STRAWBERRY": 234,
+      "WHEAT": 24,
+      "WOOL": 172
+    },
+    "tiles": 75,
+    "weeds": 18,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 95965336,
+    "hands": 10,
+    "money": 105862.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 2,
+      "FERTILIZER": 142,
+      "MELON": 95,
+      "MILK": 168,
+      "STRAWBERRY": 199,
+      "WHEAT": 60,
+      "WOOL": 44
+    },
+    "tiles": 50,
+    "weeds": 5,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 8,
+      "SHEEP": 8
+    },
+    "episode": 95965336,
+    "hands": 11,
+    "money": 118673.0,
+    "player": "RhoenSprudel",
+    "sold": {
+      "CARROT": 1169,
+      "EGG": 1100,
+      "FERTILIZER": 1356,
+      "MELON": 1210,
+      "MILK": 1307,
+      "STRAWBERRY": 1164,
+      "TOMATO": 1100,
+      "WHEAT": 1174,
+      "WOOL": 1272
+    },
+    "tiles": 50,
+    "weeds": 7,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 95967645,
+    "hands": 10,
+    "money": 78119.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 69,
+      "FERTILIZER": 189,
+      "MELON": 198,
+      "MILK": 193,
+      "STRAWBERRY": 61,
+      "TOMATO": 24,
+      "WHEAT": 36,
+      "WOOL": 70
+    },
+    "tiles": 50,
+    "weeds": 5,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 4,
+      "SHEEP": 7
+    },
+    "episode": 95967645,
+    "hands": 11,
+    "money": 84023.0,
+    "player": "Howard lin",
+    "sold": {
+      "CARROT": 126,
+      "FERTILIZER": 288,
+      "MELON": 178,
+      "MILK": 144,
+      "WHEAT": 1348,
+      "WOOL": 139
+    },
+    "tiles": 75,
+    "weeds": 5,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 1,
+      "GOOSE": 14,
+      "SHEEP": 6
+    },
+    "episode": 95969940,
+    "hands": 13,
+    "money": 66838.0,
+    "player": "VIVEK JAMI",
+    "sold": {
+      "CARROT": 19,
+      "EGG": 510,
+      "FERTILIZER": 354,
+      "MELON": 60,
+      "MILK": 34,
+      "STRAWBERRY": 73,
+      "WHEAT": 53,
+      "WOOL": 63
+    },
+    "tiles": 100,
+    "weeds": 11,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 95969940,
+    "hands": 10,
+    "money": 76560.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 8,
+      "FERTILIZER": 134,
+      "MELON": 128,
+      "MILK": 164,
+      "STRAWBERRY": 140,
+      "TOMATO": 35,
+      "WHEAT": 45,
+      "WOOL": 49
+    },
+    "tiles": 50,
+    "weeds": 5,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 8,
+      "SHEEP": 6
+    },
+    "episode": 95972232,
+    "hands": 12,
+    "money": 57445.0,
+    "player": "cedric stephan ",
+    "sold": {
+      "FERTILIZER": 182,
+      "MELON": 88,
+      "MILK": 150,
+      "STRAWBERRY": 182,
+      "WHEAT": 143,
+      "WOOL": 126
+    },
+    "tiles": 75,
+    "weeds": 12,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 95972232,
+    "hands": 10,
+    "money": 43464.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 15,
+      "FERTILIZER": 167,
+      "MELON": 108,
+      "MILK": 187,
+      "STRAWBERRY": 173,
+      "TOMATO": 27,
+      "WHEAT": 24,
+      "WOOL": 72
+    },
+    "tiles": 50,
+    "weeds": 4,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 95974529,
+    "hands": 10,
+    "money": 62269.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 73,
+      "FERTILIZER": 191,
+      "MELON": 180,
+      "MILK": 176,
+      "STRAWBERRY": 83,
+      "WHEAT": 23,
+      "WOOL": 73
+    },
+    "tiles": 50,
+    "weeds": 5,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 5,
+      "SHEEP": 2
+    },
+    "episode": 95974529,
+    "hands": 12,
+    "money": 41462.0,
+    "player": "rsraki",
+    "sold": {
+      "FERTILIZER": 37,
+      "MELON": 66,
+      "MILK": 141,
+      "STRAWBERRY": 104,
+      "WHEAT": 244,
+      "WOOL": 63
+    },
+    "tiles": 75,
+    "weeds": 33,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 11,
+      "GOOSE": 2,
+      "SHEEP": 5
+    },
+    "episode": 95976813,
+    "hands": 13,
+    "money": 81547.0,
+    "player": "christopher athans crow",
+    "sold": {
+      "EGG": 57,
+      "FERTILIZER": 162,
+      "MELON": 108,
+      "MILK": 149,
+      "STRAWBERRY": 144,
+      "WHEAT": 338,
+      "WOOL": 128
+    },
+    "tiles": 75,
+    "weeds": 26,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 95976813,
+    "hands": 10,
+    "money": 99021.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 8,
+      "FERTILIZER": 152,
+      "MELON": 102,
+      "MILK": 195,
+      "STRAWBERRY": 182,
+      "TOMATO": 26,
+      "WHEAT": 44,
+      "WOOL": 61
+    },
+    "tiles": 50,
+    "weeds": 7,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 4
+    },
+    "episode": 95981459,
+    "hands": 10,
+    "money": 81928.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 9,
+      "FERTILIZER": 181,
+      "MELON": 90,
+      "MILK": 216,
+      "STRAWBERRY": 206,
+      "WHEAT": 35,
+      "WOOL": 96
+    },
+    "tiles": 50,
+    "weeds": 2,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 4
+    },
+    "episode": 95981459,
+    "hands": 10,
+    "money": 81928.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 9,
+      "FERTILIZER": 181,
+      "MELON": 90,
+      "MILK": 216,
+      "STRAWBERRY": 206,
+      "WHEAT": 35,
+      "WOOL": 96
+    },
+    "tiles": 50,
+    "weeds": 2,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 4,
+      "SHEEP": 1
+    },
+    "episode": 95985682,
+    "hands": 12,
+    "money": 57615.0,
+    "player": "Ztrk",
+    "sold": {
+      "FERTILIZER": 368,
+      "MILK": 190,
+      "WHEAT": 138,
+      "WOOL": 121
+    },
+    "tiles": 25,
+    "weeds": 4,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 6,
+      "SHEEP": 5
+    },
+    "episode": 95985682,
+    "hands": 10,
+    "money": 122524.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 6,
+      "FERTILIZER": 179,
+      "MELON": 132,
+      "MILK": 188,
+      "STRAWBERRY": 176,
+      "WHEAT": 63,
+      "WOOL": 90
+    },
+    "tiles": 50,
+    "weeds": 1,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 95987957,
+    "hands": 10,
+    "money": 108022.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 38,
+      "FERTILIZER": 169,
+      "MELON": 84,
+      "MILK": 204,
+      "STRAWBERRY": 134,
+      "TOMATO": 4,
+      "WHEAT": 24,
+      "WOOL": 83
+    },
+    "tiles": 50,
+    "weeds": 1,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 4,
+      "SHEEP": 4
+    },
+    "episode": 95987957,
+    "hands": 8,
+    "money": 26443.0,
+    "player": "dimitris_x94",
+    "sold": {
+      "FERTILIZER": 123,
+      "MELON": 132,
+      "MILK": 20,
+      "STRAWBERRY": 50,
+      "WOOL": 16
+    },
+    "tiles": 100,
+    "weeds": 9,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 95990232,
+    "hands": 8,
+    "money": 68836.0,
+    "player": "Bhupin Thapa magar",
+    "sold": {
+      "FERTILIZER": 228,
+      "MELON": 66,
+      "MILK": 142,
+      "STRAWBERRY": 142,
+      "WHEAT": 343,
+      "WOOL": 117
+    },
+    "tiles": 75,
+    "weeds": 12,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 3
+    },
+    "episode": 95990232,
+    "hands": 10,
+    "money": 80405.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 3,
+      "FERTILIZER": 203,
+      "MELON": 165,
+      "MILK": 206,
+      "STRAWBERRY": 139,
+      "WHEAT": 98,
+      "WOOL": 82
+    },
+    "tiles": 50,
+    "weeds": 0,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 8,
+      "SHEEP": 9
+    },
+    "episode": 95992500,
+    "hands": 9,
+    "money": 53356.0,
+    "player": "shoaib khan",
+    "sold": {
+      "FERTILIZER": 259,
+      "MELON": 48,
+      "MILK": 161,
+      "STRAWBERRY": 151,
+      "WHEAT": 267,
+      "WOOL": 87
+    },
+    "tiles": 75,
+    "weeds": 14,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 95992500,
+    "hands": 10,
+    "money": 66935.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 39,
+      "FERTILIZER": 187,
+      "MELON": 120,
+      "MILK": 211,
+      "STRAWBERRY": 174,
+      "WHEAT": 24,
+      "WOOL": 87
+    },
+    "tiles": 50,
+    "weeds": 7,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 8,
+      "SHEEP": 5
+    },
+    "episode": 95994777,
+    "hands": 12,
+    "money": 79353.0,
+    "player": "Artem Garbart",
+    "sold": {
+      "CARROT": 13,
+      "EGG": 8,
+      "FERTILIZER": 445,
+      "MELON": 313,
+      "MILK": 982,
+      "STRAWBERRY": 1039,
+      "TOMATO": 4,
+      "WHEAT": 1131,
+      "WOOL": 463
+    },
+    "tiles": 75,
+    "weeds": 19,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 3
+    },
+    "episode": 95994777,
+    "hands": 10,
+    "money": 49933.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 12,
+      "FERTILIZER": 176,
+      "MELON": 129,
+      "MILK": 212,
+      "STRAWBERRY": 176,
+      "WHEAT": 58,
+      "WOOL": 85
+    },
+    "tiles": 50,
+    "weeds": 3,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 8,
+      "SHEEP": 5
+    },
+    "episode": 95997067,
+    "hands": 12,
+    "money": 76276.0,
+    "player": "lungjyuanz",
+    "sold": {
+      "CARROT": 13,
+      "EGG": 8,
+      "FERTILIZER": 445,
+      "MELON": 224,
+      "MILK": 697,
+      "STRAWBERRY": 655,
+      "TOMATO": 4,
+      "WHEAT": 1108,
+      "WOOL": 373
+    },
+    "tiles": 75,
+    "weeds": 20,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 4
+    },
+    "episode": 95997067,
+    "hands": 10,
+    "money": 45693.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 6,
+      "FERTILIZER": 190,
+      "MELON": 120,
+      "MILK": 206,
+      "STRAWBERRY": 195,
+      "WHEAT": 55,
+      "WOOL": 89
+    },
+    "tiles": 50,
+    "weeds": 2,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 6,
+      "GOOSE": 3,
+      "SHEEP": 5
+    },
+    "episode": 95999381,
+    "hands": 10,
+    "money": 62192.0,
+    "player": "Kyoungwon Jeong",
+    "sold": {
+      "CARROT": 6,
+      "EGG": 88,
+      "FERTILIZER": 215,
+      "MELON": 60,
+      "MILK": 153,
+      "STRAWBERRY": 186,
+      "WHEAT": 160,
+      "WOOL": 128
+    },
+    "tiles": 75,
+    "weeds": 11,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 3
+    },
+    "episode": 95999381,
+    "hands": 10,
+    "money": 76314.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "FERTILIZER": 171,
+      "MELON": 78,
+      "MILK": 202,
+      "STRAWBERRY": 224,
+      "WHEAT": 24,
+      "WOOL": 94
+    },
+    "tiles": 50,
+    "weeds": 1,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 3
+    },
+    "episode": 96001662,
+    "hands": 10,
+    "money": 92209.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 12,
+      "FERTILIZER": 182,
+      "MELON": 108,
+      "MILK": 215,
+      "STRAWBERRY": 182,
+      "WHEAT": 56,
+      "WOOL": 82
+    },
+    "tiles": 50,
+    "weeds": 2,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 2
+    },
+    "episode": 96001662,
+    "hands": 14,
+    "money": 76403.0,
+    "player": "Aditya Bharadwaj",
+    "sold": {
+      "FERTILIZER": 175,
+      "MELON": 103,
+      "MILK": 183,
+      "STRAWBERRY": 160,
+      "TOMATO": 46,
+      "WHEAT": 318,
+      "WOOL": 64
+    },
+    "tiles": 50,
+    "weeds": 1,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 2,
+      "SHEEP": 10
+    },
+    "episode": 96003941,
+    "hands": 12,
+    "money": 58336.0,
+    "player": "ghostiee11",
+    "sold": {
+      "CARROT": 36,
+      "FERTILIZER": 272,
+      "MELON": 104,
+      "MILK": 68,
+      "STRAWBERRY": 129,
+      "WHEAT": 414,
+      "WOOL": 141
+    },
+    "tiles": 75,
+    "weeds": 21,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 3
+    },
+    "episode": 96003941,
+    "hands": 10,
+    "money": 80305.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 12,
+      "FERTILIZER": 173,
+      "MELON": 94,
+      "MILK": 212,
+      "STRAWBERRY": 214,
+      "WHEAT": 24,
+      "WOOL": 86
+    },
+    "tiles": 50,
+    "weeds": 2,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 96006233,
+    "hands": 10,
+    "money": 53452.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 5,
+      "FERTILIZER": 170,
+      "MELON": 95,
+      "MILK": 184,
+      "STRAWBERRY": 117,
+      "TOMATO": 46,
+      "WHEAT": 80,
+      "WOOL": 84
+    },
+    "tiles": 50,
+    "weeds": 1,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 8,
+      "SHEEP": 6
+    },
+    "episode": 96006233,
+    "hands": 15,
+    "money": 78738.0,
+    "player": "llRX",
+    "sold": {
+      "FERTILIZER": 240,
+      "MELON": 132,
+      "MILK": 227,
+      "STRAWBERRY": 266,
+      "WHEAT": 188,
+      "WOOL": 168
+    },
+    "tiles": 75,
+    "weeds": 14,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 3
+    },
+    "episode": 96008535,
+    "hands": 10,
+    "money": 55632.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 24,
+      "FERTILIZER": 183,
+      "MELON": 120,
+      "MILK": 214,
+      "STRAWBERRY": 189,
+      "WHEAT": 38,
+      "WOOL": 89
+    },
+    "tiles": 50,
+    "weeds": 3,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 8,
+      "SHEEP": 5
+    },
+    "episode": 96008535,
+    "hands": 12,
+    "money": 89532.0,
+    "player": "Tamizharuvi",
+    "sold": {
+      "CARROT": 13,
+      "EGG": 8,
+      "FERTILIZER": 446,
+      "MELON": 224,
+      "MILK": 572,
+      "STRAWBERRY": 614,
+      "TOMATO": 4,
+      "WHEAT": 1106,
+      "WOOL": 360
+    },
+    "tiles": 75,
+    "weeds": 20,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 5,
+      "SHEEP": 8
+    },
+    "episode": 96010820,
+    "hands": 13,
+    "money": 74011.0,
+    "player": "Rakhansyah",
+    "sold": {
+      "FERTILIZER": 269,
+      "MELON": 70,
+      "MILK": 157,
+      "STRAWBERRY": 245,
+      "TOMATO": 1,
+      "WHEAT": 21,
+      "WOOL": 194
+    },
+    "tiles": 75,
+    "weeds": 0,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 3
+    },
+    "episode": 96010820,
+    "hands": 10,
+    "money": 60702.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 14,
+      "FERTILIZER": 192,
+      "MELON": 108,
+      "MILK": 211,
+      "STRAWBERRY": 163,
+      "TOMATO": 14,
+      "WHEAT": 68,
+      "WOOL": 93
+    },
+    "tiles": 50,
+    "weeds": 2,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 3
+    },
+    "episode": 96013094,
+    "hands": 10,
+    "money": 52576.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 92,
+      "FERTILIZER": 210,
+      "MELON": 148,
+      "MILK": 210,
+      "STRAWBERRY": 131,
+      "WHEAT": 24,
+      "WOOL": 82
+    },
+    "tiles": 50,
+    "weeds": 1,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 10,
+      "SHEEP": 4
+    },
+    "episode": 96013094,
+    "hands": 12,
+    "money": 70562.0,
+    "player": "Hoo Woo",
+    "sold": {
+      "CARROT": 6,
+      "FERTILIZER": 200,
+      "MELON": 72,
+      "MILK": 194,
+      "STRAWBERRY": 233,
+      "WHEAT": 44,
+      "WOOL": 112
+    },
+    "tiles": 75,
+    "weeds": 20,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 5,
+      "SHEEP": 8
+    },
+    "episode": 96013367,
+    "hands": 12,
+    "money": 70727.0,
+    "player": "Yaroslav Tanko",
+    "sold": {
+      "FERTILIZER": 94,
+      "MELON": 104,
+      "MILK": 161,
+      "STRAWBERRY": 146,
+      "WHEAT": 36,
+      "WOOL": 157
+    },
+    "tiles": 75,
+    "weeds": 4,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 96013367,
+    "hands": 10,
+    "money": 69924.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "FERTILIZER": 168,
+      "MELON": 120,
+      "MILK": 194,
+      "STRAWBERRY": 174,
+      "TOMATO": 6,
+      "WHEAT": 36,
+      "WOOL": 80
+    },
+    "tiles": 50,
+    "weeds": 5,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 4
+    },
+    "episode": 96015406,
+    "hands": 10,
+    "money": 38470.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 15,
+      "FERTILIZER": 166,
+      "MELON": 102,
+      "MILK": 200,
+      "STRAWBERRY": 219,
+      "WHEAT": 44,
+      "WOOL": 82
+    },
+    "tiles": 50,
+    "weeds": 2,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 6,
+      "GOOSE": 10,
+      "SHEEP": 4
+    },
+    "episode": 96015406,
+    "hands": 11,
+    "money": 54928.0,
+    "player": "Pavel Pakhmutov",
+    "sold": {
+      "EGG": 312,
+      "FERTILIZER": 266,
+      "MELON": 93,
+      "MILK": 135,
+      "STRAWBERRY": 72,
+      "WHEAT": 23,
+      "WOOL": 74
+    },
+    "tiles": 75,
+    "weeds": 18,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 6
+    },
+    "episode": 96017696,
+    "hands": 13,
+    "money": 53118.0,
+    "player": "tora",
+    "sold": {
+      "FERTILIZER": 103,
+      "MELON": 78,
+      "MILK": 138,
+      "STRAWBERRY": 61,
+      "WHEAT": 104,
+      "WOOL": 64
+    },
+    "tiles": 75,
+    "weeds": 9,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 3
+    },
+    "episode": 96017696,
+    "hands": 10,
+    "money": 94010.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 8,
+      "FERTILIZER": 198,
+      "MELON": 170,
+      "MILK": 210,
+      "STRAWBERRY": 113,
+      "TOMATO": 6,
+      "WHEAT": 119,
+      "WOOL": 93
+    },
+    "tiles": 50,
+    "weeds": 2,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 2,
+      "SHEEP": 8
+    },
+    "episode": 96017906,
+    "hands": 10,
+    "money": 82865.0,
+    "player": "SIDHAARTH SHREE",
+    "sold": {
+      "FERTILIZER": 183,
+      "MELON": 83,
+      "MILK": 68,
+      "STRAWBERRY": 238,
+      "WHEAT": 44,
+      "WOOL": 139
+    },
+    "tiles": 75,
+    "weeds": 33,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 3
+    },
+    "episode": 96017906,
+    "hands": 10,
+    "money": 70117.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 30,
+      "FERTILIZER": 169,
+      "MELON": 96,
+      "MILK": 209,
+      "STRAWBERRY": 205,
+      "WHEAT": 24,
+      "WOOL": 88
+    },
+    "tiles": 50,
+    "weeds": 2,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 4
+    },
+    "episode": 96019986,
+    "hands": 10,
+    "money": 113516.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 52,
+      "FERTILIZER": 173,
+      "MELON": 114,
+      "MILK": 198,
+      "STRAWBERRY": 148,
+      "WHEAT": 24,
+      "WOOL": 92
+    },
+    "tiles": 50,
+    "weeds": 2,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 4,
+      "SHEEP": 1
+    },
+    "episode": 96019986,
+    "hands": 11,
+    "money": 38082.0,
+    "player": "GorillaGhost",
+    "sold": {
+      "CARROT": 64,
+      "FERTILIZER": 110,
+      "MELON": 18,
+      "MILK": 113,
+      "STRAWBERRY": 16,
+      "WHEAT": 1036,
+      "WOOL": 26
+    },
+    "tiles": 75,
+    "weeds": 16,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 8,
+      "SHEEP": 3
+    },
+    "episode": 96022279,
+    "hands": 12,
+    "money": 102076.0,
+    "player": "Stanislav Kuznetsov",
+    "sold": {
+      "CARROT": 15,
+      "FERTILIZER": 199,
+      "MELON": 94,
+      "MILK": 222,
+      "STRAWBERRY": 125,
+      "WHEAT": 1129,
+      "WOOL": 73
+    },
+    "tiles": 75,
+    "weeds": 1,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 96022279,
+    "hands": 10,
+    "money": 126273.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "FERTILIZER": 166,
+      "MELON": 78,
+      "MILK": 220,
+      "STRAWBERRY": 226,
+      "WHEAT": 28,
+      "WOOL": 96
+    },
+    "tiles": 50,
+    "weeds": 1,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 96024568,
+    "hands": 10,
+    "money": 104124.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 21,
+      "FERTILIZER": 206,
+      "MELON": 148,
+      "MILK": 204,
+      "STRAWBERRY": 157,
+      "WHEAT": 80,
+      "WOOL": 101
+    },
+    "tiles": 50,
+    "weeds": 6,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 4
+    },
+    "episode": 96024568,
+    "hands": 14,
+    "money": 131000.0,
+    "player": "LLE",
+    "sold": {
+      "FERTILIZER": 301,
+      "MELON": 124,
+      "MILK": 325,
+      "STRAWBERRY": 285,
+      "WHEAT": 243,
+      "WOOL": 162
+    },
+    "tiles": 75,
+    "weeds": 5,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 8,
+      "SHEEP": 4
+    },
+    "episode": 96026863,
+    "hands": 11,
+    "money": 39969.0,
+    "player": "Yaseen Shah7897",
+    "sold": {
+      "FERTILIZER": 182,
+      "MELON": 132,
+      "MILK": 165,
+      "STRAWBERRY": 135,
+      "WHEAT": 14,
+      "WOOL": 17
+    },
+    "tiles": 50,
+    "weeds": 3,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 96026863,
+    "hands": 10,
+    "money": 84573.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 36,
+      "FERTILIZER": 172,
+      "MELON": 108,
+      "MILK": 197,
+      "STRAWBERRY": 199,
+      "WHEAT": 24,
+      "WOOL": 76
+    },
+    "tiles": 50,
+    "weeds": 2,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 3
+    },
+    "episode": 96029143,
+    "hands": 10,
+    "money": 71825.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 3,
+      "FERTILIZER": 167,
+      "MELON": 90,
+      "MILK": 218,
+      "STRAWBERRY": 203,
+      "WHEAT": 28,
+      "WOOL": 88
+    },
+    "tiles": 50,
+    "weeds": 1,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 3,
+      "SHEEP": 1
+    },
+    "episode": 96029143,
+    "hands": 12,
+    "money": 59463.0,
+    "player": "(\u30ce\u25e1 <)",
+    "sold": {
+      "CARROT": 61,
+      "FERTILIZER": 64,
+      "MELON": 120,
+      "MILK": 62,
+      "STRAWBERRY": 168,
+      "WHEAT": 456,
+      "WOOL": 34
+    },
+    "tiles": 75,
+    "weeds": 5,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 96031436,
+    "hands": 10,
+    "money": 87877.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 6,
+      "FERTILIZER": 180,
+      "MELON": 95,
+      "MILK": 201,
+      "STRAWBERRY": 230,
+      "WHEAT": 33,
+      "WOOL": 84
+    },
+    "tiles": 50,
+    "weeds": 2,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 2
+    },
+    "episode": 96031436,
+    "hands": 13,
+    "money": 58103.0,
+    "player": "H\u01b0ng Tr\u1ea7n",
+    "sold": {
+      "FERTILIZER": 108,
+      "MELON": 120,
+      "MILK": 153,
+      "STRAWBERRY": 323,
+      "WOOL": 55
+    },
+    "tiles": 75,
+    "weeds": 18,
+    "won": false
+  },
+  {
+    "animals": {
+      "SHEEP": 13
+    },
+    "episode": 96033734,
+    "hands": 11,
+    "money": 87026.0,
+    "player": "TheDuck",
+    "sold": {
+      "FERTILIZER": 142,
+      "MELON": 78,
+      "MILK": 22,
+      "STRAWBERRY": 162,
+      "WHEAT": 296,
+      "WOOL": 272
+    },
+    "tiles": 75,
+    "weeds": 16,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 96033734,
+    "hands": 10,
+    "money": 67641.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "FERTILIZER": 168,
+      "MELON": 78,
+      "MILK": 188,
+      "STRAWBERRY": 226,
+      "TOMATO": 8,
+      "WHEAT": 25,
+      "WOOL": 95
+    },
+    "tiles": 50,
+    "weeds": 1,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 9,
+      "SHEEP": 6
+    },
+    "episode": 96036033,
+    "hands": 10,
+    "money": 125617.0,
+    "player": "DEMON JI",
+    "sold": {
+      "FERTILIZER": 255,
+      "MELON": 90,
+      "MILK": 204,
+      "STRAWBERRY": 158,
+      "WHEAT": 95,
+      "WOOL": 167
+    },
+    "tiles": 75,
+    "weeds": 17,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 3
+    },
+    "episode": 96036033,
+    "hands": 10,
+    "money": 97644.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 18,
+      "FERTILIZER": 221,
+      "MELON": 207,
+      "MILK": 196,
+      "STRAWBERRY": 55,
+      "TOMATO": 8,
+      "WHEAT": 147,
+      "WOOL": 84
+    },
+    "tiles": 50,
+    "weeds": 1,
+    "won": false
+  },
+  {
+    "animals": {
+      "GOOSE": 3,
+      "SHEEP": 13
+    },
+    "episode": 96038339,
+    "hands": 11,
+    "money": 99270.0,
+    "player": "Aditi Salvi",
+    "sold": {
+      "CARROT": 8,
+      "EGG": 64,
+      "FERTILIZER": 201,
+      "MELON": 102,
+      "STRAWBERRY": 115,
+      "WHEAT": 369,
+      "WOOL": 281
+    },
+    "tiles": 75,
+    "weeds": 31,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 4
+    },
+    "episode": 96038339,
+    "hands": 10,
+    "money": 50627.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 9,
+      "FERTILIZER": 189,
+      "MELON": 112,
+      "MILK": 222,
+      "STRAWBERRY": 206,
+      "WHEAT": 40,
+      "WOOL": 92
+    },
+    "tiles": 50,
+    "weeds": 3,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 7
+    },
+    "episode": 96040627,
+    "hands": 11,
+    "money": 125289.0,
+    "player": "Xiangchen Li",
+    "sold": {
+      "FERTILIZER": 209,
+      "MELON": 113,
+      "MILK": 197,
+      "STRAWBERRY": 315,
+      "WHEAT": 767,
+      "WOOL": 145
+    },
+    "tiles": 75,
+    "weeds": 12,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 3
+    },
+    "episode": 96040627,
+    "hands": 10,
+    "money": 98657.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "FERTILIZER": 176,
+      "MELON": 93,
+      "MILK": 215,
+      "STRAWBERRY": 175,
+      "TOMATO": 8,
+      "WHEAT": 49,
+      "WOOL": 93
+    },
+    "tiles": 50,
+    "weeds": 2,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 4
+    },
+    "episode": 96042808,
+    "hands": 10,
+    "money": 109214.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 15,
+      "FERTILIZER": 202,
+      "MELON": 162,
+      "MILK": 205,
+      "STRAWBERRY": 89,
+      "WHEAT": 73,
+      "WOOL": 76
+    },
+    "tiles": 50,
+    "weeds": 3,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 10,
+      "SHEEP": 6
+    },
+    "episode": 96042808,
+    "hands": 11,
+    "money": 98169.0,
+    "player": "Rintaro Moriwaki",
+    "sold": {
+      "FERTILIZER": 179,
+      "MELON": 90,
+      "MILK": 193,
+      "STRAWBERRY": 170,
+      "WHEAT": 94,
+      "WOOL": 52
+    },
+    "tiles": 50,
+    "weeds": 16,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 7,
+      "SHEEP": 5
+    },
+    "episode": 96042919,
+    "hands": 10,
+    "money": 44422.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "FERTILIZER": 188,
+      "MELON": 117,
+      "MILK": 220,
+      "STRAWBERRY": 198,
+      "WHEAT": 67,
+      "WOOL": 98
+    },
+    "tiles": 50,
+    "weeds": 1,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 5,
+      "SHEEP": 4
+    },
+    "episode": 96042919,
+    "hands": 10,
+    "money": 54198.0,
+    "player": "AravindLochan",
+    "sold": {
+      "FERTILIZER": 230,
+      "MELON": 94,
+      "MILK": 127,
+      "STRAWBERRY": 272,
+      "WHEAT": 403,
+      "WOOL": 133
+    },
+    "tiles": 75,
+    "weeds": 23,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 4,
+      "SHEEP": 4
+    },
+    "episode": 96045240,
+    "hands": 10,
+    "money": 89213.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 3,
+      "FERTILIZER": 168,
+      "MELON": 78,
+      "MILK": 193,
+      "STRAWBERRY": 239,
+      "WHEAT": 24,
+      "WOOL": 86
+    },
+    "tiles": 50,
+    "weeds": 4,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 3,
+      "SHEEP": 9
+    },
+    "episode": 96045240,
+    "hands": 11,
+    "money": 97948.0,
+    "player": "Hira Norm",
+    "sold": {
+      "CARROT": 24,
+      "FERTILIZER": 162,
+      "MELON": 119,
+      "MILK": 85,
+      "STRAWBERRY": 228,
+      "WHEAT": 120,
+      "WOOL": 182
+    },
+    "tiles": 75,
+    "weeds": 20,
+    "won": true
+  },
+  {
+    "animals": {
+      "COW": 6,
+      "SHEEP": 5
+    },
+    "episode": 96047508,
+    "hands": 10,
+    "money": 69212.0,
+    "player": "Marcin Skalski",
+    "sold": {
+      "CARROT": 135,
+      "FERTILIZER": 211,
+      "MELON": 199,
+      "MILK": 199,
+      "STRAWBERRY": 83,
+      "TOMATO": 4,
+      "WHEAT": 24,
+      "WOOL": 76
+    },
+    "tiles": 50,
+    "weeds": 3,
+    "won": false
+  },
+  {
+    "animals": {
+      "COW": 11,
+      "SHEEP": 2
+    },
+    "episode": 96047508,
+    "hands": 11,
+    "money": 86184.0,
+    "player": "Abhi Kumar Agrawal",
+    "sold": {
+      "FERTILIZER": 151,
+      "MELON": 100,
+      "MILK": 243,
+      "STRAWBERRY": 311,
+      "WHEAT": 261,
+      "WOOL": 56
+    },
+    "tiles": 75,
+    "weeds": 7,
+    "won": true
   }
 ]

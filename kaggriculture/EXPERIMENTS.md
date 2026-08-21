@@ -2042,3 +2042,69 @@ The embedded deterministic policy beat the frozen round-30 baseline on two hundr
 The regression-pool gate used forty more paired seeds per opponent. The agent was positive against all nineteen opponents, won 1,462 of 1,520 games for 96% points, and had no failures. Against frozen 1.12.0 inside that gate it scored +$1,375 +/- $1,401 and 65% points.
 
 **Kept:** a terminal-reward policy-gradient task ranker with daily-zone features, using the iteration-four checkpoint.
+
+Frozen as `agents_1.0.x/v1_13_0_rl_routing.py`, 1.13.0.
+
+# Round 28: why the second quadrant loses, traced to the end
+
+Thirty-one ladder games under 1.11.0 gave a clean split: **4W-1L against opponents holding 25 to 50 tiles, 10W-16L against 75 or more**, and all sixteen losses were to a 75-tile farm. Across 285 recorded player-episodes the money by acreage is 35k at 25 tiles, 65k at 50, **75k at 75** and 69k at 100 — so 75 is the field's optimum, not the whole board, and twenty-four of the top thirty results hold exactly 75.
+
+Reproducing seed 135888982 from a real loss, ours at 50 tiles against ours at 75:
+
+```
+day 15        50 tiles   75 tiles
+plants              38         62
+weeds                0          0
+animals             12         12
+final money    121,726     92,769
+```
+
+More plants, no weeds, same herd, and **$29,000 less money**. The farm is not failing to work the bigger board.
+
+## The money is lost on the animals
+
+```
+                   50 tiles   75 tiles
+milk sold               207        149
+wool sold                99         57
+strawberry sold         230        235
+animal-days unfed      9.6%      32.4%
+animal-days uncared   12.1%      38.2%
+```
+
+Crops are unchanged; the herd collapses. `CARE` banks a unit on every later production, so a third of days missed is a third of the milk and wool.
+
+## The cause is a queue, not a shortage
+
+Of 88 unfed animal-days, **81 had wheat already in a unit's hands** — the feed was carried, nobody arrived. Wheat carriers spend 60% of their turns walking and only 9.3% feeding, against 12.3% at 50 tiles.
+
+The task counts explain it. Tasks emitted per season, 50 tiles against 75:
+
+```
+WATER!    162  ->  2,539
+FEED      2,386 -> 3,155
+CARE        831 ->   780
+```
+
+`WATER!` is emitted for a plant that will die tonight and carries priority 0, the same as `FEED!`. At 50 tiles two plants a day wake up in that state; at 75 tiles it is **26 of 62 from day 21 onward**. The herd waits behind a fifteen-to-one queue of dying plants.
+
+## Four attempted reconciliations, all measured
+
+| Attempt | Result |
+| :--- | :--- |
+| Weight the day-plan strips by work rather than tile count | Neglect 38.2% to 37.4%. The split was by tiles although an animal is three ops a day and a crop one, so this was a real defect — and not the binding one |
+| Animal emergencies ahead of the plant queue | Neglect 32.4% to 8.1%, money **down** 85k to 78k: the plants die instead |
+| More hands: 14 at 0.22 hands per tile, with animal priority | 103,597 on the seed, neglect 8.5%, and 69% of match points in the sweep |
+| Fewer melons, capped at eight tiles | 115,695 on the seed, neglect unchanged at 35% |
+
+Hiring is not the constraint people assume: the cost is `fib(n)`, so 13 hands cost $609 a day and 14 cost $986 against a $29,000 gap. Raising `MAX_HANDS` alone does nothing, because `want_hands` is bound by `HANDS_PER_TILE`; at 0.22 the farm does hire fourteen and the herd is saved. It still loses.
+
+The default won its own sweep at 94% of match points against every reconciled configuration.
+
+## What this establishes
+
+The second quadrant does not fail on acreage, on weeds, on the crop mix or on hiring. It fails because at 62 plants the daily watering demand exceeds what the day can deliver, plants start each dawn one dry day from death, and their emergencies outrank the herd that earns most of our money. Feeding the animals first only moves the loss to the plants.
+
+Every knob in this round trades one for the other. What would actually reconcile them is fewer watering-days per unit of yield — which is the crop mix, and every mix experiment in this log has lost — or more usable turns, and movement is already down to 56% with walks averaging 1.87 tiles.
+
+All knobs from this round were removed; `main.py` reproduces 1.12.0 byte for byte.
