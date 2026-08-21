@@ -34,10 +34,10 @@ def _probe(spec, report):
         for position, tile in _tiles(farm):
             was = previous.get(position)
             now = tile if isinstance(tile, dict) else None
-            if was and was.get("kind") == "PLANT" and (now is None or now.get("kind") == "WEED"):
-                if now is not None and now.get("kind") == "WEED":
-                    report["died_units"] += was.get("yield_units", 0)
-                    report["died_tiles"] += 1
+            if was and was.get("kind") == "PLANT" and now is not None and now.get("kind") == "WEED":
+                # A tile going bare is a harvest; only a weed is a death.
+                report["died_units"] += was.get("yield_units", 0)
+                report["died_tiles"] += 1
             if was and "animal" in was and (now is None or "animal" not in now):
                 report["escaped"] += 1
                 report["escaped_units"] += was.get("yield_units", 0)
