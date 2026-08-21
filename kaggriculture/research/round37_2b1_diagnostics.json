@@ -1,0 +1,21 @@
+{
+  "candidate": "agents_2.0.x/round37_2b1_local_fallback",
+  "seed": 42,
+  "seat": 0,
+  "opponent": "agents_1.0.x/v1_13_0_rl_routing.py",
+  "rebuilds": 80,
+  "max_build_ms": 5.370792,
+  "persisted_selections": 63,
+  "priority_pauses": 119,
+  "safety_pauses": 333,
+  "frozen_fallbacks": 4093,
+  "turns_with_persistence": 58,
+  "absent_goals": 1542,
+  "unavailable_fallbacks": 297,
+  "unrouted_fallbacks": 3713,
+  "unit_growths": 255,
+  "invalidations": {
+    "all-routes-empty": 50,
+    "day-change": 29
+  }
+}

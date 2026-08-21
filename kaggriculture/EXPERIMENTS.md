@@ -2941,3 +2941,31 @@ uv run python tools/equivalence.py agents_2.0.x/round37_2b_persistent_queue --ba
 All 197 tests pass. A seed-42 live diagnostic recorded 165 persisted selections on 135 turns, but rebuilt the plan 478 times. Its invalidations were 235 unavailable goals, 106 missing routes, 102 unit-count changes, 29 day changes and 5 empty route sets. The maximum queue build took 5.546 ms.
 
 Decision: reject strict global invalidation. It exceeds the 1.25x ratio and 2 ms p99-overhead gates. Do not run score selection because runtime already rejects the arm. Test a separate local-fallback arm: an unavailable goal, a new unit or a unit without a route must use the frozen choice without deleting valid routes of other units.
+
+## Stage 37.2B1 experiment: local frozen fallback
+
+Status: rejected on runtime before score selection.
+
+Hypothesis: preserve valid routes when one route cannot run. An unavailable goal or an unplanned unit uses the exact frozen 1.14.0 choice for that selector call. Added units do not invalidate the plan. Removed units, day changes and an empty route set still rebuild it.
+
+Candidate: `agents_2.0.x/round37_2b1_local_fallback/`. Direct control: Stage 37.2B commit `e329f18`. Frozen comparator: `agents_1.0.x/v1_14_0_central_herd.py`.
+
+Timing command:
+
+```bash
+uv run python tools/equivalence.py agents_2.0.x/round37_2b1_local_fallback --baseline agents_1.0.x/v1_14_0_central_herd.py --seed-start 3739200 --seeds 20 --workers 8 --timing-only --output research/round37_2b1_timing.json
+```
+
+| Gate | Result |
+|:---|---:|
+| Complete episodes | 40 |
+| Failures | 0 |
+| Candidate mean call | 1.174 ms |
+| Baseline mean call | 0.734 ms |
+| p99 overhead | 2.646 ms |
+| Candidate worst call | 31.892 ms |
+| Summed wall-time ratio | 1.598x |
+
+All 208 tests pass. A seed-42 diagnostic reduced complete rebuilds from 478 to 80. It recorded 63 persisted selections, 297 unavailable-goal fallbacks and 3,713 unrouted-unit fallbacks. Fifty empty-route invalidations show that full queue construction still has short lifetime.
+
+Decision: reject the local fallback arm. It improves runtime over strict invalidation but still exceeds both runtime gates and leaves new hands without routes. Do not run score selection. Test local route enrollment without complete queue rebuilding as a separate arm.
