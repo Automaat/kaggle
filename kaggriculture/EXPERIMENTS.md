@@ -1897,3 +1897,5 @@ The cleaned one-change agent beat frozen 1.11.0 on two hundred untouched paired 
 The regression-pool gate used forty more paired seeds per opponent. The agent was positive against all eighteen opponents, won 1,394 of 1,440 games for 97% points, and had no failures. Against 1.11.0 inside that gate it scored +$3,525 +/- $1,396.
 
 **Kept:** buy at most one seed per market turn.
+
+Frozen as `agents_1.0.x/v1_12_0_seed_pacing.py`, 1.12.0.
