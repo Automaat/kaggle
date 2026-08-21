@@ -1482,3 +1482,35 @@ Both were added and swept against 1.6.0. On a single seed all three arms beat th
 The survivor, charging fertilizer, confirms at **-$395 +/- $2,013**. Dropped.
 
 This is the fourth valuation refinement in three rounds to land inside the noise, after our own standing supply in round 15 and the horizon, discount and certainty-equivalent terms in round 19. The planner's marginal pricing — walking the quote down the glut curve for every tile it allocates in the same pass — appears to dominate whatever these terms add. The remaining lever on crop choice is not a better price for a tile; it is what happens to the harvest afterwards.
+
+# Round 21: the farmer worked the last day alone
+
+Two observations from the replays, one worth $1,356 a match.
+
+## Nobody was hired on day 29
+
+The hiring gate reads `hour < HIRE_HOURS and day < LAST_DAY`. The last day was excluded because hands are hired for a single day and that day looked spent. It is not: it is the richest harvest of the season, and it was being worked by the farmer alone.
+
+Tracking standing yield through the close, on one seed:
+
+```
+day 27 hour  0   55 units standing      hour 22   14
+day 28 hour  0   42 units standing      hour 22    8
+day 29 hour  0   29 units standing      hour 22   29
+```
+
+Days 27 and 28 are cleared. Day 29 does not move at all, because one unit cannot reach twenty-nine units of yield spread over fifty tiles. Twelve of those were strawberry at about $200 and eight were milk and wool.
+
+Hiring on the last day as on any other costs $376 for twelve hands and takes the standing yield from twenty-nine units to five. It confirms at **+$1,356 +/- $166**, 97% of match points against 93%, and holds at +$1,142 +/- $117 against 1.6.0 over 200 held-out paired seeds — the tightest interval in the log. On the pool it is positive against all thirteen opponents.
+
+Frozen as `agents_1.0.x/v1_7_0_lastday.py`, 1.7.0.
+
+## Tiles held for animals we cannot afford
+
+Through day 8 the farm holds five bare tiles and two to five empty structures — seven to ten of twenty-five doing nothing — on a balance of $150 to $550. The strong ladder players have nineteen crops standing at day 2 where we have thirteen.
+
+`NEAR_SHED_HERD` reserves all twelve herd positions on the first turn, whatever the balance. Releasing the ones the money cannot reach for another few days, and lending them to a crop short enough to be gone before the animal arrives, does exactly what it promises: crops standing at day 2 go from 13 to 19, bare tiles from 5 to 1, and the herd completes one day later.
+
+It still loses. Swept at lead times of 2, 3, 4 and 6 days against 1.6.0, the default won its own sweep outright. A first version without the short-crop restriction was far worse — it lent the tiles to strawberry, which occupies them for sixteen days and strands the animal.
+
+The board looks better and earns less. What the extra early crops return does not cover the herd arriving late, and the herd is where the compounding is: an animal bought on day 6 produces for twenty-three days.
