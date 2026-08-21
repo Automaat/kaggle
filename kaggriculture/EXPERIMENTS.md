@@ -1615,3 +1615,40 @@ Buying animals before seed on the opening turns took three attempts to even take
 The description of the target is now firm and comes from the real top of the ladder rather than from our own rating neighbourhood: 75 tiles, wheat as the volume crop, melon marginal, animals on day zero, fertilizer as the opening income.
 
 The gap is not knowledge of the target. Their configuration scores half our match points when we adopt it, which means the constraint is still whatever makes our 75-tile farm earn less than our 50-tile farm — measured in round 15, unexplained since. Everything in this round was an attempt to buy that ceiling with a better opening, and the ceiling did not move.
+
+# Round 25: throughput is unit-turns, and we were carrying air
+
+Round 24 ended on capacity: wheat needs a tile turned over seven times and we cannot spare the turns. So where do the turns go? Measured on 1.7.0 over two seasons:
+
+```
+movement   56.2%
+work       29.7%
+idle        8.0%
+```
+
+The leaderboard top runs movement at 48.5%. Eight points of 6,000 unit-turns is about 480 actions a season.
+
+## Carrying air
+
+The op counts showed 352 `PICKUP` calls delivering 254 `FEED` and 38 `FERTILIZE`, and units holding wheat for **8,687 unit-turns** across the season. `_pickup_op` gave every unit that passed the shed its `ceil(hungry / n_units)` share of the feed and `ceil(needs_fertilizer / n_units)` of the fertilizer, whether or not that unit had anything to feed or fertilize. The load then rode around all day and was dropped back into the shed at nightfall.
+
+Loading only what the unit's own strip will consume — the day plan already assigns each unit a set of tiles, so the count is available — takes pickups from 352 to 257 and wheat-carrying turns from 8,687 to 6,731. Work rises from 29.7% to 31.2% of unit-turns.
+
+Confirmed twice on independent blocks: **+$1,788 +/- $1,388** and **+$1,755 +/- $1,467**. Against 1.7.0 it holds at +$1,782 +/- $794 over 200 held-out paired seeds, and it is positive against all fourteen pool opponents at 95% of match points.
+
+Frozen as `agents_1.0.x/v1_8_0_loads.py`, 1.8.0.
+
+## Working the tile underfoot instead of walking
+
+A unit that picks a task two tiles away spends the turn walking. If the tile it stands on has work of its own, that turn could buy an action instead and the walk resume next turn. Measured, it raises the score on a single seed and loses in the sweep, because interrupting a walk means restarting it: mean walk length goes from 1.87 to 2.30 tiles and total movement *rises*. Both sweeps that included it preferred the pickup change alone. Removed.
+
+## What the walk profile says
+
+Distances between actions, one season:
+
+```
+walk length   1     2    3   4   5   6+
+count       930   325  142  60  27  71
+```
+
+Median one tile, mean 1.87. The trip routing from 1.3.0 and the strip plan are already doing their work; there is no long-haul waste left to cut. The remaining 56% is the irreducible cost of a farm where every plant wants water daily and every animal wants feed carried from the shed.

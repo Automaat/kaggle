@@ -1,4 +1,4 @@
-"""Kaggriculture submission entrypoint. Must expose `agent(obs)`."""
+"""Frozen 1.8.0. A unit loads only what its own work will consume."""
 
 import copy
 import math
