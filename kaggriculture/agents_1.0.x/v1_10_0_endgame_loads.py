@@ -1,4 +1,4 @@
-"""Kaggriculture submission entrypoint. Must expose `agent(obs)`."""
+"""Frozen 1.10.0. Endgame discipline, plus loading only what the unit will use."""
 
 import copy
 import math

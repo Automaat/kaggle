@@ -1720,3 +1720,24 @@ The regression-pool gate used forty more paired seeds per opponent. The agent wa
 The release gate also compared this agent directly with the independently shipped 1.8.0 load-on-demand agent. On two hundred paired seeds it won 343 of 400 games at **+$6,084 +/- $780 and 86% points**. Against the common fourteen-agent pool, ten seeds per opponent, this agent scored +$35,814 and 96% points against 1.8.0's +$29,038 and 92%. The endgame agent won both tests, so it replaces rather than combines with the unconfirmed load-on-demand mechanism.
 
 Frozen as `agents_1.0.x/v1_9_0_endgame.py`, 1.9.0.
+
+# Round 27: the two agents compose
+
+1.9.0 arrived from a parallel line of work and replaced 1.8.0's load-on-demand pickup rather than combining with it. Its release note gives the reason: measured independently against 1.7.0, four dedicated feeder units scored -$2,924, and the endgame agent beat 1.8.0 head to head at +$6,084 +/- $780 over 200 paired seeds.
+
+Reproduced here on a fresh block of 150 paired seeds: **1.9.0 beats 1.8.0 at +$5,606 +/- $800, 86% of match points**. The replacement decision was correct on the evidence available.
+
+But 1.8.0's mechanism was never measured *on top of* 1.9.0, only against the shared 1.7.0 ancestor. Restored as a knob on the 1.9.0 baseline:
+
+```
++$3,224 +/- $1,068   100 fresh paired seeds
++$3,704 +/-   $890   150 held-out paired seeds
+```
+
+The two changes do not overlap. 1.9.0's `_protected_underfoot_tasks` fixes which unit *takes* a task; on-demand pickup fixes what a unit *carries* on the way. One is task assignment, the other is load sizing, and the round 25 diagnosis still holds: without it every unit passing the shed draws a share of feed it may have nowhere to deliver, and wheat rides in hand for thousands of unit-turns.
+
+The combination is positive against all fifteen pool opponents at 97% of match points, 725 wins in 750 games.
+
+Frozen as `agents_1.0.x/v1_10_0_endgame_loads.py`, 1.10.0.
+
+The general lesson is the one the log keeps relearning from the other direction: a change measured against an old baseline says nothing certain about the current one. Round 14's near-shed herd had lost under 1.1.0 and won under 1.4.0; round 21's twelve-animal herd had lost under 1.1.0 and won under 1.3.0. This is the same pattern with the sign reversed — a mechanism dropped as redundant against one ancestor, still paying against another.
