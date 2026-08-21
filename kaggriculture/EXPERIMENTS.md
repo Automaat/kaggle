@@ -2300,3 +2300,36 @@ Regression pool over 10 paired seeds per opponent, 400 games total: 390 wins, 98
 Selected candidate: land-first ordering and central future-herd placement default on. All rejected Round 35 timing limits and feed gates were removed. The cleaned default is score-identical to the tested two-flag candidate over a final five-seed equivalence check. The suite passes 140 tests and Ruff.
 
 Frozen as `agents_1.0.x/v1_14_0_central_herd.py`, 1.14.0.
+
+# Round 36: pricing a task instead of ranking it
+
+The task list has always been ordered by a fixed table — `WATER!` and `FEED!` at zero, `FEED` at one, `WATER` at two, down to `DIG` at nine. It cannot tell a dying strawberry from a dying carrot, and round 28 measured 26 of 62 plants waking one dry day from death at 75 tiles, all raising priority-zero work that is then served in distance order.
+
+Three ways to price the work instead, measured against 1.14.0.
+
+## What a task is worth
+
+`_task_worth` returns dollars: a feed is the animal's daily rate times its product price times the feed reserve, a care is one unit of that product, a `WATER!` is the standing crop that dies tonight, a harvest is the yield held on the tile.
+
+**Collapsing rank into value** — subtracting value buckets from the priority number — pays 125,215 against 104,225 on the reference seed and takes 68 to 84% of match points against the default's 98%. Flattening everything valuable into priority zero destroys the ordering that already worked.
+
+**Value as a tiebreaker inside a priority** changes nothing at 50 tiles, where emergencies are rare enough that there are no ties to break, and loses at 75.
+
+**Value as a feature of the learned router** is the version that nearly worked. The 1.13.0 policy scores candidates on priority, raw distance, walking distance, continuation, density, zone membership, target continuity and a one-hot of the task type — nineteen features, no value among them. Adding a twentieth and sweeping its weight alone, the other nineteen frozen:
+
+```
+weight 0.05    107,849
+weight 0.15    128,605
+weight 0.40    126,396
+weight 1.00    110,999
+```
+
+At 0.15 it takes **98% of match points** over sixty paired seeds and confirms at **+$418 +/- $964** on a hundred and fifty fresh ones. The interval crosses zero, so it is dropped.
+
+## What this says about the question
+
+Dynamic task valuation is not wrong: the best weight beats the default on two of three measures and the third is positive but not significant. What it is not is a large effect, and the reason is that the fixed table already encodes most of the same ordering. An emergency really is worth more than a harvest, the table says so, and the value function agrees. The part the table gets wrong — which of two emergencies to serve first — is worth a few hundred dollars, not a few thousand.
+
+The right next step is a full retrain of all twenty weights rather than a one-dimensional sweep around weights fitted without the feature. `tools/train_routing.py` supports it.
+
+All three knobs were removed and `main.py` reproduces 1.14.0 byte for byte.
