@@ -1,0 +1,21 @@
+{
+  "candidate": "agents_2.0.x/round37_2b_persistent_queue",
+  "seed": 42,
+  "seat": 0,
+  "opponent": "agents_1.0.x/v1_13_0_rl_routing.py",
+  "rebuilds": 478,
+  "max_build_ms": 5.545708,
+  "persisted_selections": 165,
+  "priority_pauses": 333,
+  "safety_pauses": 199,
+  "frozen_fallbacks": 2371,
+  "turns_with_persistence": 135,
+  "absent_goals": 1831,
+  "invalidations": {
+    "all-routes-empty": 5,
+    "day-change": 29,
+    "goal-unavailable": 235,
+    "missing-route": 106,
+    "unit-count": 102
+  }
+}

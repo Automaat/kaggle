@@ -2913,3 +2913,31 @@ uv run python tools/equivalence.py agents_1.0.x/v1_13_0_rl_routing.py --baseline
 The intentionally different policies completed four episodes with zero failures. Timing-only reported no action-comparison claim. Candidate and baseline received 2,876 timed calls each. A separate exact smoke on Stage 37.2A reported `actions_compared=true`, zero mismatches and zero failures.
 
 All 186 tests pass. New tests protect exact-mode mismatch behavior, timing-only nullable mismatch fields, failure exit decisions and real paired call counts. Timing fields remain wall-clock measurements despite the historical `agent_cpu_ratio` field name. The shadow baseline timing follows the candidate trajectory.
+
+## Stage 37.2B experiment: strict persistent route queue
+
+Status: rejected on runtime before score selection. The revised plan was reviewed before implementation and is archived as `2026-08-21-214050-agent2-priority-safe-persistence.md`.
+
+Hypothesis: keep a route queue between observations, but use its head only when the frozen 1.14.0 choice has the same nonzero priority and safety class. Priority zero, training, priority changes and safety changes always use the frozen choice. A day change, unit-count change, missing route or unavailable goal invalidates the complete plan.
+
+Candidate: `agents_2.0.x/round37_2b_persistent_queue/`. Accepted infrastructure predecessor: signed Stage 37.D0 commit `c5fdf1e`. Frozen comparator: `agents_1.0.x/v1_14_0_central_herd.py`.
+
+Timing command:
+
+```bash
+uv run python tools/equivalence.py agents_2.0.x/round37_2b_persistent_queue --baseline agents_1.0.x/v1_14_0_central_herd.py --seed-start 3739000 --seeds 20 --workers 8 --timing-only --output research/round37_2b_timing.json
+```
+
+| Gate | Result |
+|:---|---:|
+| Complete episodes | 40 |
+| Failures | 0 |
+| Candidate mean call | 1.500 ms |
+| Baseline mean call | 0.699 ms |
+| p99 overhead | 4.843 ms |
+| Candidate worst call | 36.137 ms |
+| Summed wall-time ratio | 2.145x |
+
+All 197 tests pass. A seed-42 live diagnostic recorded 165 persisted selections on 135 turns, but rebuilt the plan 478 times. Its invalidations were 235 unavailable goals, 106 missing routes, 102 unit-count changes, 29 day changes and 5 empty route sets. The maximum queue build took 5.546 ms.
+
+Decision: reject strict global invalidation. It exceeds the 1.25x ratio and 2 ms p99-overhead gates. Do not run score selection because runtime already rejects the arm. Test a separate local-fallback arm: an unavailable goal, a new unit or a unit without a route must use the frozen choice without deleting valid routes of other units.
