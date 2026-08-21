@@ -115,3 +115,9 @@ def test_seed_order_batch_limits_units(monkeypatch):
     monkeypatch.setattr(main, "SEED_BUY_BATCH", 3)
     orders = main._seed_orders({"MELON": 5, "CARROT": 5}, 1_000)
     assert sum(order[2] for order in orders) == 3
+
+
+def test_seed_orders_stop_before_last_market_hour(monkeypatch):
+    monkeypatch.setattr(main, "SEED_BUY_STOP_HOUR", 22)
+    assert main._seed_orders({"MELON": 1}, 1_000, 21) == [["BUY_SEED", "MELON", 1]]
+    assert main._seed_orders({"MELON": 1}, 1_000, 22) == []

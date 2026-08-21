@@ -108,6 +108,7 @@ PROTECT_UNDERFOOT = _enabled("KAGG_PROTECT_UNDERFOOT", True)
 FEED_DEADLINE = _enabled("KAGG_FEED_DEADLINE", True)
 PICKUP_ON_DEMAND = _enabled("KAGG_PICKUP_ON_DEMAND", True)
 SEED_BUY_BATCH = int(os.environ.get("KAGG_SEED_BUY_BATCH", "1"))
+SEED_BUY_STOP_HOUR = int(os.environ.get("KAGG_SEED_BUY_STOP_HOUR", "22"))
 ROUTE_CLUSTERS = _enabled("KAGG_ROUTE_CLUSTERS", True)
 ZONE_PENALTY = int(os.environ.get("KAGG_ZONE_PENALTY", "1"))
 
@@ -786,11 +787,11 @@ def _fertilizer_orders(need, stock, shed, prices, money):
     return [["BUY_PRODUCT", "FERTILIZER", take]] if take > 0 else []
 
 
-def _seed_orders(wanted, money):
-    """Buy the dearest missing seeds, capped per market turn."""
+def _seed_orders(wanted, money, hour=0):
+    """Buy the dearest missing seeds before the final market hour."""
     orders = []
     budget = money
-    remaining = SEED_BUY_BATCH
+    remaining = 0 if hour >= SEED_BUY_STOP_HOUR else SEED_BUY_BATCH
     for crop, need in sorted(wanted.items(), key=lambda kv: -CROPS[kv[0]]["seed"]):
         take = min(need, int(budget // CROPS[crop]["seed"]), remaining)
         if take > 0:
@@ -1159,7 +1160,7 @@ def agent(obs):
     land_reserve = LAND_PRICES[0] if DAIRY_LAND_COWS > 0 and land_orders else 0
     if DAIRY_LAND_COWS > 0:
         orders += land_orders
-    orders += _seed_orders(wanted_seeds, farm["money"] - land_reserve)
+    orders += _seed_orders(wanted_seeds, farm["money"] - land_reserve, hour)
     if day < LAST_DAY:
         orders += _feed_orders(
             herd, shed, obs["market"]["prices"], farm["money"] - seed_bill, carried_wheat

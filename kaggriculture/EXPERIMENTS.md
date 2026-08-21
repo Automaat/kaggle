@@ -1899,3 +1899,84 @@ The regression-pool gate used forty more paired seeds per opponent. The agent wa
 **Kept:** buy at most one seed per market turn.
 
 Frozen as `agents_1.0.x/v1_12_0_seed_pacing.py`, 1.12.0.
+
+# Round 30: use the one-seed budget better
+
+The baseline is frozen 1.12.0. The one-seed limit reduced abandoned inventory, but the surrounding cash reserves and the crop selected for that single purchase still assume bulk buying.
+
+The following hypotheses were registered before testing:
+
+1. Buy the cheapest, largest-deficit, or highest-value missing crop instead of the dearest crop.
+2. Reserve only the cost of the next seed purchase for other market decisions.
+3. Reduce or increase the per-tile seed reserve used by the land gate.
+4. Re-tune the minimum cash reserve after seed purchases became incremental.
+5. Buy two seeds during the first few hours, then return to one.
+6. Stop buying seeds late in the day when a new purchase is unlikely to be planted.
+7. Keep a short-lived purchase intent until its seed is planted, so replanning cannot change the next crop between turns.
+
+Every change will first run alone against frozen 1.12.0. Only independently positive changes will enter combination tests.
+
+## Purchase priority and seed bill
+
+Forty paired seeds used one common block.
+
+| Change | Result | Points | Decision |
+| :--- | ---: | ---: | :--- |
+| Cheapest missing seed first | -$4,461 +/- $1,741 | 24% | drop |
+| Largest crop deficit first | -$4,371 +/- $1,634 | 22% | drop |
+| Highest projected crop value first | -$4,777 +/- $1,854 | 22% | drop |
+| Reserve only the next seed purchase | -$10,314 +/- $3,729 | 22% | drop |
+
+The dearest-first order is not an arbitrary tie-break. It preserves the scarce slow crops selected by the planner. The full desired seed bill also prevents other purchases from consuming cash needed by that plan.
+
+## Cash gates
+
+The first common block produced these results:
+
+| Change | Result | Points | Decision |
+| :--- | ---: | ---: | :--- |
+| Seed reserve 40 per empty tile | -$65,671 +/- $6,653 | 0% | drop |
+| Seed reserve 60 per empty tile | $0 +/- $0 | 50% | inert |
+| Seed reserve 100 per empty tile | -$1 +/- $3 | 50% | inert |
+| Minimum cash 200 | -$3,501 +/- $2,466 | 45% | drop |
+
+A seed reserve of 40 admits the land purchase before the farm can operate the extra quadrant. Values 60 to 100 rarely alter the purchase turn. Lowering the general cash floor spends working capital too early.
+
+The remaining minimum-cash arms were also non-positive on forty paired seeds: 300 scored -$1,997 +/- $2,385, 500 scored -$372 +/- $952, and 600 scored -$185 +/- $1,262. The existing value of 400 remains.
+
+## Adaptive morning batch
+
+Buying two seeds only at the start of each day gave:
+
+| Two-seed hours | Result | Points |
+| ---: | ---: | ---: |
+| 0 through 1 | +$466 +/- $864 | 54% |
+| 0 through 3 | +$1,180 +/- $1,665 | 54% |
+| 0 through 7 | +$435 +/- $1,051 | 54% |
+
+All three screens used forty paired seeds. The four-hour window has the largest mean but does not clear its uncertainty interval, so it requires confirmation before any combination.
+
+## Late purchase limit and planting acknowledgement
+
+| Change | Result | Points | Decision |
+| :--- | ---: | ---: | :--- |
+| Stop seed buying at hour 18 | -$576 +/- $607 | 45% | drop |
+| Stop seed buying at hour 20 | -$394 +/- $613 | 39% | drop |
+| Stop seed buying at hour 22 | +$1,322 +/- $627 | 71% | confirm |
+| Wait until the previous seed is planted | -$35,756 +/- $3,185 | 0% | drop |
+
+Stopping only for the last market-clearing hour removes purchases with little execution time. Earlier limits suppress productive work. Waiting for each seed to be acknowledged is too restrictive because several hands can plant in parallel.
+
+The hour-22 limit confirmed on one hundred fresh paired seeds at **+$562 +/- $549 and 56% points**, with no failures. The four-hour morning batch failed its confirmation at -$865 +/- $959 and 48% points.
+
+No combination was valid: the hour-22 limit was the only independently positive change. The cleaned candidate contains only that limit.
+
+## Release gate
+
+The cleaned one-change candidate beat frozen 1.12.0 on two hundred untouched paired seeds at **+$943 +/- $299 and 63% points**, with 239 wins, 23 ties, and no failures in 400 games.
+
+The regression-pool gate used forty more paired seeds per opponent. The candidate was positive against all nineteen opponents, won 1,473 of 1,520 games for 97% points, and had no failures. Against 1.12.0 inside that gate it scored +$882 +/- $692 and 66% points.
+
+Across ten diagnostic episodes, 1.12.0 bought 1.2 seeds per episode at hour 22. The candidate bought none. Both ended with zero seeds on average, so the gain comes from rejecting marginal final-hour work rather than removing visible closing inventory.
+
+**Kept:** do not buy seeds during the final market-clearing hour of each day.
