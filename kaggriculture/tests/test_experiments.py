@@ -79,3 +79,18 @@ def test_crop_batching_waits_until_capacity_would_overflow(monkeypatch):
     assert ("HARVEST", None) not in main._tile_task(tile, 10, None, {}, {}, {})
     tile["yield_units"] = 4
     assert ("HARVEST", None) in main._tile_task(tile, 12, None, {}, {}, {})
+
+
+def test_feed_deadline_follows_last_sellable_production(monkeypatch):
+    monkeypatch.setattr(main, "FEED_DEADLINE", True)
+    cow = {
+        "animal": "COW", "placed_day": 1, "fed_today": False,
+        "cared_today": False, "yield_units": 0, "fertilizer_available": False,
+    }
+    assert ("FEED", None) in main._animal_tasks(cow, 28)
+    assert ("FEED", None) not in main._animal_tasks(cow, 29)
+
+
+def test_protected_underfoot_task_belongs_to_later_unit():
+    tasks = [(2, 3, 4, ("WATER", None))]
+    assert main._protected_underfoot_tasks(tasks, [(0, 0), (3, 4)], [{}, {}]) == {0: 1}

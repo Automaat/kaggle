@@ -1652,3 +1652,71 @@ count       930   325  142  60  27  71
 ```
 
 Median one tile, mean 1.87. The trip routing from 1.3.0 and the strip plan are already doing their work; there is no long-haul waste left to cut. The remaining 56% is the irreducible cost of a farm where every plant wants water daily and every animal wants feed carried from the shed.
+
+# Round 26: finish work before the simulation stops
+
+The 1.7.0 last-day hire removed most standing yield, but it did not realize all of the value. On seed 42 the final shed still held eight strawberry and four fertilizer. Their sell order was emitted on the state after the last processed turn. Across seeds 0 through 4, the final shed held 9.4 units worth about $918 at the final quoted prices. The final-day trace also spent turns on feeding, watering, digging and passing while saleable goods were still outside the shed.
+
+Fourteen changes were first measured independently against frozen 1.7.0 on sixty fresh paired seeds each:
+
+| Independent change | Seat-pair result | Points | Decision after screen |
+| :--- | ---: | ---: | :--- |
+| Protect an executable underfoot task for a later unit | +$5,296 +/- $1,515 | 82% | confirm |
+| Stable daily work zones | +$1,629 +/- $1,409 | 56% | confirm |
+| Fifteen animals | +$3,019 +/- $1,704 | 63% | confirm |
+| Feed only production that can still finish | +$1,292 +/- $290 | 78% | confirm |
+| Return to the shed one turn earlier on day 29 | +$1,110 +/- $202 | 83% | confirm |
+| Prune final-day work with no terminal value | +$476 +/- $289 | 64% | confirm |
+| Care only production that can still finish | +$436 +/- $354 | 62% | confirm |
+| Reject final tasks that cannot fit before the deadline | +$202 +/- $107 | 64% | confirm |
+| Count owned seeds as sunk choices in the crop planner | +$126 +/- $1,350 | 49% | drop |
+| Choose the nearest shed dynamically | -$12 +/- $153 | 44% | drop |
+| Double animal weight when assigning work zones | -$1,581 +/- $1,483 | 38% | drop |
+| Ignore zone penalties for raw underfoot work | -$2,677 +/- $1,718 | 38% | drop |
+| Four real feeder units | -$2,924 +/- $1,482 | 30% | drop standalone |
+| Freeze empty-tile crop intent for a day | -$3,323 +/- $1,627 | 35% | drop |
+
+The positive screens were then repeated on one hundred new paired seeds each:
+
+| Change | Fresh confirmation | Points | Decision |
+| :--- | ---: | ---: | :--- |
+| Protect underfoot work | +$7,495 +/- $998 | 92% | keep |
+| Stable daily work zones | +$1,488 +/- $1,179 | 64% | keep |
+| Feed production deadline | +$1,555 +/- $228 | 83% | keep |
+| Earlier final return | +$1,094 +/- $163 | 80% | keep |
+| Care production deadline | +$432 +/- $229 | 57% | keep |
+| Final task deadline | +$249 +/- $95 | 58% | keep |
+| Final task pruning | +$227 +/- $167 | 60% | keep |
+| Fifteen animals | +$483 +/- $1,319 | 50% | drop standalone |
+
+The underfoot result is the main finding. A unit that stands on useful work currently consumes that task even when its zone score sends it elsewhere. Reserving one executable task for a later unit removes this coordination loss and reproduces strongly on a fresh block. The terminal and production-deadline changes are smaller, but their intervals stay above zero. The larger herd does not reproduce against 1.7.0, so the round 20 result is not sufficient to change the default.
+
+## Mixing the confirmed changes
+
+Eight combinations and the default entered sequential halving. The first forty-seed round ranked the full seven-change package first at +$8,867, the underfoot/return/feed package second at +$8,454, underfoot/feed third at +$7,626 and underfoot/return fourth at +$7,022. Those four advanced. On the next block the full package scored +$8,790 and the three-change package +$8,532. On the third block they scored +$8,648 and +$8,403. The full package then confirmed against 1.7.0 at **+$8,351 +/- $1,013 and 94% points** on one hundred new seeds.
+
+The rank did not prove that all seven changes were useful. A direct one-hundred-seed ablation of the full package against the three-change package gave **+$88 +/- $872**. The four extra mechanisms were therefore removed as a group.
+
+Each plausible addition was also screened directly against the three-change package on the same forty new seeds:
+
+| Addition to underfoot, return and feed deadline | Result |
+| :--- | ---: |
+| Stable work zones | +$2,334 +/- $1,582 |
+| Fifteen animals | +$286 +/- $1,624 |
+| Care deadline | +$144 +/- $171 |
+| Final task deadline | +$18 +/- $13 |
+| Final task pruning | -$69 +/- $101 |
+| Fifteen animals and three feeder units | -$3,155 +/- $1,846 |
+| Fifteen animals and four feeder units | -$3,709 +/- $2,231 |
+
+Only stable zones cleared the screen. It failed on the fresh one-hundred-seed confirmation at **-$418 +/- $1,086** and was removed. The feeder interaction is decisively negative, not a hidden route to the larger herd.
+
+The cleaned three-change agent then beat frozen 1.7.0 on two hundred untouched paired seeds at **+$8,884 +/- $768 and 96% points**, with 383 wins in 400 games and no failures.
+
+The regression-pool gate used forty more paired seeds per opponent. The agent was positive against all fourteen opponents, won 1,114 of 1,120 games for 99% points, and had no failures. Against 1.7.0 inside that gate it scored +$9,692 +/- $1,581.
+
+**Kept:** protect one executable underfoot task for a later unit, return to the shed one turn earlier on day 29, and stop feeding when no production can complete before the simulation ends.
+
+The release gate also compared this agent directly with the independently shipped 1.8.0 load-on-demand agent. On two hundred paired seeds it won 343 of 400 games at **+$6,084 +/- $780 and 86% points**. Against the common fourteen-agent pool, ten seeds per opponent, this agent scored +$35,814 and 96% points against 1.8.0's +$29,038 and 92%. The endgame agent won both tests, so it replaces rather than combines with the unconfirmed load-on-demand mechanism.
+
+Frozen as `agents_1.0.x/v1_9_0_endgame.py`, 1.9.0.
