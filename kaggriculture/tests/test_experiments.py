@@ -94,3 +94,18 @@ def test_feed_deadline_follows_last_sellable_production(monkeypatch):
 def test_protected_underfoot_task_belongs_to_later_unit():
     tasks = [(2, 3, 4, ("WATER", None))]
     assert main._protected_underfoot_tasks(tasks, [(0, 0), (3, 4)], [{}, {}]) == {0: 1}
+
+
+def test_emergency_underfoot_is_protected():
+    tasks = [(0, 3, 4, ("WATER!", None))]
+    assert main._protected_underfoot_tasks(tasks, [(0, 0), (3, 4)], [{}, {}]) == {0: 1}
+
+
+def test_owned_seed_is_free_in_plan_budget(monkeypatch):
+    monkeypatch.setattr(main, "HERD_SPEC", "")
+    tiles = [(0, 0, None), (1, 0, None)]
+    plan = main._dynamic_plan(
+        tiles, 0, {crop: 10_000 for crop in main.CROPS}, [], budget=0,
+        seeds={"MELON": 1},
+    )
+    assert plan[(0, 0)] == "MELON"

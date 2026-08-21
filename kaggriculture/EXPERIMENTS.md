@@ -1741,3 +1741,84 @@ The combination is positive against all fifteen pool opponents at 97% of match p
 Frozen as `agents_1.0.x/v1_10_0_endgame_loads.py`, 1.10.0.
 
 The general lesson is the one the log keeps relearning from the other direction: a change measured against an old baseline says nothing certain about the current one. Round 14's near-shed herd had lost under 1.1.0 and won under 1.4.0; round 21's twelve-animal herd had lost under 1.1.0 and won under 1.3.0. This is the same pattern with the sign reversed — a mechanism dropped as redundant against one ancestor, still paying against another.
+
+# Round 28: keep urgent work local and spend owned seeds
+
+The baseline changed to frozen 1.10.0 before the release gate. Every result below is against `agents_1.0.x/v1_10_0_endgame_loads.py` unless another opponent is named. Screens use seat-swapped paired seeds.
+
+## Independent task and logistics changes
+
+| Change | Result | Points | Decision |
+| :--- | ---: | ---: | :--- |
+| Disable on-demand feed pickup | -$3,978 +/- $1,924 | 26% | drop |
+| Disable on-demand fertilizer pickup | -$87 +/- $923 | 51% | drop |
+| Protect urgent underfoot work | +$3,253 +/- $2,008 | 71% | confirm |
+| Reserve radius 1, regret 1 | -$126 +/- $1,214 | 50% | drop |
+| Reserve radius 1, regret 2 | -$713 +/- $1,102 | 42% | drop |
+| Reserve radius 2, regret 1 | -$1,328 +/- $1,430 | 38% | drop |
+| Reserve radius 2, regret 2 | -$1,057 +/- $1,076 | 39% | drop |
+| Resume an interrupted route | +$367 +/- $1,094 | 56% | drop |
+
+The urgent protection changes one existing rule. A non-urgent task under a later unit was already reserved for that unit. Priority-zero work was excluded, so another unit could claim a dying plant from across the board while the unit on that plant walked elsewhere. Removing the exclusion confirmed at **+$1,979 +/- $1,077 and 64% points** on one hundred new paired seeds.
+
+## Return and hiring sweeps
+
+| Change | Result | Points | Decision |
+| :--- | ---: | ---: | :--- |
+| Final return lead 1 | -$1,036 +/- $270 | 16% | drop |
+| Final return lead 3 | -$35 +/- $73 | 61% | drop |
+| Final return lead 4 | -$119 +/- $90 | — | drop |
+| Hire window 8 hours | $0 +/- $0 | 50% | drop |
+| Hire window 12 hours | $0 +/- $0 | 50% | drop |
+| Hire window 24 hours | $0 +/- $0 | 50% | drop |
+| Dynamic hiring, rate 0.1 | -$1,545 +/- $1,995 | 36% | drop |
+| Dynamic hiring, rate 0.2 | -$5,732 +/- $1,321 | 12% | drop |
+| Dynamic hiring, rate 0.3 | -$3,372 +/- $1,358 | 22% | drop |
+
+The existing two-turn final return lead remains best. Extending the hiring window does not change the paired season result. Backlog-based hiring underhires and loses.
+
+## Owned seed planning
+
+The planner subtracted seed cost from its cash budget even when that seed was already in the shed. Four variants were measured independently:
+
+| Change | Result | Points | Decision |
+| :--- | ---: | ---: | :--- |
+| Owned seeds cost zero in the cash budget | +$1,705 +/- $1,429 | 62% | confirm |
+| Owned seeds are sunk cost in crop value | +$357 +/- $1,717 | 56% | drop |
+| Budget and value together | +$1,104 +/- $1,399 | 56% | drop |
+| Freeze crop intent for the day | -$8,880 +/- $1,821 | 6% | drop |
+
+The budget change did not stand alone on one hundred fresh paired seeds: **-$367 +/- $873 and 45% points**. It was retained only for an interaction test with urgent protection.
+
+## Seventy-five-tile packages
+
+Every package bought a second extra quadrant and raised the hand cap to fourteen. Each used forty paired seeds.
+
+| Package | Without urgent protection | With urgent protection |
+| :--- | ---: | ---: |
+| Current crop and herd plan | -$20,912 +/- $2,863 | -$5,512 +/- $2,536 |
+| Melon cap of ten | -$22,264 +/- $2,851 | -$7,128 +/- $2,339 |
+| Fifteen animals | -$23,378 +/- $2,002 | -$5,336 +/- $2,388 |
+
+Urgent protection recovers about $15,000 to $18,000 at this scale, but all six packages remain significant losses. The 75-tile ceiling is still task throughput, not crop mix or herd size.
+
+## Interactions
+
+Sixty paired seeds compared four combinations with the baseline:
+
+| Combination | Result | Points |
+| :--- | ---: | ---: |
+| Urgent protection | +$2,345 +/- $1,549 | 62% |
+| Protection and owned-seed budget | +$4,235 +/- $1,382 | 81% |
+| Protection and route resume | +$2,059 +/- $1,512 | 63% |
+| Protection, seed budget and route resume | +$3,836 +/- $1,452 | 77% |
+
+Route resume reduces the result. The seed budget has a positive interaction with protection despite failing alone. Directly against urgent protection, the two-change package confirmed at **+$1,116 +/- $937 and 62% points** on one hundred new paired seeds.
+
+## Release gate
+
+The cleaned two-change agent beat frozen 1.10.0 on two hundred untouched paired seeds at **+$5,142 +/- $958 and 80% points**, with 319 wins in 400 games and no failures.
+
+The regression-pool gate used forty more paired seeds per opponent. The agent was positive against all seventeen opponents, won 1,335 of 1,360 games for 98% points, and had no failures. Against the current champion inside that gate it scored +$5,826 +/- $1,736.
+
+**Kept:** reserve urgent executable work for the unit already on its tile, and count owned seeds as zero-cost items in the crop planner's cash budget.

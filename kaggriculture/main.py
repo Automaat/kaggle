@@ -581,7 +581,7 @@ def _dairy_positions(tiles, board_size):
     return set(positions[:DAIRY_LAND_COWS])
 
 
-def _dynamic_plan(tiles, day, inventory, shops, board_size=10, budget=None):
+def _dynamic_plan(tiles, day, inventory, shops, board_size=10, budget=None, seeds=None):
     """Assign each empty tile the crop with the best marginal return at harvest.
 
     The first `HERD` tiles are reserved for livestock. Letting the value model
@@ -600,6 +600,7 @@ def _dynamic_plan(tiles, day, inventory, shops, board_size=10, budget=None):
         elif isinstance(tile, dict) and tile.get("kind") == "PLANT" and tile.get("crop") in standing:
             standing[tile["crop"]] += 1
     allocated = {crop: 0 for crop in CROPS}
+    owned = dict(seeds or {})
     half = int(board_size / 2)
     herd_positions = {}
     if NEAR_SHED_HERD:
@@ -632,14 +633,19 @@ def _dynamic_plan(tiles, day, inventory, shops, board_size=10, budget=None):
         if BUDGET_PLAN and budget is not None:
             # An empty tile earns nothing. Once the money runs out, the choice
             # is not the best crop but the best crop we can still sow.
-            affordable = [c for c in eligible if CROPS[c]["seed"] <= budget]
+            affordable = [
+                c for c in eligible
+                if (0 if owned.get(c, 0) > 0 else CROPS[c]["seed"]) <= budget
+            ]
             eligible = affordable or eligible
         if SEASONAL_PLANNER:
             best = _seasonal_crop(eligible, standing, allocated, projected, day)
         else:
             best = max(eligible, key=lambda c: _crop_value(c, projected, day))
         if BUDGET_PLAN and budget is not None:
-            budget -= CROPS[best]["seed"]
+            budget -= 0 if owned.get(best, 0) > 0 else CROPS[best]["seed"]
+        if owned.get(best, 0) > 0:
+            owned[best] -= 1
         plan[(x, y)] = best
         allocated[best] += 1
         projected[best] += _effective_yield(best) if EFFECTIVE_PROJECTION else EXPECTED_YIELD[best]
@@ -1044,7 +1050,8 @@ def _protected_underfoot_tasks(tasks, units, inventories):
         position = tuple(units[unit_index])
         carried = inventories[unit_index] if unit_index < len(inventories) else {}
         for task_index, (priority, x, y, (task, item)) in enumerate(tasks):
-            if priority > 0 and position == (x, y) and task_index not in protected and _can_do(task, item, carried):
+            if (position == (x, y)
+                    and task_index not in protected and _can_do(task, item, carried)):
                 protected[task_index] = unit_index
                 break
     return protected
@@ -1120,7 +1127,7 @@ def agent(obs):
     if _planner(player) == "dynamic":
         plan = _dynamic_plan(
             tiles, day, obs["market"]["inventory"], obs["town"]["unlocked_shops"], board_size,
-            farm["money"] - MIN_CASH if BUDGET_PLAN else None,
+            farm["money"] - MIN_CASH if BUDGET_PLAN else None, seeds,
         )
     else:
         plan = _tile_plan(player, tiles, day)
