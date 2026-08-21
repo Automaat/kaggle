@@ -2863,3 +2863,37 @@ uv run python tools/equivalence.py agents_2.0.x/round37_1_task_graph --seed-star
 All 174 tests pass. New tests cover stable IDs, duplicate ordinals, immutable graph storage, exact action preservation, observation immutability, duplicate calls, episode reset and disabled capture.
 
 Decision: accept Stage 37.1. It meets zero-difference and runtime gates. Start 37.2A from this commit in a new worktree. Do not merge it into root `main.py`.
+
+## Stage 37.2A experiment: rebuild route queue every turn
+
+Status: rejected on runtime. The plan was reviewed before implementation and is archived as `2026-08-21-210705-agent2-rebuild-route-queue.md`.
+
+Hypothesis: a complete queue can be constructed from the current frozen task list on every observation while the exact 1.14.0 selector remains the queue head. This is the no-persistence control for Stage 37.2B.
+
+Candidate: `agents_2.0.x/round37_2a_rebuild_queue/`. Accepted predecessor: signed Stage 37.1 commit `933bff0`. Frozen comparator: `agents_1.0.x/v1_14_0_central_herd.py`.
+
+The route wrapper calls the original selector exactly once, records immutable inputs and returns its exact result. After the frozen action returns, the scheduler builds provisional suffixes only for units that reached the selector. Pickup, cashout, pass and disabled-selector units do not get a route. Current resources are not depleted through a suffix, so these queues are diagnostic and not claimed to be executable.
+
+Exact differential command:
+
+```bash
+uv run python tools/equivalence.py agents_2.0.x/round37_2a_rebuild_queue --seed-start 3731000 --seeds 100 --workers 8 --output research/round37_2a_equivalence.json
+```
+
+| Gate | Result |
+|:---|---:|
+| Complete episodes | 200 |
+| Compared calls | 143,800 |
+| Action mismatches | 0 |
+| Failures | 0 |
+| Candidate mean money | $78,610 |
+| Frozen 1.13.0 opponent mean money | $75,404 |
+| Candidate mean call | 1.707 ms |
+| Baseline mean call | 0.770 ms |
+| p99 overhead | 4.916 ms |
+| Candidate worst call | 37.525 ms |
+| Summed agent CPU ratio | 2.218x |
+
+All 182 tests pass. They cover immutable queue accounting, exact action preservation, duplicate calls, reset, disabled hooks, training-selector call count, exception abort, route-tail distance and stable ties. A seed-42 diagnostic rebuilt 719 plans, with a maximum measured suffix build of 5.603 ms.
+
+Decision: reject rebuilding complete queues every turn. It violates the 1.25x CPU and 2 ms p99-overhead gates despite exact actions and no timeout risk. Keep this branch as the direct control. Stage 37.2B may reuse the builder only if persistence reduces rebuild frequency and total CPU below the gate.
