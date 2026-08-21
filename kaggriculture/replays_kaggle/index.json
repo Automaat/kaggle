@@ -2365,5 +2365,392 @@
       "XU XUXIANG"
     ],
     "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95495327": {
+    "episode": 95495327,
+    "file": "episode-95495327-replay.json.gz",
+    "rewards": [
+      59368.0,
+      91856.0
+    ],
+    "seed": 1616824036,
+    "steps": 720,
+    "submission": 55653896,
+    "teams": [
+      "Marcin Skalski",
+      "Farm-ops"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95497606": {
+    "episode": 95497606,
+    "file": "episode-95497606-replay.json.gz",
+    "rewards": [
+      90367.0,
+      106586.0
+    ],
+    "seed": 575999946,
+    "steps": 720,
+    "submission": 55653896,
+    "teams": [
+      "Marcin Skalski",
+      "Francesco Zaccaria"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95499906": {
+    "episode": 95499906,
+    "file": "episode-95499906-replay.json.gz",
+    "rewards": [
+      81438.0,
+      80004.0
+    ],
+    "seed": 1743144118,
+    "steps": 720,
+    "submission": 55653896,
+    "teams": [
+      "Marcin Skalski",
+      "BJFC"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95502208": {
+    "episode": 95502208,
+    "file": "episode-95502208-replay.json.gz",
+    "rewards": [
+      72106.0,
+      79503.0
+    ],
+    "seed": 1583255905,
+    "steps": 720,
+    "submission": 55653896,
+    "teams": [
+      "Marcin Skalski",
+      "Tergel Munkhbat"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95504475": {
+    "episode": 95504475,
+    "file": "episode-95504475-replay.json.gz",
+    "rewards": [
+      50861.0,
+      76243.0
+    ],
+    "seed": 48238213,
+    "steps": 720,
+    "submission": 55653896,
+    "teams": [
+      "Dean Shalev",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95547852": {
+    "episode": 95547852,
+    "file": "episode-95547852-replay.json.gz",
+    "rewards": [
+      90345.0,
+      106083.0
+    ],
+    "seed": 1118098721,
+    "steps": 720,
+    "submission": 55653896,
+    "teams": [
+      "Marcin Skalski",
+      "TheDuck"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95582104": {
+    "episode": 95582104,
+    "file": "episode-95582104-replay.json.gz",
+    "rewards": [
+      86619.0,
+      95951.0
+    ],
+    "seed": 1739056135,
+    "steps": 720,
+    "submission": 55653896,
+    "teams": [
+      "Bugra Cinar",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95652746": {
+    "episode": 95652746,
+    "file": "episode-95652746-replay.json.gz",
+    "rewards": [
+      51632.0,
+      55395.0
+    ],
+    "seed": 584148885,
+    "steps": 720,
+    "submission": 55653896,
+    "teams": [
+      "anthony sinchi",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95703024": {
+    "episode": 95703024,
+    "file": "episode-95703024-replay.json.gz",
+    "rewards": [
+      110326.0,
+      114510.0
+    ],
+    "seed": 1252731387,
+    "steps": 720,
+    "submission": 55623460,
+    "teams": [
+      "Crop Dusta",
+      "Ryo Hasegawa"
+    ]
+  },
+  "95703028": {
+    "episode": 95703028,
+    "file": "episode-95703028-replay.json.gz",
+    "rewards": [
+      55859.0,
+      56179.0
+    ],
+    "seed": 1532196697,
+    "steps": 720,
+    "submission": 55614463,
+    "teams": [
+      "Ryo Hasegawa",
+      "Crop Dusta"
+    ]
+  },
+  "95732685": {
+    "episode": 95732685,
+    "file": "episode-95732685-replay.json.gz",
+    "rewards": [
+      77889.0,
+      104691.0
+    ],
+    "seed": 1399770729,
+    "steps": 720,
+    "submission": 55653896,
+    "teams": [
+      "Marcin Skalski",
+      "MugaBros"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95734941": {
+    "episode": 95734941,
+    "file": "episode-95734941-replay.json.gz",
+    "rewards": [
+      82507.0,
+      75761.0
+    ],
+    "seed": 696064064,
+    "steps": 720,
+    "submission": 55623460,
+    "teams": [
+      "Crop Dusta",
+      "Arman Tuganbaev"
+    ]
+  },
+  "95734944": {
+    "episode": 95734944,
+    "file": "episode-95734944-replay.json.gz",
+    "rewards": [
+      67311.0,
+      60247.0
+    ],
+    "seed": 1163647371,
+    "steps": 720,
+    "submission": 55614463,
+    "teams": [
+      "Crop Dusta",
+      "Ryo Hasegawa"
+    ]
+  },
+  "95734945": {
+    "episode": 95734945,
+    "file": "episode-95734945-replay.json.gz",
+    "rewards": [
+      105369.0,
+      99448.0
+    ],
+    "seed": 550187922,
+    "steps": 720,
+    "submission": 55614463,
+    "teams": [
+      "tetsuya",
+      "Ryo Hasegawa"
+    ]
+  },
+  "95750854": {
+    "episode": 95750854,
+    "file": "episode-95750854-replay.json.gz",
+    "rewards": [
+      79030.0,
+      66011.0
+    ],
+    "seed": 2063319926,
+    "steps": 720,
+    "submission": 55653896,
+    "teams": [
+      "Varshith K",
+      "Marcin Skalski"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95755327": {
+    "episode": 95755327,
+    "file": "episode-95755327-replay.json.gz",
+    "rewards": [
+      101374.0,
+      126961.0
+    ],
+    "seed": 2142768243,
+    "steps": 720,
+    "submission": 55653896,
+    "teams": [
+      "Marcin Skalski",
+      "Tim McGarvey"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95759846": {
+    "episode": 95759846,
+    "file": "episode-95759846-replay.json.gz",
+    "rewards": [
+      86944.0,
+      76216.0
+    ],
+    "seed": 458118881,
+    "steps": 720,
+    "submission": 55653896,
+    "teams": [
+      "Marcin Skalski",
+      "wintermute"
+    ],
+    "type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+  },
+  "95769177": {
+    "episode": 95769177,
+    "file": "episode-95769177-replay.json.gz",
+    "rewards": [
+      129296.0,
+      124052.0
+    ],
+    "seed": 1084200634,
+    "steps": 720,
+    "submission": 55574890,
+    "teams": [
+      "Arman Tuganbaev",
+      "tetsuya"
+    ]
+  },
+  "95769180": {
+    "episode": 95769180,
+    "file": "episode-95769180-replay.json.gz",
+    "rewards": [
+      82635.0,
+      79756.0
+    ],
+    "seed": 220595132,
+    "steps": 720,
+    "submission": 55614463,
+    "teams": [
+      "Ryo Hasegawa",
+      "Crop Dusta"
+    ]
+  },
+  "95769181": {
+    "episode": 95769181,
+    "file": "episode-95769181-replay.json.gz",
+    "rewards": [
+      92721.0,
+      88406.0
+    ],
+    "seed": 35064699,
+    "steps": 720,
+    "submission": 55614463,
+    "teams": [
+      "Ryo Hasegawa",
+      "tetsuya"
+    ]
+  },
+  "95769184": {
+    "episode": 95769184,
+    "file": "episode-95769184-replay.json.gz",
+    "rewards": [
+      82698.0,
+      103192.0
+    ],
+    "seed": 1079226710,
+    "steps": 720,
+    "submission": 55574890,
+    "teams": [
+      "tetsuya",
+      "Arman Tuganbaev"
+    ]
+  },
+  "95803410": {
+    "episode": 95803410,
+    "file": "episode-95803410-replay.json.gz",
+    "rewards": [
+      108452.0,
+      98436.0
+    ],
+    "seed": 2017312496,
+    "steps": 720,
+    "submission": 55623460,
+    "teams": [
+      "Crop Dusta",
+      "Arman Tuganbaev"
+    ]
+  },
+  "95803411": {
+    "episode": 95803411,
+    "file": "episode-95803411-replay.json.gz",
+    "rewards": [
+      89255.0,
+      90801.0
+    ],
+    "seed": 390063386,
+    "steps": 720,
+    "submission": 55614463,
+    "teams": [
+      "Ryo Hasegawa",
+      "tetsuya"
+    ]
+  },
+  "95803412": {
+    "episode": 95803412,
+    "file": "episode-95803412-replay.json.gz",
+    "rewards": [
+      78998.0,
+      66324.0
+    ],
+    "seed": 925210506,
+    "steps": 720,
+    "submission": 55574890,
+    "teams": [
+      "Arman Tuganbaev",
+      "tetsuya"
+    ]
+  },
+  "95803414": {
+    "episode": 95803414,
+    "file": "episode-95803414-replay.json.gz",
+    "rewards": [
+      61696.0,
+      75495.0
+    ],
+    "seed": 101721863,
+    "steps": 720,
+    "submission": 55574890,
+    "teams": [
+      "\u30ab\u30ef\u30b7\u30ae",
+      "tetsuya"
+    ]
   }
 }

@@ -1556,3 +1556,62 @@ The survivor was the goose-free `COW:8,SHEEP:4`, confirming at **+$474 +/- $2,25
 The 131 idle tile-days are real and remain unrecovered. What the round rules out is that they are caused by the reservation policy, the fill order, the purchase logic, or the choice of animal. They are caused by the opening cash curve: melon, our best crop, pays nothing until day 10, and until then the farm is genuinely broke.
 
 That points at the opening mix rather than the herd, and round 18 already measured the obvious version of that — sowing cheap seed to plant more tiles — as a loss. The lever, if there is one, is a crop that pays *before* day 10 without displacing the melon that pays after it.
+
+# Round 23: what the actual leaderboard top does
+
+Until now "the field" meant the opponents our own submissions had been paired against, rated around 700 to 800. `replays_kaggle/fetch.py` could not pull anyone else's episodes: other teams report a submission under `id` where our own report it under `ref`, so `_team_submissions` raised a `KeyError`. Fixed, and thirteen episodes pulled from the top five on the leaderboard — Ryo Hasegawa at 3159, Crop Dusta, tetsuya, Arman Tuganbaev, カワシギ.
+
+They do not play like the opponents we had been studying.
+
+```
+                        top five        us
+tiles                         75        45
+hands                      12-15        12
+wheat, share of sales      26.0%      4.9%
+melon, share of sales       6.8%     20.5%
+strawberry                 16.3%     21.4%
+fertilizer                 20.0%     17.5%
+```
+
+Every one of the five holds exactly 75 tiles. Every one sells 194 to 422 wheat and only 66 to 149 melon. We do the reverse.
+
+## The opening they all share
+
+Tracing Arman Tuganbaev's 129,296 turn by turn, and then checking the pattern across all five:
+
+```
+player            first animal purchases              animals by day 6   first sale
+Arman Tuganbaev   d0 sheep4, d4 cow1, d6 cow1, cow1                  5   d1 fertilizer
+tetsuya           d0 cow2, d0 sheep3, d3 cow1, d4 cow2               8   d1 fertilizer
+Crop Dusta        d0 cow1, cow1, sheep1, sheep1                      5   d2 fertilizer
+Ryo Hasegawa      d0 sheep2, cow2, d7 cow3, d8 cow1                  4   d2 fertilizer
+カワシギ            d0 cow2, sheep2, d3 cow1, d5 cow1                   6   d1 fertilizer
+```
+
+Three to five animals on **day zero**, and the first income is **fertilizer on day one or two**. Arman spends $2,000 on four sheep and $130 on thirteen wheat. We spend $1,040 on thirteen melon and have $1,560 left, which buys three cows, and our first real income is melon on day 10.
+
+Fertilizer is one unit per animal per day and nothing else in the game consumes it, so their opening cash comes from a stream that costs no tiles at all. Ours comes from a crop that pays nothing for ten days. That is the whole difference in the opening float, which round 22 measured sitting between -$207 and +$154 for nine days.
+
+Two other structural differences: Arman's movement is **48.5% of unit-turns against our 56.7%**, and he hires across the whole day rather than in the first four hours, ramping 2, 3, 6, 9, 13 as the money arrives. He buys his second quadrant on day 6 and his third on day 10; we buy one on day 11.
+
+## Measured, and none of it transfers
+
+Every arm below was swept against 1.7.0 with a floor of forty paired seeds.
+
+| Arm | Points |
+| :--- | ---: |
+| Default | 96% |
+| Ten wheat tiles and a melon cap of six, 50 tiles | 95% |
+| Their whole package: 75 tiles, 20 wheat, melon cap | 55% |
+| Their package with 14 wheat | 49% |
+| 75 tiles, melon cap alone | 40% |
+| Carrot bridge, 5 tiles to day 8 | 76% |
+| Wheat bridge, 8 tiles to day 12 | 68% |
+
+Buying animals before seed on the opening turns took three attempts to even take effect — the first reserved cash the seed order spent anyway, the second deadlocked because structures are only built once the animal is in the shed, the third asked `_herd_deficit` for a number the plan had already zeroed. Once it worked, it scored 86,829 against 59,272 on one seed, then confirmed at **+$2,194 +/- $2,290** and settled at **+$600 +/- $977** over 200 held-out paired seeds against the champion. Not significant, dropped.
+
+## What this round establishes
+
+The description of the target is now firm and comes from the real top of the ladder rather than from our own rating neighbourhood: 75 tiles, wheat as the volume crop, melon marginal, animals on day zero, fertilizer as the opening income.
+
+The gap is not knowledge of the target. Their configuration scores half our match points when we adopt it, which means the constraint is still whatever makes our 75-tile farm earn less than our 50-tile farm — measured in round 15, unexplained since. Everything in this round was an attempt to buy that ceiling with a better opening, and the ceiling did not move.

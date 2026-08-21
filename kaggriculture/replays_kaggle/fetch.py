@@ -35,7 +35,9 @@ def _submissions():
 
 
 def _team_submissions(team):
-    return [row["ref"] for row in _cli("competitions", "team-submissions", str(team), "--format", "json")]
+    """Other teams report the submission under `id`; our own report it as `ref`."""
+    rows = _cli("competitions", "team-submissions", str(team), "--format", "json")
+    return [row.get("ref") or row["id"] for row in rows]
 
 
 def _episodes(submission):
