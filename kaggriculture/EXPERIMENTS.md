@@ -2333,3 +2333,375 @@ Dynamic task valuation is not wrong: the best weight beats the default on two of
 The right next step is a full retrain of all twenty weights rather than a one-dimensional sweep around weights fitted without the feature. `tools/train_routing.py` supports it.
 
 All three knobs were removed and `main.py` reproduces 1.14.0 byte for byte.
+
+# Round 37: Agent 2.0.0 plans work before it walks
+
+Status: architecture and experiment plan only. No Agent 2.0.0 policy has been implemented or measured.
+
+The fixed baseline for every score comparison is `agents_1.0.x/v1_14_0_central_herd.py`. The current `main.py` is byte-identical to that file. The later Round 36 commit changed only this experiment log.
+
+## Hypotheses registered before implementation
+
+1. A stable ordered route for each unit will reduce target changes and repeated walks.
+2. A task graph will keep pickup, feed, care, build, place, plant, water, harvest, drop and sale dependencies valid.
+3. Local plan repair will preserve useful work after a small state change better than full replanning every turn.
+4. A layout scored by expected service flow will need fewer unit-turns than a layout scored only by crop value and central distance.
+5. An investment is profitable only when the available units can execute its work. The economy planner must ask the route planner for this cost.
+6. Reinforcement learning will be more useful for choosing whole plans or search operators than for choosing one next tile.
+
+Round 37 is an architecture roadmap, not one executable implementation plan. Every stage needs a smaller reviewed subplan before code starts.
+
+The behavior-equivalent foundation is created from 1.14.0. Later mechanisms branch in separate worktrees from their accepted predecessor because routing, layout and economy need the new typed infrastructure. Every score run still compares directly with frozen 1.14.0 and also measures marginal change from its immediate predecessor. A mechanism can enter a combination only after both comparisons pass its registered gate.
+
+Before each experiment campaign, record and verify the `kaggle-environments` version and configuration against a recent live replay. Local 1.32.7 and replay 96047508 both use `townCenterSellInterval=24`, while current upstream prose says 12 and the upstream configuration file says 24. A benchmark with configuration drift is invalid.
+
+## Critical reading of 1.14.0
+
+The current agent is a successful policy, but it is not the target architecture:
+
+- `agent()` owns market belief, portfolio, layout, buying, task creation, safety, pickup, unit assignment and action formatting.
+- `_dynamic_plan()` mixes economic value, budget, owned seeds, crop deadlines, herd composition and tile position.
+- `_tile_task()` and `_animal_tasks()` create valid work, but raw tuples connect generation, priority, pickup, routing, action conversion and tests.
+- `_cluster_plan()` freezes a spatial zone for one day. It does not freeze an ordered route.
+- `_route_targets()` remembers only one destination per unit.
+- `_route_rl_choice()` ranks one next task inside a hard safety class. It has no route, inventory schedule or dependency model.
+- `_pickup_op()` runs outside routing and can consume a turn before the unit has selected its work.
+- The market order helpers estimate separate budgets, while the simulator enforces one cash balance and a ten-order queue.
+- Module globals hold episode state and infer reset from the step number.
+
+Round 32 found zero idle time after day 12 on 75 tiles and about 56% movement. Round 33 found that theoretical value per action did not include travel and supply pickup. Round 36 found only a neutral `+$418 +/- $964` from adding task value to the old one-step ranker. The next change must plan sequences, not add another scalar to the same selector.
+
+## What Agent 2.0.0 keeps
+
+| 1.14.0 component | Decision |
+|:---|:---|
+| Rule tables and exact market curve | Keep and test for exact equivalence |
+| Town demand and public supply forecast | Keep behind a `Forecast` interface |
+| Opponent stock lower bound | Keep as one market scenario input |
+| Per-product sell or hold and liquidation | Keep as the first market policy |
+| Crop and animal task rules | Keep as the source of task preconditions and effects |
+| Emergency masks and final return | Keep in a hard `SafetyKernel` |
+| Central future-herd placement | Keep as the layout fallback |
+| Daily zones and deterministic task key | Keep as the routing fallback |
+| Frozen 19-feature routing model | Keep for comparison and fallback only |
+| Current control loop | Replace |
+| Raw task tuples | Replace with typed task nodes |
+| Independent cash reservations | Replace with one budget ledger |
+| Per-turn next-task selection | Replace with persistent route queues |
+| Implicit module state | Replace with explicit episode and day plans |
+
+This is a strangler change, not a blank rewrite. Agent 2.0.0 starts beside `BaselinePolicy`. Each new component replaces one boundary. The baseline stays executable until the new component passes its gate.
+
+Development uses a small multi-file `agent_2` package. The release entrypoint owns one policy instance. Helper modules cannot own mutable episode state. Kaggle accepts a tar archive with `main.py` and helper files, so the architecture does not need to return to one monolithic source file.
+
+Each release is one immutable directory and tar archive. The loader must give every artifact an isolated import root and module cache. Tests run the exact packed archive after extraction in a clean directory. A runtime fallback is selected at episode start. A mid-episode fallback is allowed only if the 1.14.0 policy has processed every observation in shadow mode with separate state.
+
+## Target flow
+
+```text
+observation
+  -> normalized world state and episode state
+  -> market forecast scenarios
+  -> investment candidates
+  -> persistent layout candidates
+  -> projected task graphs and route-cost estimates
+  -> revised investment and layout choice
+  -> current-day task graph
+  -> global unit routes
+  -> persistent plan executor
+  -> event detector and local plan repair
+  -> Kaggle action adapter
+```
+
+Market orders run beside unit routes. An ordinary price change updates market orders. A price change that moves an optional task across its keep-or-drop threshold triggers revaluation of affected route suffixes.
+
+The dependency direction is fixed before files are created:
+
+```text
+domain <- state and forecast <- economy, layout and tasks
+domain and tasks <- safety <- scheduler
+domain, tasks and safety <- executor
+all decisions -> policy -> adapter
+```
+
+`scheduler` does not import `executor`. Domain types import only the standard library. Stage subplans must preserve this direction.
+
+## Problem formulation
+
+The daily routing problem is closest to a team orienteering problem with time windows:
+
+- units are vehicles;
+- a tile action is a visit with one turn of service time;
+- Manhattan distance is travel time;
+- `WATER!`, `FEED!`, production and the last sale create deadlines;
+- task loss or terminal revenue is the visit prize;
+- wheat, fertilizer and animals create pickup and delivery dependencies;
+- each unit has a release turn and at most 24 turns are available;
+- optional work can be dropped when it costs more than it returns.
+
+This is not a multi-agent path-finding problem. Units can share a tile and have no collision constraints. Manhattan paths are exact, so the hard part is assignment, order, deadlines and inventory.
+
+A general HTN planner is also unnecessary. The domain has a small fixed set of task chains. A directed acyclic task graph is enough and is easier to validate.
+
+An exact solver is not the first implementation. Routing with optional visits and time windows is NP-hard, and the Kaggle runtime must be predictable. The first solver will use deterministic insertion and local-search operators in pure Python. OR-Tools supplies the useful formulation, not a submission dependency.
+
+## Stage 37.0: create an equivalent shell
+
+Create these boundaries:
+
+- `model`: normalized observation and rule tables;
+- `state`: episode context, beliefs and persistent plans;
+- `economy`: portfolio, budget and market intents;
+- `layout`: occupancy commitments and spatial cost;
+- `tasks`: task graph creation;
+- `safety`: legal actions, deadlines and reachability;
+- `scheduler`: task assignment and route order;
+- `executor`: route validation and progress;
+- `policy`: heuristic and learned scorers;
+- `adapter`: Kaggle action dictionary.
+
+Implement this as five sub-stages: isolated package and entrypoint, observation normalization, explicit policy state, baseline adapters, then submission archive verification. First route every call through the 1.14.0 policy.
+
+The gate is identical returned actions for identical observation streams in both seats, identical observable transitions, identical final scores, normalized-world equivalence, repeated-episode reset isolation and duplicate-observation handling over unit tests, saved replays and at least 100 paired local episodes. Internal state does not need byte equivalence after normalization. This stage can change structure, not behavior.
+
+The local loader must prove that two artifact versions and two seats cannot share `agent_2` modules or mutable state through `sys.modules`. The packed tar must pass import and full-episode tests after extraction in a clean directory.
+
+## Stage 37.1: build the task graph in shadow mode
+
+Each task node contains:
+
+- stable identity and tile;
+- primitive operation and service time;
+- earliest turn and deadline;
+- hard or optional class;
+- a value-model key and state needed for contextual marginal valuation;
+- inventory consumed and produced;
+- preconditions and predicted effects;
+- predecessor and successor nodes;
+- validity check against the next observation.
+
+The graph has separate current executable nodes and predicted successor nodes. Initial dependency patterns are:
+
+- shed pickup -> feed -> care;
+- shed pickup -> fertilize;
+- shed pickup animal and build -> place, with pickup and build allowed in either order;
+- plant -> same-day water;
+- dig -> plant or build;
+- fertilize -> water when the same-day bonus pays;
+- water -> harvest when the last watering changes yield;
+- market purchase clears -> later pickup, plant or new-land work;
+- final harvest -> return -> drop, with a linked market sale no later than hour 22.
+
+Tasks on the same tile can form one service bundle. For example, one animal visit can execute feed, care, harvest and fertilizer collection in a valid order. The planner still counts every primitive action as one turn. A bundle preserves effect order. It cannot treat `FERTILIZE -> WATER` as equivalent to `WATER -> FERTILIZE`.
+
+The graph first runs in shadow mode. Its current executable view must reproduce the work and safety decisions of the old generators without controlling a unit. Its successor view predicts deterministic work that activates later in the day. Tests cover preconditions, effects, inventory conservation, atomic seed planting, latest start, purchase latency, sequential unit effects, per-turn decay, end-of-day refresh and final sale timing.
+
+## Stage 37.2: persist a full daily route
+
+At the first observation of a day, plan ordered queues for the farmer and expected hands. Each unit has a release turn and end turn. A hire clears after unit actions, so that hand can work only from the next observation. A failed hire removes that future route and triggers one global rebuild.
+
+Store goals, not every movement step. The executor emits the next exact Manhattan move and keeps the same goal until completion or invalidation. Equal-length paths use one deterministic rule. Work underfoot remains protected.
+
+The route simulator tracks:
+
+- unit position and remaining turns;
+- carried wheat, fertilizer, animals and harvested goods;
+- shed stock reserved by other routes;
+- task effects and dependencies;
+- deadlines and latest start times;
+- final-day shed return and market clearance.
+
+The route simulator reproduces the complete turn order: farmer action, hands in index order, market clearing, town demand, plant decay and end-of-day refresh. It tracks pending purchases separately because wheat, fertilizer, animals, seeds, hires and land bought this turn are unavailable to unit actions from that turn. It also reserves shed space for ordinary end-of-day auto-drops.
+
+Per-turn task and resource locks prevent conflicting same-tile actions, duplicate pickup and seed oversubscription. Planting is accepted only when the same-day water chain fits. Crop-wide atomic planting never emits more requests than available seeds.
+
+The control arm freezes routes built with the current 1.14.0 priority, zone and safety rules. This isolates the value of persistence from the value of a new route algorithm. Stage 37.2 includes a simple global rebuild for invalid routes and a hard legal-action fallback. Stage 37.4 later tests local repair as an optimization.
+
+## Stage 37.3: test route construction methods separately
+
+All arms start from the same typed task graph:
+
+| Arm | Mechanism |
+|:---|:---|
+| A | Frozen 1.14.0 priority and zone queues |
+| B | Cheapest feasible insertion |
+| C | Regret-2 feasible insertion |
+| D | C plus within-route 2-opt |
+| E | C plus cross-route relocate and swap |
+| F | C plus removal and repair of the worst route segment |
+
+C is tested against A and 1.14.0. D, E and F are separate operator experiments built on C; each is tested against C and 1.14.0.
+
+Hard tasks are `WATER!`, `FEED!`, reachable final return and sale realization. `CARE` and ordinary production work are optional even when valuable. Hard tasks are inserted first by slack and contextual loss. Optional tasks are inserted by positive contextual marginal terminal gain after travel and service cost. Every insertion simulates time, inventory and dependencies. A task that makes a hard deadline unreachable is rejected.
+
+The main objective is final win or tie against 1.14.0. Route diagnostics explain the result but do not select a release:
+
+- movement share;
+- productive actions;
+- task switches before completion;
+- repeated tile visits;
+- missed hard deadlines;
+- feed, care and water neglect;
+- carried goods lost or sold too late;
+- planner time per turn and per day.
+
+## Stage 37.4: repair plans only on material events
+
+The executor predicts the next observable state field by field. Only a difference from the predicted transition creates an event. Expected task successors activate inside the graph and are not events.
+
+| Event | Repair scope |
+|:---|:---|
+| Target already complete or invalid | Remove or replace that node in one route |
+| Pickup or inventory reservation failed | Repair routes that require that item |
+| New urgent task | Insert it into the route with the smallest feasible delay |
+| Expected hire or land purchase cleared | Activate its planned capacity |
+| Expected hire or land purchase failed | Rebuild all routes once |
+| Price crosses an optional-work threshold | Revalue affected route suffixes |
+| Other market forecast change | Rebuild market orders only |
+| Day boundary | Build the next full day plan |
+| No difference | Continue the stored route |
+
+Random weeds spawn during end-of-day refresh and belong in the next daily plan. A decaying plant can also become a weed during per-turn decay. This transition is predicted from `max_lifespan_step`; an unpredicted one creates a local event.
+
+Plan repair has a stability penalty for changing unaffected route suffixes. Every repair validates global stock reservations and every later hard deadline. One failed repair triggers a global rebuild; a second failure uses the legal-action fallback for the turn. The experiment compares local repair with full replanning after the same injected events. It measures final score, repaired nodes, abandoned walking and planner time.
+
+## Stage 37.5: make layout pay for its service flow
+
+Occupied animals cannot move, so layout decisions apply only to empty tiles and future replacements. The 1.14.0 central herd remains the fallback.
+
+These experiments use the unchanged 1.14.0 investment output. They change only where its future assets go. Portfolio enumeration remains in Stage 37.6.
+
+For each candidate item and tile, estimate:
+
+- expected visits over its remaining life;
+- shed pickup and drop flow;
+- synchronized visits with nearby tasks;
+- marginal insertion cost in projected daily routes;
+- risk that required work does not fit in available unit-turns;
+- terminal revenue after market impact.
+
+Test these arms separately:
+
+| Arm | Layout score |
+|:---|:---|
+| A | Service-frequency weighted shed distance |
+| B | Cluster crops with the same daily service pattern |
+| C | Marginal route insertion cost |
+| D | Local tile swaps starting from the 1.14.0 layout |
+
+High-flow animals should usually stay near shed access. Low-frequency one-time crops can use outer tiles. The planner must prove this from route cost instead of using a fixed centre rule.
+
+## Stage 37.6: make investments route-feasible
+
+The first economy implementation keeps the proven 1.14.0 market forecast and selling policy. It replaces only the decision about what new capacity to buy.
+
+At each day boundary, enumerate a small set of portfolio candidates around the 1.14.0 plan:
+
+- buy or defer the next land quadrant;
+- add no animal or one small herd batch;
+- choose crop counts, not a crop independently for every tile;
+- choose hands, seeds, wheat and fertilizer together;
+- keep or sell product stock needed to fund the candidate.
+
+One `BudgetLedger` tracks separate balances for shed stock, seeds, carried stock, pending market stock and route reservations. It reserves cash, shed capacity and all ten market order slots before orders are emitted. Each portfolio receives a projected task graph and route-cost estimate. Reject candidates that cannot meet hard survival work or fit projected end-of-day drops. Score the remaining candidates by projected terminal money difference, not gross production or shortest route.
+
+Test in order:
+
+| Arm | Change from 1.14.0 |
+|:---|:---|
+| A | One cash, inventory, capacity and order-slot ledger only |
+| B | Reject portfolios above the unit-turn capacity |
+| C | Charge marginal route insertion cost |
+| D | Receding-horizon search over two to four days |
+| E | Multiple future-shop and opponent-supply scenarios |
+
+Arm A first has a shadow mode that must emit the exact 1.14.0 queue. Any accounting correction is a policy change and runs behind its own flag. The planner executes only the first day's investment decisions, observes the result, and solves the next horizon at the next day boundary. This is economic model-predictive control at a daily macro-action level.
+
+Multi-day arms use the projected-state and future-task API created in Stage 37.1. They do not extrapolate the current executable task list.
+
+## Stage 37.7: couple economy, layout and routes
+
+Use a bounded coordination loop:
+
+1. Economy creates the top portfolio candidates.
+2. Layout assigns their new assets to legal tiles.
+3. The route planner returns feasible work, dropped work and unit-turn cost.
+4. Economy rescales terminal value with those results.
+5. Repeat once, then select one plan.
+
+The loop has a fixed candidate count, two passes and a fixed compute budget. It cannot search raw movement actions across the 720-turn season.
+
+Only independently positive components enter this stack. The final ablation removes one component at a time and compares both with 1.14.0 and with the complete stack.
+
+## Stage 37.8: add learning at the correct level
+
+Do not train an end-to-end movement policy first. The dynamics are mostly known, hard failures are expensive, and the reward arrives after 720 turns.
+
+After the deterministic scheduler wins, learning can choose among safe macro decisions:
+
+- portfolio candidate;
+- layout swap;
+- insertion position;
+- relocate, swap or repair operator;
+- local repair versus global rebuild.
+
+The safety kernel masks invalid choices. Training uses terminal money difference and a varied opponent pool. Checkpoints, features, training history and seed splits are saved as JSON, as in the 1.13.0 routing experiment. Inference stays deterministic and dependency-free.
+
+The existing 19-feature model is not an initialization for this policy. Its action is one next task under sequential unit assignment. Agent 2.0.0 learns over whole route or plan alternatives, which is a different action space.
+
+## Replay use
+
+Top-player replays are evidence for hypotheses, not labels to copy. Extract:
+
+- route length and repeated visits;
+- completed task bundles per visit;
+- target-change rate;
+- service load by tile and asset type;
+- animal distance from the four shed-access points by day;
+- investment, land and hire timing.
+
+Compare these distributions with 1.14.0 and each Agent 2.0 arm. Do not replay a fixed trajectory. Shop draws, weeds, opponent production and market orders still require state-based control.
+
+## Evaluation and release gate
+
+- Fixed comparator: frozen 1.14.0 from `main`.
+- Environment gate: pinned package version and configuration equal a recent live replay.
+- Every seed runs in both seats.
+- Debug seeds never select a policy.
+- Screens use fresh paired blocks.
+- Confirmation uses fresh paired blocks registered before execution.
+- Release uses at least 400 fresh paired seeds after all selection.
+- The final gate uses a new untouched block, the local lineage pool, replay-derived opponent specialists and one Kaggle validation submission.
+- Primary metric: win and tie points, because Kaggle scores the match result.
+- Secondary metric: paired terminal money difference with uncertainty.
+- A confirmed arm needs the lower 95% confidence bound for clustered match points above 50%, a positive mean paired-money delta and no failure.
+- Multi-arm screens use registered seed blocks and an untouched confirmation, so the selected arm does not reuse its selection data.
+- Hard gates: no crashes, predicted invalid action, missed final sale, inventory loss, safety regression or configuration drift.
+- Runtime gates: new plan or repair budget at most 100 ms, p99 full agent call below 250 ms, worst call below 750 ms and zero one-second action timeouts.
+- Artifact gate: build the tar, extract it in a clean directory, import its `main.py`, run the full paired gate and pass Kaggle validation.
+- Every result, including neutral and negative arms, is appended here before combination.
+
+Instrumentation compares predicted and observed position, inventory, tile effect, market result and deadline state. It detects silent no-ops. Differential tests apply predicted primitive transitions to the real simulator. Property tests cover conservation, shed capacity, task uniqueness, precedence, reachability, atomic planting and repair feasibility.
+
+Required end-to-end cases include late hires, failed orders, new land, purchase latency, same-tile sequential actions, day-end overflow, mid-day decay to weed, animal escape, fresh planting, day-29 harvest and hour-22 drop plus sale.
+
+Before each stage starts, its subplan records the accepted predecessor commit, exact files and interfaces, dependency direction, experiment flag, episode-start fallback, direct and marginal comparators, seed blocks, runtime budget, pass and reject gates, rollback, frozen artifact format and resolved stage questions.
+
+`2.0.0` is the architecture candidate name, not yet a release. It becomes a release only when the complete candidate beats 1.14.0 on the confirmation, final and regression gates. Until then `main.py` remains 1.14.0.
+
+## Research basis
+
+- [Kaggle submission guide](https://www.kaggle.com/competitions/kaggriculture/overview/getting-started-test-locally-submit): a multi-file agent can be submitted as a tar archive.
+- [Current environment configuration](https://github.com/Kaggle/kaggle-environments/blob/master/kaggle_environments/envs/kaggriculture/kaggriculture.json): action timeout and simulator defaults, checked again against a live replay before testing.
+- [Vehicle routing with time windows](https://developers.google.com/optimization/routing/vrptw), [pickup and delivery](https://developers.google.com/optimization/routing/pickup_delivery) and [optional visits](https://developers.google.com/optimization/routing/penalties): the routing constraints that match daily farm work.
+- [Multi-Robot Allocation of Tasks with Temporal and Ordering Constraints](https://doi.org/10.1609/aaai.v31i1.11145): assignment with deadlines and precedence.
+- [A constraint programming approach for the team orienteering problem with time windows](https://doi.org/10.1016/j.cie.2017.03.017): optional profitable work with service times and time windows.
+- [An Adaptive Large Neighborhood Search Heuristic for the Pickup and Delivery Problem with Time Windows](https://doi.org/10.1287/trsc.1050.0135): competing insertion, removal and repair operators.
+- [Plan Stability: Replanning Versus Plan Repair](https://cdn.aaai.org/ICAPS/2006/ICAPS06-022.pdf): local repair and plan-stability measurement.
+- [Minimizing Work-in-Process and Material Handling in the Facilities Layout Problem](http://hdl.handle.net/1903/5629): layout scored by movement flow and distance.
+- [Improved Switching among Temporally Abstract Actions](https://proceedings.neurips.cc/paper_files/paper/1998/hash/9597353e41e6957b5e7aa79214fcb256-Abstract.html): learning and planning over existing high-level controllers.
+
+## Unresolved questions
+
+- Best initial planning horizon: one day or several days with a committed current day.
+- Minimum optional-task value change that justifies route-suffix revaluation.
