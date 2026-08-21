@@ -2108,3 +2108,40 @@ The second quadrant does not fail on acreage, on weeds, on the crop mix or on hi
 Every knob in this round trades one for the other. What would actually reconcile them is fewer watering-days per unit of yield — which is the crop mix, and every mix experiment in this log has lost — or more usable turns, and movement is already down to 56% with walks averaging 1.87 tiles.
 
 All knobs from this round were removed; `main.py` reproduces 1.12.0 byte for byte.
+
+# Round 30: the tended-plant ceiling
+
+Round 28 traced the second quadrant's loss to a queue: at 62 plants, 26 wake each dawn one dry day from death, each emits a `WATER!` at priority zero, and the herd waits behind them. Two ways out were named — fewer watering-days per unit of yield, or more usable turns. Both were tried.
+
+## Alternate-day watering does not work
+
+`RULES.md` says a plant survives one dry day, and that water adds yield only inside the bonus window of a one-time crop or on a production day of an ongoing one. Outside those, skipping is free and the tile is watered on alternate days instead.
+
+Measured at 75 tiles on the seed from a real ladder loss: money 92,769 to 86,633, animal neglect **worse**, 38.2% to 41.3%. A skipped safe watering becomes tomorrow's emergency, which is the priority-zero traffic that was starving the herd. This reproduces the round 11 result at the board size where it should have had every advantage.
+
+## Capping the plant count does, almost
+
+`KAGG_PLANT_CAP` stops the planner allocating past a fixed number of standing plants, leaving the rest of the bought quadrant bare. Same seed:
+
+```
+plants   animal-days uncared   money
+   62               38.2%     92,769
+   55               23.6%    104,789
+   48               11.8%    118,686
+   42               10.0%    120,361
+   38                8.9%    109,962
+```
+
+At 42 plants the farm earns **120,361 against 92,769** uncapped, and the neglect round 28 identified is gone.
+
+Across forty paired seeds the capped two-quadrant farm scores **90 to 91% of match points against the default's 91%**, where round 28 measured the same farm at 40 to 66%. The cap closes almost the whole gap without clearing it: on the reference seed 120,361 against 121,726 for the 50-tile default, a tie.
+
+Scaling hands does not break the tie. The best arm, 45 plants with thirteen hands at 0.2 per tile, took 88% in the sweep and confirmed at **-$1,610 +/- $2,671** on a hundred fresh seeds. A larger herd on the freed tiles is worse: ten cows and eight sheep pay 101,319, twelve and ten pay 83,421, against 120,361 for the unchanged herd.
+
+## What this settles
+
+The binding constraint is neither acreage nor hiring. The farm tends about **forty plants and twelve animals**, and that number barely moves with the board or the payroll: 38 and 12 at fifty tiles, 42 and 12 at seventy-five capped, the same money to within noise.
+
+So the second quadrant is no longer a loss, it is a break-even — buying it and leaving a third of it bare costs nothing and gains nothing. The next gain has to raise the tended-plant ceiling itself, not find more ground to put plants on.
+
+All knobs from this round were removed.
