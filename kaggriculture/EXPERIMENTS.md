@@ -2145,3 +2145,57 @@ The binding constraint is neither acreage nor hiring. The farm tends about **for
 So the second quadrant is no longer a loss, it is a break-even — buying it and leaving a third of it bare costs nothing and gains nothing. The next gain has to raise the tended-plant ceiling itself, not find more ground to put plants on.
 
 All knobs from this round were removed.
+
+# Round 32: the ceiling is unit-turns, and it is priced
+
+Round 30 left the second quadrant at break-even and named the open question: raise the tended-plant ceiling itself. This round measures what that ceiling is made of.
+
+## The day, turn by turn
+
+At 75 tiles, per day around day 18:
+
+```
+              50 tiles   75 tiles
+unit-turns         242        282
+movement           55%        56%
+idle             0-20%         0%
+WATER ops           38          63
+everything else     59          53
+```
+
+Idle is **zero** from day 12 onward at 75 tiles. Every extra plant is watered — 63 waterings for 63 plants — and the turns come out of the 36 a day the herd needs for feed, care and fertilizer collection. The farm is not neglecting the animals by choice; it has nothing left.
+
+## Hiring cannot buy the turns
+
+`HIRE_HOURS = 4` and `HIRES_PER_TURN = 3` cap hiring at **twelve hands a day** whatever `MAX_HANDS` says. That is why raising `MAX_HANDS` to 15 in round 28 produced a byte-identical episode.
+
+Lifting the window to seven hours does hire more, and it loses. On the reference seed, fifteen hands cut animal neglect from 21.8% to 15.5% and cut money from 104,874 to 94,145; fourteen hands gave 98,734. The hire cost is `fib(n)` — twelve hands cost $376 a day, fifteen cost $1,596 — and over the eighteen days that matter the extra payroll is about $22,000, which is the whole gain.
+
+## What a unit-turn is worth
+
+Value per work-op at the prices that actually occur, market inventory 300 below neutral:
+
+```
+COW          $156 per op-day
+MELON        $151
+SHEEP        $111
+STRAWBERRY   $105
+TOMATO        $81
+CARROT        $53
+GOOSE         $45
+WHEAT         $31
+```
+
+A cow is the best thing a unit-turn can be spent on, ahead of melon, and wheat is the worst by a factor of five. This is the arithmetic behind every failed wheat experiment in this log, and it says the herd — not the crop mix — is where an extra turn should go.
+
+## Which makes the herd result surprising
+
+On the reference seed, sixteen animals on **fifty** tiles pay 110,412 against 104,225 for the standing twelve, with neglect at 13.6%. The same sixteen on seventy-five tiles pay 89,153 at 28.6% neglect, and twenty on seventy-five pay 62,690.
+
+Swept over forty paired seeds against 1.13.0, every larger herd still loses: 90% of match points at fourteen animals, 85% at sixteen, 76% at eighteen, 70% at eighteen with more sheep, against 96% for the default.
+
+So the single seed was not representative, and the $156 an op is not collectable at scale. An animal's three ops a day do not include the walk to it or the wheat carried to it, and those are what the extra animals actually consume.
+
+## Where this leaves the board
+
+Full utilisation of seventy-five tiles is not blocked by ground, hiring, crop choice or herd size. It is blocked by unit-turns, the farm already spends every one of them from day 12, and the two ways to buy more — payroll and walking — are priced above what they return. The quadrant is worth buying and leaving partly bare; it is not yet worth filling.
