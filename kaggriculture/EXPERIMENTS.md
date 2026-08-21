@@ -1514,3 +1514,45 @@ Through day 8 the farm holds five bare tiles and two to five empty structures �
 It still loses. Swept at lead times of 2, 3, 4 and 6 days against 1.6.0, the default won its own sweep outright. A first version without the short-crop restriction was far worse — it lent the tiles to strawberry, which occupies them for sixteen days and strands the animal.
 
 The board looks better and earns less. What the extra early crops return does not cover the herd arriving late, and the herd is where the compounding is: an animal bought on day 6 produces for twenty-three days.
+
+# Round 22: the idle opening, diagnosed properly
+
+The replays keep showing the same opening: through day 8 the farm holds five bare tiles and two to five empty structures, seven to ten of twenty-five doing nothing, while the strong ladder players have nineteen crops standing at day 2 against our thirteen. Measured over days 0 to 12 that is **131 idle tile-days**, which at thirty to a hundred dollars a tile-day is worth more than any single change shipped this week.
+
+Three explanations were tested. The first two were wrong about the cause.
+
+## It is not the reservation, and it is not the order
+
+Round 21 released the herd tiles the balance could not reach. It lifted day-2 crops from 13 to 19 and lost anyway, because the herd completed a day later.
+
+Filling the herd cheapest-first changes nothing: `COW:7,SHEEP:5` is already in cost order, and reversing it to dearest-first loses outright.
+
+Ordering animals for *planned* tiles rather than built structures — cows and sheep share the pasture, so cows filling every built pasture could in principle starve the sheep of orders — produces a byte-identical episode.
+
+## What the trace actually says
+
+Instrumenting `_animal_orders` day by day:
+
+```
+day  0  wanted SHEEP 5, COW 7   money 1,560   buys COW 3
+day  4  wanted COW 4, SHEEP 5   money   154   buys nothing
+day  9  wanted COW 1, SHEEP 5   money  -207   buys nothing
+day 12  wanted SHEEP 2          money 6,973   buys nothing
+day 16  wanted nothing          money 18,434
+```
+
+The day-12 line looks like the bug — seven thousand dollars in hand and nothing bought — and it is not. Those two sheep were bought earlier and are sitting in the shed waiting to be placed, so `need - shed` is correctly zero. The herd is complete by day 16.
+
+The real picture is simpler and harder: the opening float sits between **-$207 and +$154 for nine consecutive days**. The farm is not failing to spend; it has nothing to spend. Every animal is bought the moment the money exists, one at a time, and the tiles wait because a cow costs $400 against a balance that hovers at zero.
+
+## Cheap animals to fill the gap
+
+If the gap is cash, the cheapest animal should close it: a goose is $300 against a cow's $400 and yields from day 4 rather than day 8. Swept against 1.7.0 with two geese added to the herd in three configurations, plus a goose-free control at eight cows and four sheep:
+
+The survivor was the goose-free `COW:8,SHEEP:4`, confirming at **+$474 +/- $2,259**. Every configuration containing geese lost the first round.
+
+## Where that leaves it
+
+The 131 idle tile-days are real and remain unrecovered. What the round rules out is that they are caused by the reservation policy, the fill order, the purchase logic, or the choice of animal. They are caused by the opening cash curve: melon, our best crop, pays nothing until day 10, and until then the farm is genuinely broke.
+
+That points at the opening mix rather than the herd, and round 18 already measured the obvious version of that — sowing cheap seed to plant more tiles — as a loss. The lever, if there is one, is a crop that pays *before* day 10 without displacing the melon that pays after it.
