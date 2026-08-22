@@ -3047,3 +3047,96 @@ uv run python tools/bench.py agents_2.0.x/round37_2b3_indexed_sticky agents_1.0.
 All 230 tests pass.
 
 Decision: reject sticky goals. The implementation meets runtime limits, but it loses the registered score screen. The frozen selector's cell-by-cell changes are often useful reactions, not only route thrash. Do not confirm or combine this arm. Resource chains and operation bundles must be tested separately from frozen 1.14.0 rather than stacked on this negative arm.
+
+## Round 37 full-field scaling experiments
+
+Status: complete, with no score-accepted 75-tile policy.
+
+The fixed comparator for 75 tiles was `variant:KAGG_LAND=2;KAGG_MAX_HANDS=14;KAGG_HANDS_PER_TILE=0.2`. The economic comparator was `agents_1.0.x/v1_14_0_central_herd.py` on 50 tiles. Every screen used paired, seat-swapped seeds. Candidates started from accepted Stage 37.1, not rejected Stage 37.2 routing arms.
+
+Fresh baseline screens confirmed the scale break.
+
+| Field request | Seeds | Points | Paired money delta vs 50 | Candidate mean |
+|:---|---:|---:|---:|---:|
+| 75 tiles | 40 | 0% | -$15,739 +/- $1,497 | $67,435 |
+| 100 tiles | 40 | 0% | -$31,239 +/- $2,095 | $57,719 |
+
+`tools/scaling.py` adds paired mechanism measurements for productive occupancy, movement, work, idle time, end-of-day neglect and carried wheat. Its probes wrap plain functions so Kaggle calls them correctly. Unit tests cover the rates and pairing.
+
+### Global assignment
+
+Candidate: `agents_2.0.x/round37_3_global_assignment/`.
+
+A min-cost one-turn assignment preserved market behavior, pickups, cashout and underfoot protection. It resolved a synthetic greedy trap and assigned feed only to a wheat carrier. The 40-seed 75-tile screen scored 12% points and -$5,483 +/- $1,430. Mean money was $67,077 with no failures.
+
+The three-seed mechanism probe reported 55.3% movement, 29.2% work, 12.8% idle, 21.4% missed water, 23.2% missed feed and 31.7% missed care. It did not reach the movement or neglect gates.
+
+Decision: reject. One-turn matching moved work between units but did not create useful routes.
+
+### Daily tours
+
+Candidate: `agents_2.0.x/round37_4_daily_tour/`.
+
+Workers followed fixed boustrophedon tours and replanned only through the frozen emergency path. The 40-seed screen scored 0% points and -$66,476 +/- $3,902. Mean money was $26,241 with no failures.
+
+Decision: reject. A fixed geographic tour ignored changing resource and task chains.
+
+### Staggered watering
+
+Candidate: `agents_2.0.x/round37_5_water_cohorts/`.
+
+The policy never filtered `WATER!`. It preserved watering before a yield and divided only safe watering into stable spatial cohorts.
+
+| Period | Seeds | Points | Paired money delta | Candidate mean |
+|:---|---:|---:|---:|---:|
+| 2 | 40 | 48% | -$924 +/- $2,085 | $74,210 |
+| 3 | 40 | 35% | -$2,149 +/- $2,135 | $71,296 |
+| 4 | 40 | 28% | -$4,381 +/- $1,734 | $65,836 |
+
+The period-2 mechanism probe reported 82.9% productive occupancy, 59.6% movement, 36.4% missed water, 27.1% missed feed and 37.2% missed care.
+
+Decision: reject all periods. Period 2 was close in money but failed the registered mechanism and score gates.
+
+### Scale-specific routing RL
+
+Candidate: `agents_2.0.x/round37_6_scale_rl/`.
+
+The feature vector grew from 19 to 26 values. Added values cover task worth, deadline priority, hour interaction, board-distance interaction, urgent backlog interaction, workload pressure and carried-resource compatibility. The selector admitted tasks within two priority levels of the best candidate, so training could compare urgent plant and herd work. `tools/train_routing.py` now loads Agent 2 artifacts, accepts initial weights and supports a land curriculum.
+
+The 75-only run trained eight batches of ten paired seeds. Checkpoints 4, 7 and 8 were screened separately. Checkpoint 7 was best, but its fresh 40-seed confirmation scored 48% points and +$1,070 +/- $2,516. The mixed 50/75 curriculum trained six batches. Its best held-out 75-tile checkpoint scored 30% points and -$8,284 +/- $4,136.
+
+Decision: reject both training programs. Neither produced a positive lower confidence bound.
+
+### Seasonal capacity plan
+
+Candidate: `agents_2.0.x/round37_7_capacity_plan/`.
+
+The planner reduces the herd as requested land grows, so productive crop tiles replace high-work animal tiles. The screen tested 12, 11, 10, 8 and 6 animals. Ten animals, `COW:6,SHEEP:4`, was best. Its initial 20-seed screen scored 78% points and +$3,901 +/- $3,527. A fresh 40-seed screen fell to 52% points and +$1,040 +/- $2,337. A 200-seed confirmation scored 57% points and +$166 +/- $1,003, with mean money $67,621 and no failures.
+
+The three-seed mechanism probe for ten animals reported 85.5% productive occupancy, 54.1% movement, 32.1% work, 11.2% idle, 8.4% missed water, 24.8% missed feed and 29.7% missed care.
+
+Decision: reject the herd reduction as a 75-tile score change. It improved win frequency but not expected money or the mechanism gates.
+
+### Workload zones and surge hires
+
+Candidates: `agents_2.0.x/round37_8_workload_zones/` and `agents_2.0.x/round37_9_surge_hires/`.
+
+Workload zones weighted an animal tile as three daily operations instead of one active tile. Its 40-seed result was 52% points and -$565 +/- $2,571. Surge hiring added two hands only on a day after at least five neglected plants or animals. Its 40-seed result was 52% points and +$146 +/- $1,606.
+
+Decision: reject both arms. Neither result was significant.
+
+### Adaptive land gate
+
+The capacity candidate estimates mandatory daily work before it accepts another quadrant. It accepts 50 and 75 tiles but rejects the fourth quadrant when the forecast exceeds 7.7 mandatory operations per available unit. Every accepted tile remains available to the normal productive planner.
+
+Forcing 100 tiles with eight animals and 16 hands lost -$27,522 +/- $4,287 against the existing 100-tile policy. Keeping 12 hands still lost -$4,338 +/- $1,959. The adaptive gate stopped at 75 and beat forced 100 in 80 of 80 games, by +$16,919 +/- $2,244.
+
+Final validation:
+
+| Request | Actual stop | Comparator | Seeds | Points | Paired money delta |
+|:---|---:|:---|---:|---:|---:|
+| 50 | 50 | 50-tile 1.14.0 | 40 | 50% | $0 +/- $0 |
+| 75 | 75 | 50-tile 1.14.0 | 40 | 1% | -$16,622 +/- $2,213 |
+| 100 | 75 | forced 100 | 40 | 100% | +$16,919 +/- $2,244 |
+
+Overall decision: do not change root `main.py`. Full physical expansion does not have positive marginal value with the current execution model. The safe result is a capacity gate that stops at 75 when 100 is requested, but 75 still fails the economic acceptance gate against 50. Do not tune 100 again until a 75-tile policy clears movement below 50%, animal neglect below 12% and productive occupancy above 90%.

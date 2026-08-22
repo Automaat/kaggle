@@ -21,18 +21,30 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 INITIAL_WEIGHTS = [2.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0] + [0.0] * 12
 
 
-def _load_policy(settings, identity):
+def _load_policy(settings, identity, candidate):
     name = f"routing_policy_{os.getpid()}_{identity}"
     with _environment(settings):
+        if candidate != "main.py":
+            loaded = load_agent(candidate)
+            policy = loaded.module._policy_agent.policy
+            return loaded, policy.baseline.module
         specification = importlib.util.spec_from_file_location(name, ROOT / "main.py")
         module = importlib.util.module_from_spec(specification)
         sys.modules[name] = module
         specification.loader.exec_module(module)
-    return module
+    return module.agent, module
+
+
+def _land_opponent(opponent, land):
+    if not opponent.startswith("variant:"):
+        return opponent
+    settings = opponent.removeprefix("variant:").split(";")
+    settings = [setting for setting in settings if not setting.startswith("KAGG_LAND=")]
+    return "variant:" + ";".join([f"KAGG_LAND={land}", *settings])
 
 
 def _episode(job):
-    weights, mode, temperature, opponent, seed, seat, policy_seed = job
+    weights, mode, temperature, opponent, candidate, land, seed, seat, policy_seed = job
     settings = {
         "KAGG_ROUTE_RL": "1",
         "KAGG_ROUTE_RL_TRAIN": "1",
@@ -40,14 +52,15 @@ def _episode(job):
         "KAGG_ROUTE_RL_TEMPERATURE": str(temperature),
         "KAGG_ROUTE_RL_SEED": str(policy_seed),
         "KAGG_ROUTE_RL_WEIGHTS": ",".join(str(value) for value in weights),
+        "AGENT2_LAND": str(land),
     }
-    module = _load_policy(settings, f"{seed}_{seat}_{policy_seed}")
-    rival = load_agent(opponent)
-    agents = [module.agent, rival] if seat == 0 else [rival, module.agent]
+    policy, stats_module = _load_policy(settings, f"{seed}_{seat}_{policy_seed}", candidate)
+    rival = load_agent(_land_opponent(opponent, land))
+    agents = [policy, rival] if seat == 0 else [rival, policy]
     environment = make("kaggriculture", configuration={"episodeSteps": 720, "seed": seed})
     environment.run(agents)
     rewards = [state.reward for state in environment.steps[-1]]
-    stats = module._route_rl_stats.get(seat, {})
+    stats = stats_module._route_rl_stats.get(seat, {})
     return {
         "seed": seed,
         "seat": seat,
@@ -58,10 +71,14 @@ def _episode(job):
     }
 
 
-def _batch(weights, mode, temperature, opponent, seeds, workers, iteration):
+def _batch(weights, mode, temperature, opponent, candidate, lands, seeds, workers, iteration):
     jobs = [
-        (weights, mode, temperature, opponent, seed, seat, iteration * 100_000 + seed * 2 + seat)
-        for seed in seeds for seat in (0, 1)
+        (
+            weights, mode, temperature, opponent, candidate,
+            lands[index % len(lands)], seed, seat,
+            iteration * 100_000 + seed * 2 + seat,
+        )
+        for index, seed in enumerate(seeds) for seat in (0, 1)
     ]
     with ProcessPoolExecutor(max_workers=workers) as pool:
         results = list(pool.map(_episode, jobs, chunksize=1))
@@ -92,6 +109,7 @@ def _batch(weights, mode, temperature, opponent, seeds, workers, iteration):
 
 def _arguments():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--candidate", default="main.py")
     parser.add_argument("--mode", choices=("basic", "zones", "memory"), required=True)
     parser.add_argument("--opponent", required=True)
     parser.add_argument("--output", required=True)
@@ -101,12 +119,18 @@ def _arguments():
     parser.add_argument("--workers", type=int, default=os.cpu_count())
     parser.add_argument("--learning-rate", type=float, default=0.08)
     parser.add_argument("--temperature", type=float, default=1.0)
+    parser.add_argument("--initial-weights")
+    parser.add_argument("--land-curriculum", default="2")
     return parser.parse_args()
 
 
 def main():
     args = _arguments()
-    weights = list(INITIAL_WEIGHTS)
+    weights = (
+        [float(value) for value in args.initial_weights.split(",")]
+        if args.initial_weights else list(INITIAL_WEIGHTS)
+    )
+    lands = [int(value) for value in args.land_curriculum.split(",")]
     first_moment = [0.0] * len(weights)
     second_moment = [0.0] * len(weights)
     history = []
@@ -115,8 +139,8 @@ def main():
         seeds = list(range(cursor, cursor + args.batch))
         cursor += args.batch
         reward, spread, gradient, choices, entropy = _batch(
-            weights, args.mode, args.temperature, args.opponent,
-            seeds, args.workers, iteration,
+            weights, args.mode, args.temperature, args.opponent, args.candidate,
+            lands, seeds, args.workers, iteration,
         )
         for index, value in enumerate(gradient):
             first_moment[index] = 0.9 * first_moment[index] + 0.1 * value
@@ -141,7 +165,16 @@ def main():
             f"spread={spread:>8.0f} choices={choices:>6d} entropy={entropy:.3f}"
         )
         pathlib.Path(args.output).write_text(
-            json.dumps({"mode": args.mode, "weights": weights, "history": history}, indent=2) + "\n"
+            json.dumps(
+                {
+                    "mode": args.mode,
+                    "candidate": args.candidate,
+                    "land_curriculum": lands,
+                    "weights": weights,
+                    "history": history,
+                },
+                indent=2,
+            ) + "\n"
         )
     print("weights=" + ",".join(f"{value:.8f}" for value in weights))
 
