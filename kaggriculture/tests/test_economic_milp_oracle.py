@@ -549,6 +549,31 @@ def test_exhausted_ongoing_crop_values_only_held_goods():
     assert oracle._active_crop_terminal_value(data, option) == 10
 
 
+def test_active_ongoing_crop_tail_includes_held_goods():
+    terminal_values = oracle.CropTerminalValues(
+        (0, 0, 180, 0, 0),
+        (0,) * len(market.CROPS),
+        (0, 0, 36, 0, 0),
+        0,
+    )
+    plant = oracle.ExistingPlant((0, 0), "TOMATO", 0, 1, False, 0, -1)
+    data = _input(
+        day=5,
+        cash=0,
+        existing=(plant,),
+        slots=0,
+        terminal_day=6,
+        terminal_values=terminal_values,
+    )
+    result = oracle.solve_oracle(data, 10, 0)
+    assert result.success
+    assert result.decisions[0].harvests == ()
+    assert result.terminal_cash == 0
+    assert result.terminal_value == 193.5
+    assert result.forecast_terminal_cash == 193.5
+    assert oracle.verify_result(data, result) == ()
+
+
 def test_harvested_exhausted_crop_does_not_double_count_active_tail():
     terminal_values = oracle.CropTerminalValues(
         (0, 0, 180, 0, 0),

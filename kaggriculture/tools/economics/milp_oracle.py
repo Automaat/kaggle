@@ -641,7 +641,12 @@ def _active_crop_terminal_value(data, option):
     progress_days = max(0, data.last_day - plant_day + 1)
     maturity_days = max(1, CROP_SPECS[option.crop].first_yield_day)
     progress = min(1.0, progress_days / maturity_days)
-    return data.terminal_values.active_crops[CROPS.index(option.crop)] * progress
+    value = data.terminal_values.active_crops[CROPS.index(option.crop)] * progress
+    if CROP_SPECS[option.crop].ongoing and not option.harvests:
+        value += option.yield_units * data.terminal_values.goods[
+            CROPS.index(option.crop)
+        ]
+    return value
 
 
 def generate_crop_options(data):
