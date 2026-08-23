@@ -667,13 +667,14 @@ def _crop_input(
     forecast,
 ):
     investment_cost = selected_investment.investment_cost or 0.0
+    existing_plants = len(snapshot.crop.existing_plants)
+    weeds = sum(cell.kind == "WEED" for cell in snapshot.cells)
     return replace(
         snapshot.crop,
         cash=snapshot.crop.cash - investment_cost,
         tile_capacity=tuple(
-            min(original, capacity - use)
-            for original, capacity, use in zip(
-                snapshot.crop.tile_capacity,
+            capacity - use - existing_plants - weeds
+            for capacity, use in zip(
                 field_capacity,
                 animal_profile["fields"],
             )
@@ -765,13 +766,19 @@ def _crop_profile(data, result):
         _crop_option_key(data, option): option for option in generate_crop_options(data)
     }
     actions = [0] * data.horizon_days
-    fields = [0] * data.horizon_days
+    fields = [len(data.existing_plants)] * data.horizon_days
     for decision in result.decisions:
         option = options[_crop_decision_key(decision)]
         for index, action_count in enumerate(option.actions):
             actions[index] += action_count * decision.count
         for day in option.active_days:
             fields[day - data.current_day] += decision.count
+        if option.existing_index is not None and option.release_day is not None:
+            for day in range(
+                option.release_day,
+                data.current_day + data.horizon_days,
+            ):
+                fields[day - data.current_day] -= decision.count
     orders = [0] * data.horizon_days
     for day, _ in {
         (purchase.day, purchase.item) for purchase in result.purchases
@@ -1054,17 +1061,31 @@ def _crop_targets(snapshot, solved, space_targets):
         if decision.plant_day is None:
             continue
         by_day.setdefault(decision.plant_day, []).extend(
-            [decision.crop] * decision.count
+            [(decision.crop, decision.release_day)] * decision.count
         )
+    available_from = {
+        cell.position: cell.unlock_day
+        for cell in snapshot.cells
+        if cell.kind == "EMPTY" and cell.position not in blocked
+    }
+    plant_positions = {
+        cell.position
+        for cell in snapshot.cells
+        if cell.kind == "PLANT" and cell.position not in blocked
+    }
+    for decision in solved.crop_result.decisions:
+        if (
+            decision.existing_position in plant_positions
+            and decision.release_day is not None
+        ):
+            available_from[decision.existing_position] = decision.release_day
     targets = []
     for day, crops in sorted(by_day.items()):
         available = sorted(
             (
-                cell.position
-                for cell in snapshot.cells
-                if cell.unlock_day <= day
-                and cell.kind == "EMPTY"
-                and cell.position not in blocked
+                position
+                for position, available_day in available_from.items()
+                if available_day <= day
             ),
             key=lambda position: (
                 abs(position[0] - 4) + abs(position[1] - 4),
@@ -1073,10 +1094,19 @@ def _crop_targets(snapshot, solved, space_targets):
         )
         if len(available) < len(crops):
             raise WholeFarmSolveError("execution handoff lacks crop target cells")
-        targets.extend(
-            CropTargetIntent(day, position[1], position[0], crop)
-            for position, crop in zip(available, crops)
+        ordered_crops = sorted(
+            crops,
+            key=lambda value: (
+                value[0],
+                value[1] is None,
+                0 if value[1] is None else value[1],
+            ),
         )
+        for position, (crop, release_day) in zip(available, ordered_crops):
+            targets.append(CropTargetIntent(day, position[1], position[0], crop))
+            del available_from[position]
+            if release_day is not None and release_day > day:
+                available_from[position] = release_day
     return tuple(targets)
 
 

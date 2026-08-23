@@ -9,6 +9,7 @@ from kaggriculture.tools.economics.market_ledger import CROPS
 from kaggriculture.tools.economics.milp_oracle import ExistingPlant
 from kaggriculture.tools.economics.rolling_coordinator import (
     ExecutionSignal,
+    PlanFailure,
     RollingCoordinator,
     RollingObservation,
     canonical_sha256,
@@ -26,6 +27,8 @@ from kaggriculture.tools.economics.whole_farm_backend import (
     WholeFarmPlannerBackend,
     WholeFarmSnapshot,
     WholeFarmSolveError,
+    _crop_input,
+    _crop_profile,
     verify_shared_ledger,
 )
 from kaggriculture.tools.routing.offline_route_planner import (
@@ -100,14 +103,14 @@ def _snapshot():
     )
 
 
-def _observation():
+def _observation(source_step=696):
     return RollingObservation(
-        696,
+        source_step,
         (),
-        canonical_sha256("economy", 696),
-        canonical_sha256("topology", 696),
-        canonical_sha256("route", 696),
-        canonical_sha256("progress", 696),
+        canonical_sha256("economy", source_step),
+        canonical_sha256("topology", source_step),
+        canonical_sha256("route", source_step),
+        canonical_sha256("progress", source_step),
         ExecutionSignal(),
     )
 
@@ -218,6 +221,139 @@ def test_storage_cut_preserves_observed_animal_goods():
     intent = RollingCoordinator(backend).prepare(_observation())
     assert intent.epoch == 0
     assert backend.last_solve.verification.errors == ()
+
+
+def test_crop_capacity_excludes_existing_plants():
+    snapshot = _snapshot()
+    plant = ExistingPlant((4, 4), "CARROT", 27, 1, False, 0, -1)
+    snapshot = replace(
+        snapshot,
+        crop=replace(snapshot.crop, existing_plants=(plant,)),
+        cells=(SpaceCell((4, 4), 0, "PLANT", "CARROT", 35, 29),),
+    )
+    empty = (0,)
+    animal_profile = {
+        "actions": empty,
+        "fields": empty,
+        "storage": empty,
+        "orders": empty,
+        "cash_flow": (0.0,),
+        "wheat_feed": empty,
+        "fertilizer_supply": empty,
+    }
+    forecast = SimpleNamespace(
+        expected_drain_by_day=((0.0,) * 9,),
+    )
+    crop = _crop_input(
+        snapshot,
+        SimpleNamespace(investment_cost=0.0),
+        animal_profile,
+        (1,),
+        (8,),
+        forecast,
+    )
+    assert crop.tile_capacity == (0,)
+
+
+def test_crop_profile_counts_unreleased_existing_plants():
+    plant = ExistingPlant((4, 4), "CARROT", 0, 1, False, 0, -1)
+    data = replace(crop_input(), existing_plants=(plant,))
+    balances = tuple(
+        SimpleNamespace(goods=(0,) * len(CROPS), fertilizer=0)
+        for _ in range(data.horizon_days)
+    )
+    result = SimpleNamespace(
+        decisions=(),
+        purchases=(),
+        sales=(),
+        balances=balances,
+    )
+    profile = _crop_profile(data, result)
+    assert profile["fields"] == (1,) * data.horizon_days
+
+
+def test_rolling_ledger_reuses_released_existing_crop_tile():
+    source_step = 576
+    days = 6
+    steps = 143
+    plant = ExistingPlant((4, 4), "CARROT", 20, 1, False, 0, -1)
+    seeds = [0] * len(CROPS)
+    seeds[CROPS.index("CARROT")] = 2
+    crop = replace(
+        crop_input(),
+        source_step=source_step,
+        seeds=tuple(seeds),
+        existing_plants=(plant,),
+        tile_capacity=(1,) * days,
+        action_capacity=(20,) * days,
+        crop_storage_capacity=(100,) * days,
+        wheat_demand=(0,) * days,
+        fixed_cash_flow=(0.0,) * days,
+        fertilizer_supply=(0,) * days,
+        fertilizer_buy_price=(100.0,) * days,
+        market_order_slots=(10,) * days,
+        base_inventory=((10_000,) * len(CROPS),) * days,
+        wheat_buy_price=(25.0,) * days,
+        first_plant_day=24,
+    )
+    animal = replace(
+        animal_input(0),
+        source_step=source_step,
+        animal_tile_capacity=(1,) * days,
+        action_capacity=(20,) * days,
+        shed_capacity=(100,) * days,
+        fixed_shed_occupancy=(0,) * days,
+        market_order_slots=(10,) * days,
+        fixed_cash_flow=(0.0,) * days,
+        base_inventory=((10_000,) * len(GOODS),) * days,
+    )
+    investment = OptimizerInput(
+        source_step,
+        718,
+        3000.0,
+        400.0,
+        4,
+        0,
+        0,
+        0,
+        1,
+        (0.0,) * steps,
+        (10,) * steps,
+        (0,) * steps,
+        (0,) * steps,
+        (1,) * steps,
+        (1,) * steps,
+        (0.0,) * steps,
+        "registered-executor-capacity-v1",
+    )
+    snapshot = WholeFarmSnapshot(
+        3_980_000,
+        crop,
+        animal,
+        investment,
+        (SpaceCell((4, 4), 0, "PLANT", "CARROT", 35, 24),),
+        SharedCapacity(
+            (1,) * days,
+            (20,) * days,
+            (100,) * days,
+            (10,) * days,
+            (2,) * days,
+        ),
+        ((),),
+    )
+    backend = WholeFarmPlannerBackend(lambda observation: snapshot, 5, 0.05, 5)
+    intent = RollingCoordinator(backend).prepare(_observation(source_step))
+    assert not isinstance(intent, PlanFailure), intent.exception_text
+    assert intent.epoch == 0
+    assert verify_shared_ledger(backend.last_solve.ledger) == ()
+    assert all(
+        day.crop_field_use + day.animal_field_use <= day.field_capacity
+        for day in backend.last_solve.ledger.days
+    )
+    assert backend.last_handoff.crop_targets
+    assert {
+        (target.y, target.x) for target in backend.last_handoff.crop_targets
+    } == {(4, 4)}
 
 
 def test_second_arm_plans_daily_crop_service_route():
