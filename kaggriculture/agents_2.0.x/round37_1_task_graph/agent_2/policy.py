@@ -5,11 +5,18 @@ from .state import EpisodeState
 
 
 class Agent2Policy:
-    def __init__(self, baseline_path=None, economy_factory=None):
+    def __init__(self, baseline_path=None, economy_factory=None, strategy_factory=None):
         self.state = EpisodeState()
         self.baseline = BaselinePolicy(baseline_path)
         factory = economy_factory or FrozenEconomyPlanner
-        self.coordinator = Agent2Coordinator(self.baseline, factory())
+        if strategy_factory is None:
+            self.coordinator = Agent2Coordinator(self.baseline, factory())
+        else:
+            self.coordinator = Agent2Coordinator(
+                self.baseline,
+                factory(),
+                strategy_factory(),
+            )
 
     def act(self, obs) -> dict:
         world = normalize_observation(obs)

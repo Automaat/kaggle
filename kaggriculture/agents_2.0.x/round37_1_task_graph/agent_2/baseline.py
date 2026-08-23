@@ -48,11 +48,47 @@ class BaselinePolicy:
         self.module = module
         self._captured_tasks = None
 
-    def decide(self, obs) -> BaselineDecision:
+    def decide(self, obs, strategy=None) -> BaselineDecision:
         if self.module is None:
             self.reset()
         self._captured_tasks = None
-        action = self.module.agent(obs)
+        if strategy is None:
+            action = self.module.agent(obs)
+        else:
+            original = self.module._dynamic_plan
+            targets = strategy.targets
+            animals = frozenset(self.module.ANIMALS)
+
+            def planned(
+                tiles,
+                day,
+                inventory,
+                shops,
+                board_size=10,
+                budget=None,
+                seeds=None,
+            ):
+                plan = dict(
+                    original(
+                        tiles,
+                        day,
+                        inventory,
+                        shops,
+                        board_size,
+                        budget,
+                        seeds,
+                    )
+                )
+                for x, y, crop in targets:
+                    if plan.get((x, y)) not in animals:
+                        plan[(x, y)] = crop
+                return plan
+
+            self.module._dynamic_plan = planned
+            try:
+                action = self.module.agent(obs)
+            finally:
+                self.module._dynamic_plan = original
         day = int(obs["day"])
         graph = TaskGraph.from_legacy(day, self._captured_tasks or ())
         return BaselineDecision(action, graph)
