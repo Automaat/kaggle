@@ -1,0 +1,1569 @@
+{
+  "input": {
+    "action_capacity": [
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+    ],
+    "base_inventory": [
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ],
+      [
+        10000,
+        10000,
+        10000,
+        10000,
+        10000
+      ]
+    ],
+    "cash": 3000.0,
+    "cash_reserve": 400.0,
+    "crop_storage_capacity": [
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+    ],
+    "existing_plants": [],
+    "first_plant_day": 0,
+    "fixed_cash_flow": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "goods": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "market_order_slots": [
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5
+    ],
+    "sale_unit_limit": 100,
+    "scenario": "no-future-opponent-orders-v1",
+    "seeds": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "source_step": 0,
+    "terminal_return_actions": 4,
+    "terminal_step": 718,
+    "tile_capacity": [
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13
+    ],
+    "wheat_buy_price": [
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0
+    ],
+    "wheat_demand": [
+      0,
+      0,
+      4,
+      4,
+      4,
+      4,
+      8,
+      8,
+      8,
+      8,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      0
+    ]
+  },
+  "model_sha256": "5561bbd6d33a4b238fc40848093978c3e7ca5305280aa551c5af06feb44552ed",
+  "ranking_gate_complete": false,
+  "realized_simulator_score": null,
+  "registered_seed": 3980000,
+  "result": {
+    "balances": [
+      {
+        "cash": 2500.0,
+        "day": 0,
+        "goods": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "seeds": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "cash": 1700.0,
+        "day": 1,
+        "goods": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "seeds": [
+          0,
+          0,
+          0,
+          0,
+          10
+        ]
+      },
+      {
+        "cash": 1600.0,
+        "day": 2,
+        "goods": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "seeds": [
+          0,
+          0,
+          0,
+          0,
+          10
+        ]
+      },
+      {
+        "cash": 1488.0,
+        "day": 3,
+        "goods": [
+          4,
+          22,
+          0,
+          0,
+          0
+        ],
+        "seeds": [
+          0,
+          0,
+          0,
+          0,
+          5
+        ]
+      },
+      {
+        "cash": 1656.0,
+        "day": 4,
+        "goods": [
+          0,
+          17,
+          0,
+          0,
+          0
+        ],
+        "seeds": [
+          0,
+          0,
+          0,
+          0,
+          5
+        ]
+      },
+      {
+        "cash": 894.0,
+        "day": 5,
+        "goods": [
+          30,
+          12,
+          0,
+          0,
+          0
+        ],
+        "seeds": [
+          0,
+          0,
+          0,
+          0,
+          6
+        ]
+      },
+      {
+        "cash": 1062.0,
+        "day": 6,
+        "goods": [
+          22,
+          19,
+          0,
+          0,
+          0
+        ],
+        "seeds": [
+          0,
+          0,
+          0,
+          0,
+          2
+        ]
+      },
+      {
+        "cash": 1230.0,
+        "day": 7,
+        "goods": [
+          14,
+          14,
+          0,
+          0,
+          0
+        ],
+        "seeds": [
+          0,
+          0,
+          0,
+          0,
+          2
+        ]
+      },
+      {
+        "cash": 1292.0,
+        "day": 8,
+        "goods": [
+          6,
+          11,
+          0,
+          0,
+          0
+        ],
+        "seeds": [
+          0,
+          2,
+          0,
+          0,
+          2
+        ]
+      },
+      {
+        "cash": 860.0,
+        "day": 9,
+        "goods": [
+          22,
+          6,
+          0,
+          0,
+          0
+        ],
+        "seeds": [
+          0,
+          2,
+          0,
+          0,
+          2
+        ]
+      },
+      {
+        "cash": 2929.0,
+        "day": 10,
+        "goods": [
+          10,
+          4,
+          0,
+          0,
+          16
+        ],
+        "seeds": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "cash": 3148.0,
+        "day": 11,
+        "goods": [
+          12,
+          2,
+          0,
+          0,
+          14
+        ],
+        "seeds": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "cash": 5217.0,
+        "day": 12,
+        "goods": [
+          0,
+          0,
+          0,
+          0,
+          6
+        ],
+        "seeds": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "cash": 6011.0,
+        "day": 13,
+        "goods": [
+          11,
+          4,
+          0,
+          0,
+          28
+        ],
+        "seeds": [
+          0,
+          0,
+          0,
+          0,
+          4
+        ]
+      },
+      {
+        "cash": 7995.0,
+        "day": 14,
+        "goods": [
+          0,
+          2,
+          0,
+          0,
+          20
+        ],
+        "seeds": [
+          0,
+          3,
+          0,
+          0,
+          4
+        ]
+      },
+      {
+        "cash": 9764.0,
+        "day": 15,
+        "goods": [
+          0,
+          0,
+          0,
+          0,
+          12
+        ],
+        "seeds": [
+          0,
+          3,
+          0,
+          0,
+          4
+        ]
+      },
+      {
+        "cash": 10333.0,
+        "day": 16,
+        "goods": [
+          48,
+          7,
+          0,
+          0,
+          28
+        ],
+        "seeds": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "cash": 12362.0,
+        "day": 17,
+        "goods": [
+          36,
+          5,
+          0,
+          0,
+          20
+        ],
+        "seeds": [
+          0,
+          2,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "cash": 14530.0,
+        "day": 18,
+        "goods": [
+          24,
+          0,
+          0,
+          0,
+          12
+        ],
+        "seeds": [
+          0,
+          2,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "cash": 16359.0,
+        "day": 19,
+        "goods": [
+          12,
+          7,
+          0,
+          0,
+          4
+        ],
+        "seeds": [
+          0,
+          2,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "cash": 18428.0,
+        "day": 20,
+        "goods": [
+          0,
+          5,
+          0,
+          0,
+          8
+        ],
+        "seeds": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "cash": 18697.0,
+        "day": 21,
+        "goods": [
+          60,
+          3,
+          0,
+          0,
+          0
+        ],
+        "seeds": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "cash": 18799.0,
+        "day": 22,
+        "goods": [
+          48,
+          0,
+          0,
+          0,
+          0
+        ],
+        "seeds": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "cash": 20748.0,
+        "day": 23,
+        "goods": [
+          36,
+          4,
+          0,
+          0,
+          16
+        ],
+        "seeds": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "cash": 22817.0,
+        "day": 24,
+        "goods": [
+          24,
+          2,
+          0,
+          0,
+          8
+        ],
+        "seeds": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "cash": 24686.0,
+        "day": 25,
+        "goods": [
+          12,
+          0,
+          0,
+          0,
+          0
+        ],
+        "seeds": [
+          0,
+          10,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "cash": 26854.0,
+        "day": 26,
+        "goods": [
+          0,
+          13,
+          0,
+          0,
+          16
+        ],
+        "seeds": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "cash": 28518.0,
+        "day": 27,
+        "goods": [
+          12,
+          5,
+          0,
+          0,
+          8
+        ],
+        "seeds": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "cash": 30686.0,
+        "day": 28,
+        "goods": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "seeds": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "cash": 36096.0,
+        "day": 29,
+        "goods": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "seeds": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    ],
+    "constraint_count": 1111,
+    "decisions": [
+      {
+        "count": 9,
+        "crop": "CARROT",
+        "existing_position": null,
+        "harvest_day": 3,
+        "plant_day": 0,
+        "sale_day": 3,
+        "yield_per_unit": 3
+      },
+      {
+        "count": 4,
+        "crop": "CARROT",
+        "existing_position": null,
+        "harvest_day": 6,
+        "plant_day": 3,
+        "sale_day": 6,
+        "yield_per_unit": 3
+      },
+      {
+        "count": 2,
+        "crop": "CARROT",
+        "existing_position": null,
+        "harvest_day": 13,
+        "plant_day": 10,
+        "sale_day": 13,
+        "yield_per_unit": 3
+      },
+      {
+        "count": 3,
+        "crop": "CARROT",
+        "existing_position": null,
+        "harvest_day": 16,
+        "plant_day": 13,
+        "sale_day": 16,
+        "yield_per_unit": 3
+      },
+      {
+        "count": 3,
+        "crop": "CARROT",
+        "existing_position": null,
+        "harvest_day": 19,
+        "plant_day": 16,
+        "sale_day": 19,
+        "yield_per_unit": 3
+      },
+      {
+        "count": 2,
+        "crop": "CARROT",
+        "existing_position": null,
+        "harvest_day": 23,
+        "plant_day": 20,
+        "sale_day": 23,
+        "yield_per_unit": 3
+      },
+      {
+        "count": 6,
+        "crop": "CARROT",
+        "existing_position": null,
+        "harvest_day": 26,
+        "plant_day": 23,
+        "sale_day": 26,
+        "yield_per_unit": 3
+      },
+      {
+        "count": 10,
+        "crop": "CARROT",
+        "existing_position": null,
+        "harvest_day": 29,
+        "plant_day": 26,
+        "sale_day": 29,
+        "yield_per_unit": 3
+      },
+      {
+        "count": 4,
+        "crop": "MELON",
+        "existing_position": null,
+        "harvest_day": 10,
+        "plant_day": 0,
+        "sale_day": 10,
+        "yield_per_unit": 6
+      },
+      {
+        "count": 5,
+        "crop": "MELON",
+        "existing_position": null,
+        "harvest_day": 13,
+        "plant_day": 3,
+        "sale_day": 13,
+        "yield_per_unit": 6
+      },
+      {
+        "count": 4,
+        "crop": "MELON",
+        "existing_position": null,
+        "harvest_day": 16,
+        "plant_day": 6,
+        "sale_day": 16,
+        "yield_per_unit": 6
+      },
+      {
+        "count": 2,
+        "crop": "MELON",
+        "existing_position": null,
+        "harvest_day": 20,
+        "plant_day": 10,
+        "sale_day": 20,
+        "yield_per_unit": 6
+      },
+      {
+        "count": 4,
+        "crop": "MELON",
+        "existing_position": null,
+        "harvest_day": 23,
+        "plant_day": 13,
+        "sale_day": 23,
+        "yield_per_unit": 6
+      },
+      {
+        "count": 4,
+        "crop": "MELON",
+        "existing_position": null,
+        "harvest_day": 26,
+        "plant_day": 16,
+        "sale_day": 26,
+        "yield_per_unit": 6
+      },
+      {
+        "count": 3,
+        "crop": "MELON",
+        "existing_position": null,
+        "harvest_day": 29,
+        "plant_day": 19,
+        "sale_day": 29,
+        "yield_per_unit": 6
+      }
+    ],
+    "incremental_crop_profit": 33096.0,
+    "input_sha256": "5e7d246a019f6e718a7d45154518c231ad952659b50170184b972affcba6a97e",
+    "message": "Optimization terminated successfully. (HiGHS Status 7: Optimal)",
+    "mip_gap": 0.0,
+    "purchases": [
+      {
+        "day": 0,
+        "item": "CARROT_SEED",
+        "quantity": 9
+      },
+      {
+        "day": 0,
+        "item": "MELON_SEED",
+        "quantity": 4
+      },
+      {
+        "day": 1,
+        "item": "MELON_SEED",
+        "quantity": 10
+      },
+      {
+        "day": 2,
+        "item": "WHEAT",
+        "quantity": 4
+      },
+      {
+        "day": 3,
+        "item": "CARROT_SEED",
+        "quantity": 4
+      },
+      {
+        "day": 3,
+        "item": "WHEAT",
+        "quantity": 8
+      },
+      {
+        "day": 5,
+        "item": "MELON_SEED",
+        "quantity": 1
+      },
+      {
+        "day": 5,
+        "item": "WHEAT",
+        "quantity": 34
+      },
+      {
+        "day": 8,
+        "item": "CARROT_SEED",
+        "quantity": 2
+      },
+      {
+        "day": 9,
+        "item": "WHEAT",
+        "quantity": 24
+      },
+      {
+        "day": 11,
+        "item": "WHEAT",
+        "quantity": 14
+      },
+      {
+        "day": 13,
+        "item": "CARROT_SEED",
+        "quantity": 3
+      },
+      {
+        "day": 13,
+        "item": "MELON_SEED",
+        "quantity": 8
+      },
+      {
+        "day": 13,
+        "item": "WHEAT",
+        "quantity": 23
+      },
+      {
+        "day": 14,
+        "item": "CARROT_SEED",
+        "quantity": 3
+      },
+      {
+        "day": 14,
+        "item": "WHEAT",
+        "quantity": 1
+      },
+      {
+        "day": 15,
+        "item": "WHEAT",
+        "quantity": 12
+      },
+      {
+        "day": 16,
+        "item": "WHEAT",
+        "quantity": 60
+      },
+      {
+        "day": 17,
+        "item": "CARROT_SEED",
+        "quantity": 2
+      },
+      {
+        "day": 19,
+        "item": "MELON_SEED",
+        "quantity": 3
+      },
+      {
+        "day": 21,
+        "item": "WHEAT",
+        "quantity": 72
+      },
+      {
+        "day": 23,
+        "item": "CARROT_SEED",
+        "quantity": 6
+      },
+      {
+        "day": 25,
+        "item": "CARROT_SEED",
+        "quantity": 10
+      },
+      {
+        "day": 27,
+        "item": "WHEAT",
+        "quantity": 24
+      }
+    ],
+    "sales": [
+      {
+        "crop": "CARROT",
+        "day": 3,
+        "quantity": 5,
+        "revenue": 168
+      },
+      {
+        "crop": "CARROT",
+        "day": 4,
+        "quantity": 5,
+        "revenue": 168
+      },
+      {
+        "crop": "CARROT",
+        "day": 5,
+        "quantity": 5,
+        "revenue": 168
+      },
+      {
+        "crop": "CARROT",
+        "day": 6,
+        "quantity": 5,
+        "revenue": 168
+      },
+      {
+        "crop": "CARROT",
+        "day": 7,
+        "quantity": 5,
+        "revenue": 168
+      },
+      {
+        "crop": "CARROT",
+        "day": 8,
+        "quantity": 3,
+        "revenue": 102
+      },
+      {
+        "crop": "CARROT",
+        "day": 9,
+        "quantity": 5,
+        "revenue": 168
+      },
+      {
+        "crop": "CARROT",
+        "day": 10,
+        "quantity": 2,
+        "revenue": 69
+      },
+      {
+        "crop": "MELON",
+        "day": 10,
+        "quantity": 8,
+        "revenue": 2000
+      },
+      {
+        "crop": "CARROT",
+        "day": 11,
+        "quantity": 2,
+        "revenue": 69
+      },
+      {
+        "crop": "MELON",
+        "day": 11,
+        "quantity": 2,
+        "revenue": 500
+      },
+      {
+        "crop": "CARROT",
+        "day": 12,
+        "quantity": 2,
+        "revenue": 69
+      },
+      {
+        "crop": "MELON",
+        "day": 12,
+        "quantity": 8,
+        "revenue": 2000
+      },
+      {
+        "crop": "CARROT",
+        "day": 13,
+        "quantity": 2,
+        "revenue": 69
+      },
+      {
+        "crop": "MELON",
+        "day": 13,
+        "quantity": 8,
+        "revenue": 2000
+      },
+      {
+        "crop": "CARROT",
+        "day": 14,
+        "quantity": 2,
+        "revenue": 69
+      },
+      {
+        "crop": "MELON",
+        "day": 14,
+        "quantity": 8,
+        "revenue": 2000
+      },
+      {
+        "crop": "CARROT",
+        "day": 15,
+        "quantity": 2,
+        "revenue": 69
+      },
+      {
+        "crop": "MELON",
+        "day": 15,
+        "quantity": 8,
+        "revenue": 2000
+      },
+      {
+        "crop": "CARROT",
+        "day": 16,
+        "quantity": 2,
+        "revenue": 69
+      },
+      {
+        "crop": "MELON",
+        "day": 16,
+        "quantity": 8,
+        "revenue": 2000
+      },
+      {
+        "crop": "CARROT",
+        "day": 17,
+        "quantity": 2,
+        "revenue": 69
+      },
+      {
+        "crop": "MELON",
+        "day": 17,
+        "quantity": 8,
+        "revenue": 2000
+      },
+      {
+        "crop": "CARROT",
+        "day": 18,
+        "quantity": 5,
+        "revenue": 168
+      },
+      {
+        "crop": "MELON",
+        "day": 18,
+        "quantity": 8,
+        "revenue": 2000
+      },
+      {
+        "crop": "CARROT",
+        "day": 19,
+        "quantity": 2,
+        "revenue": 69
+      },
+      {
+        "crop": "MELON",
+        "day": 19,
+        "quantity": 8,
+        "revenue": 2000
+      },
+      {
+        "crop": "CARROT",
+        "day": 20,
+        "quantity": 2,
+        "revenue": 69
+      },
+      {
+        "crop": "MELON",
+        "day": 20,
+        "quantity": 8,
+        "revenue": 2000
+      },
+      {
+        "crop": "CARROT",
+        "day": 21,
+        "quantity": 2,
+        "revenue": 69
+      },
+      {
+        "crop": "MELON",
+        "day": 21,
+        "quantity": 8,
+        "revenue": 2000
+      },
+      {
+        "crop": "CARROT",
+        "day": 22,
+        "quantity": 3,
+        "revenue": 102
+      },
+      {
+        "crop": "CARROT",
+        "day": 23,
+        "quantity": 2,
+        "revenue": 69
+      },
+      {
+        "crop": "MELON",
+        "day": 23,
+        "quantity": 8,
+        "revenue": 2000
+      },
+      {
+        "crop": "CARROT",
+        "day": 24,
+        "quantity": 2,
+        "revenue": 69
+      },
+      {
+        "crop": "MELON",
+        "day": 24,
+        "quantity": 8,
+        "revenue": 2000
+      },
+      {
+        "crop": "CARROT",
+        "day": 25,
+        "quantity": 2,
+        "revenue": 69
+      },
+      {
+        "crop": "MELON",
+        "day": 25,
+        "quantity": 8,
+        "revenue": 2000
+      },
+      {
+        "crop": "CARROT",
+        "day": 26,
+        "quantity": 5,
+        "revenue": 168
+      },
+      {
+        "crop": "MELON",
+        "day": 26,
+        "quantity": 8,
+        "revenue": 2000
+      },
+      {
+        "crop": "CARROT",
+        "day": 27,
+        "quantity": 8,
+        "revenue": 264
+      },
+      {
+        "crop": "MELON",
+        "day": 27,
+        "quantity": 8,
+        "revenue": 2000
+      },
+      {
+        "crop": "CARROT",
+        "day": 28,
+        "quantity": 5,
+        "revenue": 168
+      },
+      {
+        "crop": "MELON",
+        "day": 28,
+        "quantity": 8,
+        "revenue": 2000
+      },
+      {
+        "crop": "CARROT",
+        "day": 29,
+        "quantity": 30,
+        "revenue": 927
+      },
+      {
+        "crop": "MELON",
+        "day": 29,
+        "quantity": 18,
+        "revenue": 4483
+      }
+    ],
+    "scenario": "no-future-opponent-orders-v1",
+    "status": 0,
+    "success": true,
+    "terminal_cash": 36096.0,
+    "terminal_unsold_goods": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "variable_count": 16153,
+    "wall_seconds": 3.3071815420116764
+  },
+  "schema": 1,
+  "scope": "a2a-oracle-core",
+  "verification_errors": []
+}

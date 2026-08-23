@@ -3194,3 +3194,65 @@ seeded RNG order. Adversarial review returned `CLEAN` in both passes.
 Decision: accept A1d. The exact offline transition stack is complete. Start
 A2a from this commit and build the correctness-first whole-horizon MILP before
 any live Kaggle runtime optimization.
+
+## Round 39.7: crop MILP oracle core A2a
+
+Status: accepted shadow-only oracle core. It changes no live agent action and
+makes no realized score claim.
+
+Plan commit: `d14f037`. Implementation commit: `efd5ec6`.
+
+The SciPy MILP selects seed purchases, one-time and ongoing crop cohorts,
+harvest dates, bought wheat and crop sales through source step 718. It enforces
+daily crop tiles, crop work, crop storage, market orders, inventory balances,
+cash reserve and terminal return work under registered scenario
+`no-future-opponent-orders-v1`.
+
+The registered seed-3,980,000 input freezes 13 crop tiles, 100 crop actions and
+five market orders per day. It reserves $400, supplies fixed wheat demand and
+uses an explicit exogenous base market inventory of 10,000 units per crop and
+day. Fixed animal income, land purchases, exact routes and future opponent
+orders are outside this run.
+
+Registered command:
+
+```bash
+.venv/bin/python -m kaggriculture.tools.economics.run_milp_oracle \
+  --time-limit 120 --mip-rel-gap 0 \
+  --output kaggriculture/research/round39_7_milp_oracle_seed_3980000.json
+```
+
+| Gate | Result |
+|:---|---:|
+| Solver status | Optimal |
+| Requested and achieved relative gap | 0.0 |
+| Solver wall time | 3.307 s |
+| Variables | 16,153 |
+| Constraints | 1,111 |
+| Forecast terminal cash | $36,096 |
+| Forecast incremental crop profit | $33,096 |
+| Maximum crop storage | 83 / 100 |
+| Terminal crop goods | 0 |
+| Terminal seeds | 0 |
+| Post-solve verification errors | 0 |
+| Input SHA-256 | `5e7d246a019f6e718a7d45154518c231ad952659b50170184b972affcba6a97e` |
+| Model SHA-256 | `5561bbd6d33a4b238fc40848093978c3e7ca5305280aa551c5af06feb44552ed` |
+
+The selected plan plants 39 carrot and 26 melon cohorts. It sells 117 carrots
+for $3,873 and 156 melons for $38,983. It buys the registered 276 wheat units
+for fixed animal feed. Two repeated runs produced the same canonical result
+after solver wall time was removed.
+
+Adversarial review found missing crop storage, blocked same-day tile reuse,
+missing late harvest for an existing one-time crop and missing reuse of its
+released tile. The final model and verifier cover all four cases. Both final
+review passes returned `CLEAN`. All 304 tests and Ruff for changed files pass.
+
+The $36,096 value is an oracle forecast, not simulator money and not a score
+comparison with frozen 1.14.0. The fixed future market path and daily route
+capacity remain approximations. A2a ranking calibration must measure forecast
+error and portfolio rank on matched simulator states before an A2b rollout can
+execute the first-day choice.
+
+Decision: accept the A2a oracle core. Start registered A2a calibration, then
+run A2b against frozen 1.14.0 only if the ranking gate passes.
