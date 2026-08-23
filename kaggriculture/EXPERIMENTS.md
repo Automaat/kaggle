@@ -3353,3 +3353,17 @@ The staged plant cap did not expose a new local routing optimum. Distance weight
 ### Final decision
 
 Keep the Round 39 default unchanged. It beats the frozen 50-tile champion by $3,581 +/- $944 over 200 fresh paired seeds. Every tested attempt to fill the last 15 crop slots displaced higher-value animal or crop work. Full physical occupancy remains an invalid target for the present 30-day economy. The next material experiment requires a joint crop-and-route admission solver that prices the work displaced by each added plant, not another static cap or task-priority rule.
+
+## Round 41 release 1.15.0
+
+Status: released locally as the new champion.
+
+The accepted Round 39 policy was frozen without a behavior change as `agents_1.0.x/v1_15_0_staged_field` and `agents_1.0.x/v1_15_0_staged_field.tar.gz`. The release keeps land 2, 12 hands, hire batch 10, guarded tile bundles, trip radius 1, sale-funded urgent feed, urgent pre-care and the 42-to-48 staged plant cap.
+
+The final version gate used 400 fresh paired seeds `3772000..3772399` against frozen 1.14.0. Version 1.15.0 scored 77% points, won 614 of 800 games and finished at **+$3,447 +/- $720**, with no failures.
+
+The held-out regression pool used 10 paired seeds per opponent. The release scored 96% points, won 403 of 420 games, was positive against all 21 opponents and had no failures.
+
+Two independent archive builds were byte-identical. The archive SHA-256 is `daaaea0121ac370efe4da1a37b6b0fd620df10c090613fadb7671360d1bf1067`. Its manifest records candidate `1.15.0`, stage `39`, source commit `f2dd7895c05003c1ee0a90f2b96eda56dcbfd05b`, `kaggle-environments==1.32.7` and the frozen 1.14.0 baseline hash.
+
+`tools/runner.py` now resolves `champion` to the immutable 1.15.0 source directory. Root `main.py` remains the historical one-file 1.14.0 submission. Kaggle submission uses the 1.15.0 tar archive.

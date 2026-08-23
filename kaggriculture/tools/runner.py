@@ -10,7 +10,7 @@ from artifact import load_artifact
 
 ROOT = Path(__file__).resolve().parent.parent
 BUILTIN = {"pass", "random", "starter"}
-CHAMPION = "agents_1.0.x/v1_14_0_central_herd.py"
+CHAMPION = "agents_1.0.x/v1_15_0_staged_field"
 
 
 class ConfiguredAgent:

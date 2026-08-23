@@ -19,7 +19,7 @@ uv run python tools/bench.py main.py --pool default --held-out
 uv run python tools/bandit.py --grid KAGG_LAND=1,2 --floor 40
 uv run python tools/trace.py main.py starter 42
 uv run python tools/labour.py main.py champion
-uv run python tools/package_agent.py agents_2.0.x/round37_0_shell /tmp/agent.tar.gz
+uv run python tools/package_agent.py agents_1.0.x/v1_15_0_staged_field /tmp/agent.tar.gz --stage 39 --candidate 1.15.0
 uv run python tools/equivalence.py /tmp/agent.tar.gz --seeds 100
 uv run pytest -q tests/
 ```
@@ -30,7 +30,7 @@ Built-in opponents: `pass`, `random`, `starter`, `champion`. A callable, `.py` f
 
 | Path                   | Role                                                           |
 |:-----------------------|:---------------------------------------------------------------|
-| `main.py`              | Current one-file 1.x submission with root `agent(obs)`.        |
+| `main.py`              | Historical one-file 1.14.0 submission with root `agent(obs)`.  |
 | `agents_2.0.x/`        | Agent 2 package candidates and frozen source directories       |
 | `tools/runner.py`      | Match harness shared by the scripts                            |
 | `tools/play.py`        | Single match, writes `replays/*.json`                          |
@@ -57,7 +57,17 @@ Agents follow semantic versioning. `0.N.0` is the historical line: one minor per
 
 A **major** bump means the strategy itself changed, not that it was tuned. 1.0.0 is the first such change: the farm buys a quadrant, staffs it with 12 hands and runs a larger herd, which no amount of tuning had ever made pay. It comes from measuring the labour cost of a tile and from 26 real ladder replays, not from another self-play sweep.
 
-## Current agent (1.3.0)
+1.15.0 uses the package artifact format developed on the Agent 2 branch but remains in the 1.x release line. The immutable source directory and deterministic tar archive carry the same version.
+
+## Current agent (1.15.0)
+
+The champion is `agents_1.0.x/v1_15_0_staged_field`. It buys 75 tiles, hires 12 hands in larger early batches and limits concurrent plants to 42 during expansion, then 48 from day 18. Guarded same-tile work and a one-tile trip radius reduce movement. Same-turn sales can fund urgent wheat, and urgent care can run before delayed feed.
+
+Against frozen 1.14.0, the release scored 77% points and **+$3,447 +/- $720** over 400 fresh paired seeds. It won 614 of 800 games with no failures. The regression pool scored 96% points, 403 wins in 420 games and a positive mean against all 21 opponents.
+
+The source directory and packed archive are behavior-identical. The archive is deterministic and has SHA-256 `daaaea0121ac370efe4da1a37b6b0fd620df10c090613fadb7671360d1bf1067`.
+
+## Previous 1.x strategy
 
 **A second quadrant of board, staffed.** One extra quadrant is bought, hands are capped at 12, and the herd is 6 cows and 4 sheep. Land had lost every previous test because `KAGG_HANDS_PER_TILE` was 0.34 for every tile: on 50 tiles that asks for 17 hands, which the Fibonacci hire cost makes unaffordable, so the farm bought dirt it could not staff. `tools/labour.py` measured the real figure — 1.2 to 1.5 work ops per tile-day for crops, about 3 for animals, so 0.05 to 0.13 hands per tile. At 0.2 the joint sweep of land, hands and herd clears by +$5,614 +/- $2,208 on fresh paired seeds.
 
@@ -118,5 +128,5 @@ The plan for the next version is [agents_1.0.x/PLAN.md](agents_1.0.x/PLAN.md), a
 ## Submit
 
 ```bash
-uv run kaggle competitions submit kaggriculture -f main.py -m "1.1.0 land and herd"
+uv run kaggle competitions submit kaggriculture -f agents_1.0.x/v1_15_0_staged_field.tar.gz -m "1.15.0 staged 75-tile field"
 ```

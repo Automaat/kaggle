@@ -46,11 +46,11 @@ def _payload(source):
     return files
 
 
-def _manifest(files, source_commit):
+def _manifest(files, source_commit, stage="37.0", candidate="2.0.0-shell"):
     return {
         "schema": 1,
-        "stage": "37.0",
-        "candidate": "2.0.0-shell",
+        "stage": stage,
+        "candidate": candidate,
         "source_commit": source_commit,
         "baseline_commit": BASELINE_COMMIT,
         "baseline_sha256": _sha256(files[f"frozen/{BASELINE.name}"]),
@@ -77,9 +77,11 @@ def _tar_info(path, content):
     return info
 
 
-def build_archive(source, output, source_commit=None):
+def build_archive(
+    source, output, source_commit=None, stage="37.0", candidate="2.0.0-shell"
+):
     files = _payload(source)
-    manifest = _manifest(files, source_commit or _source_commit())
+    manifest = _manifest(files, source_commit or _source_commit(), stage, candidate)
     files["MANIFEST.json"] = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
     tar_buffer = io.BytesIO()
     with tarfile.open(fileobj=tar_buffer, mode="w", format=tarfile.USTAR_FORMAT) as archive:
@@ -99,8 +101,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("source")
     parser.add_argument("output")
+    parser.add_argument("--stage", default="37.0")
+    parser.add_argument("--candidate", default="2.0.0-shell")
     args = parser.parse_args()
-    manifest = build_archive(args.source, args.output)
+    manifest = build_archive(
+        args.source, args.output, stage=args.stage, candidate=args.candidate,
+    )
     print(json.dumps(manifest, indent=2, sort_keys=True))
 
 

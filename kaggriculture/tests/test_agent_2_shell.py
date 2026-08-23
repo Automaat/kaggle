@@ -11,13 +11,15 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tools")
 
 from artifact import load_artifact
 from package_agent import build_archive
-from runner import load_agent, run_match
+from runner import CHAMPION, load_agent, run_match
 
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CANDIDATE = ROOT / "agents_2.0.x/round37_0_shell"
 BASELINE = ROOT / "agents_1.0.x/v1_14_0_central_herd.py"
 REPLAY = ROOT / "replays/main_vs_champion_42.json"
+RELEASE = ROOT / "agents_1.0.x/v1_15_0_staged_field"
+RELEASE_ARCHIVE = ROOT / "agents_1.0.x/v1_15_0_staged_field.tar.gz"
 
 
 def _observations(seat, limit=720):
@@ -252,3 +254,39 @@ assert states[0].reward > 3000
         text=True,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_release_archive_is_the_champion(tmp_path):
+    generated = tmp_path / "release.tar.gz"
+    manifest = build_archive(
+        RELEASE,
+        generated,
+        source_commit="f2dd7895c05003c1ee0a90f2b96eda56dcbfd05b",
+        stage="39",
+        candidate="1.15.0",
+    )
+    assert CHAMPION == "agents_1.0.x/v1_15_0_staged_field"
+    assert generated.read_bytes() == RELEASE_ARCHIVE.read_bytes()
+    assert manifest["candidate"] == "1.15.0"
+    assert manifest["stage"] == "39"
+
+
+def test_release_source_matches_selected_candidate():
+    selected = ROOT / "agents_2.0.x/round38_2_hire_batch"
+    selected_files = {
+        path.relative_to(selected): path.read_bytes()
+        for path in selected.rglob("*.py")
+    }
+    release_files = {
+        path.relative_to(RELEASE): path.read_bytes()
+        for path in RELEASE.rglob("*.py")
+    }
+    assert release_files == selected_files
+
+
+def test_release_champion_finishes_live_episode():
+    assert callable(load_agent(str(RELEASE_ARCHIVE)))
+    _environment, rewards, statuses = run_match("champion", str(BASELINE), seed=64)
+    assert statuses == ["DONE", "DONE"]
+    assert rewards[0] > 3000
+    assert rewards[1] > 3000
