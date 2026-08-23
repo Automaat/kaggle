@@ -48,18 +48,61 @@ def _encoded(value):
 def _write_gzip(value, path):
     encoded = _encoded(value)
     compressed = gzip.compress(encoded, mtime=0)
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(compressed)
+    _write_bytes_atomic(compressed, path)
     return hashlib.sha256(compressed).hexdigest(), len(compressed)
 
 
-def _write_json_atomic(value, path):
+def _write_bytes_atomic(value, path):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp")
-    temporary.write_bytes(_encoded(value) + b"\n")
+    temporary.write_bytes(value)
     temporary.replace(path)
+
+
+def _write_json_atomic(value, path):
+    _write_bytes_atomic(_encoded(value) + b"\n", path)
+
+
+def _checkpoint_artifacts(
+    environment,
+    replay_path,
+    html_path,
+    arm,
+    seed,
+    candidate_seat,
+):
+    replay = environment.toJSON()
+    replay["id"] = canonical_sha256(
+        "whole-farm-game",
+        (arm, seed, candidate_seat),
+    )
+    replay_hash, replay_bytes = _write_gzip(replay, replay_path)
+    result = {
+        "replay": {
+            "bytes": replay_bytes,
+            "path": str(replay_path),
+            "sha256": replay_hash,
+            "steps": len(replay["steps"]),
+        }
+    }
+    if html_path is not None:
+        html = environment.render(
+            mode="html",
+            width=1200,
+            height=800,
+            controls=True,
+        )
+        if not isinstance(html, str):
+            raise TypeError("html renderer returned no document")
+        encoded = html.encode()
+        _write_bytes_atomic(encoded, html_path)
+        result["html"] = {
+            "bytes": len(encoded),
+            "path": str(html_path),
+            "sha256": hashlib.sha256(encoded).hexdigest(),
+        }
+    return replay, result
 
 
 def _candidate_farm(observation, candidate_seat):
@@ -179,6 +222,7 @@ def run(
     time_limit=30.0,
     mip_rel_gap=0.0,
     progress_path=None,
+    html_path=None,
 ):
     if _sha256(COMPARATOR) != COMPARATOR_SHA256:
         raise ValueError("frozen comparator hash changed")
@@ -208,6 +252,14 @@ def run(
                 environment.steps[-1],
                 source_getter(),
             )
+            _checkpoint_artifacts(
+                environment,
+                replay_path,
+                html_path,
+                arm,
+                seed,
+                candidate_seat,
+            )
         return action
 
     agents = (
@@ -215,11 +267,28 @@ def run(
         if candidate_seat == 0
         else (comparator, candidate)
     )
-    environment.run(list(agents))
-    replay = environment.toJSON()
-    replay["id"] = canonical_sha256(
-        "whole-farm-game",
-        (arm, seed, candidate_seat),
+    try:
+        environment.run(list(agents))
+    except Exception:
+        try:
+            _checkpoint_artifacts(
+                environment,
+                replay_path,
+                html_path,
+                arm,
+                seed,
+                candidate_seat,
+            )
+        except Exception:
+            pass
+        raise
+    replay, artifacts = _checkpoint_artifacts(
+        environment,
+        replay_path,
+        html_path,
+        arm,
+        seed,
+        candidate_seat,
     )
     if len(replay["steps"]) != 720:
         raise ValueError("full game must contain 720 steps")
@@ -251,7 +320,6 @@ def run(
         "seed": seed,
     }
     trace_hash, trace_bytes = _write_gzip(trace_document, trace_path)
-    replay_hash, replay_bytes = _write_gzip(replay, replay_path)
     opponent_seat = 1 - candidate_seat
     result = {
         "arm": arm,
@@ -285,12 +353,7 @@ def run(
         "kaggle_environments_version": importlib.metadata.version(
             "kaggle-environments"
         ),
-        "replay": {
-            "bytes": replay_bytes,
-            "path": str(replay_path),
-            "sha256": replay_hash,
-            "steps": len(replay["steps"]),
-        },
+        "replay": artifacts["replay"],
         "schema": "whole-farm-offline-game-v1",
         "seed": seed,
     }
@@ -300,6 +363,8 @@ def run(
             "records": len(progress.records),
             "sha256": _sha256(progress.path),
         }
+    if "html" in artifacts:
+        result["html"] = artifacts["html"]
     result["result_sha256"] = canonical_sha256("whole-farm-game-result", result)
     return result
 
@@ -312,6 +377,7 @@ def main():
         default="control-1.14",
     )
     parser.add_argument("--candidate-seat", type=int, choices=(0, 1), default=0)
+    parser.add_argument("--html", type=Path)
     parser.add_argument("--mip-rel-gap", type=float, default=0.0)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--progress", type=Path)
@@ -330,6 +396,7 @@ def main():
         arguments.mip_rel_gap,
         arguments.progress
         or arguments.output.with_name(f"{arguments.output.stem}_progress.json"),
+        arguments.html,
     )
     text = json.dumps(result, allow_nan=False, indent=2, sort_keys=True) + "\n"
     arguments.output.parent.mkdir(parents=True, exist_ok=True)

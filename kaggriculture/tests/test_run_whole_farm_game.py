@@ -1,7 +1,11 @@
+import gzip
 import json
 from types import SimpleNamespace
 
-from kaggriculture.tools.economics.run_whole_farm_game import _DailyProgress
+from kaggriculture.tools.economics.run_whole_farm_game import (
+    _DailyProgress,
+    _checkpoint_artifacts,
+)
 
 
 def test_daily_progress_writes_atomic_solve_checkpoint(tmp_path):
@@ -86,3 +90,43 @@ def test_daily_progress_writes_atomic_solve_checkpoint(tmp_path):
         "status": "ACTIVE",
     }
     assert not (tmp_path / ".progress.json.tmp").exists()
+
+
+def test_checkpoint_writes_official_html_and_replay_atomically(tmp_path):
+    class Environment:
+        def __init__(self):
+            self.render_arguments = None
+
+        def toJSON(self):
+            return {"steps": [[{"observation": {}}]]}
+
+        def render(self, **arguments):
+            self.render_arguments = arguments
+            return "<html>official replay</html>"
+
+    environment = Environment()
+    replay_path = tmp_path / "replay.json.gz"
+    html_path = tmp_path / "replay.html"
+    replay, metadata = _checkpoint_artifacts(
+        environment,
+        replay_path,
+        html_path,
+        "control-1.14",
+        3_980_000,
+        0,
+    )
+
+    with gzip.open(replay_path, "rt") as stream:
+        written_replay = json.load(stream)
+    assert written_replay == replay
+    assert html_path.read_text() == "<html>official replay</html>"
+    assert environment.render_arguments == {
+        "controls": True,
+        "height": 800,
+        "mode": "html",
+        "width": 1200,
+    }
+    assert metadata["replay"]["steps"] == 1
+    assert metadata["html"]["bytes"] == 28
+    assert not (tmp_path / ".replay.json.gz.tmp").exists()
+    assert not (tmp_path / ".replay.html.tmp").exists()
