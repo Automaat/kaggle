@@ -11,6 +11,10 @@ Połączyć istniejące modele w rzeczywisty backend `PlannerBackend.solve_whole
 - końcowy model zwierząt: `0b1c433`
 - końcowy model ziemi i pracowników: `27225bd`
 - końcowy planer przestrzeni: `c029420`
+- końcowy planer tras: `f43083f`
+- wykonawca offline: `ce02405`, poprawka `00923f5`
+- adapter obserwacji: `81e0a3e`, poprawka delta coverage `0ff8bcc`
+- wykonawca tras: `9b6a095`, poprawki `b7c2541`, `dd895cc`
 - zamrożony komparator 1.14.0: `b74a3ea`
 
 Kod modeli zostanie przeniesiony z commitów implementacyjnych. Dokumentacja eksperymentów i stare artefakty nie zostaną połączone.
@@ -43,7 +47,7 @@ Ledger odrzuci ujemne salda i przekroczenia limitów.
 8. Rozwiązać i zweryfikować model upraw. Jego saldo po wspólnych przepływach będzie jedynym saldem końcowym.
 9. Utworzyć zamiary zakupu zwierząt i rozwiązać planer przestrzeni.
 10. Gdy przestrzeń odrzuci zakup lub ledger wykryje konflikt, dodać cięcie i ponowić obliczenie. Limit to pięć iteracji. Powtórzony podpis cięcia kończy cykl błędem.
-11. Utworzyć zależne `EconomicPlanRef`, `SpacePlanRef` i `RoutePlanRef`. Trasy pozostają konserwatywną rezerwą shadow.
+11. Utworzyć zależne `EconomicPlanRef`, `SpacePlanRef` i `RoutePlanRef`. Kontrola używa konserwatywnej rezerwy, a drugie ramię pełnego planera tras.
 12. Wyeksportować jawny `ExecutionHandoff`. Frozen 1.14 wykona kroki i akcje przez istniejące seam'y `Agent2Policy` i `BaselinePolicy`.
 13. Zbudować adapter `observation → WholeFarmSnapshot` z aktualnej obserwacji symulatora.
 14. Wywołać `RollingCoordinator.prepare` dla każdej obserwacji.
