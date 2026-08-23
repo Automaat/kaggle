@@ -17,6 +17,7 @@ try:
     from .run_animal_milp import registered_input as registered_animal_input
     from .run_milp_oracle import registered_input as registered_crop_input
     from .space_planner import SpaceCell
+    from ..routing.offline_route_planner import RouteUnit
     from .whole_farm_backend import (
         REGISTERED_SEED,
         SOURCE_COMMITS,
@@ -39,6 +40,7 @@ except ImportError:
     )
     from tools.economics.run_milp_oracle import registered_input as registered_crop_input
     from tools.economics.space_planner import SpaceCell
+    from tools.routing.offline_route_planner import RouteUnit
     from tools.economics.whole_farm_backend import (
         REGISTERED_SEED,
         SOURCE_COMMITS,
@@ -121,6 +123,12 @@ def registered_snapshot():
         _registered_cells(),
         shared,
         tuple(("SHEEP",) * count for count in range(4, -1, -1)),
+        (
+            RouteUnit("unit-0", (4, 4)),
+            RouteUnit("unit-1", (5, 4)),
+            RouteUnit("unit-2", (4, 5)),
+            RouteUnit("unit-3", (5, 5)),
+        ),
     )
 
 
@@ -140,13 +148,14 @@ def _source_hash(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def run(time_limit=30.0, mip_rel_gap=0.0):
+def run(time_limit=30.0, mip_rel_gap=0.0, route_arm="frozen-1.14"):
     snapshot = registered_snapshot()
     backend = WholeFarmPlannerBackend(
         lambda observation: snapshot,
         time_limit,
         mip_rel_gap,
         5,
+        route_arm,
     )
     coordinator = RollingCoordinator(backend)
     intent = coordinator.prepare(registered_observation())
@@ -167,7 +176,7 @@ def run(time_limit=30.0, mip_rel_gap=0.0):
         "schema": 1,
         "registered_seed": REGISTERED_SEED,
         "scope": "agent2-whole-farm-shadow",
-        "execution_label": "strategy-2.0-execution-1.14",
+        "execution_label": handoff.label,
         "success": not solved.verification.errors,
         "shadow_only": True,
         "realized_simulator_score": None,
@@ -214,8 +223,13 @@ def main():
     parser.add_argument("--time-limit", type=float, default=30.0)
     parser.add_argument("--mip-rel-gap", type=float, default=0.0)
     parser.add_argument("--output")
+    parser.add_argument(
+        "--route-arm",
+        choices=("frozen-1.14", "planner-2.0"),
+        default="frozen-1.14",
+    )
     args = parser.parse_args()
-    document = run(args.time_limit, args.mip_rel_gap)
+    document = run(args.time_limit, args.mip_rel_gap, args.route_arm)
     encoded = json.dumps(document, indent=2, sort_keys=True)
     print(encoded)
     if args.output:

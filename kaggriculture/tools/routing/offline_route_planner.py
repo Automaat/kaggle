@@ -1,7 +1,11 @@
 from dataclasses import dataclass
 
-from economics.market_ledger import ANIMALS, CROPS, PRODUCTS, SHED_ITEMS
-from economics.rolling_coordinator import canonical_sha256
+try:
+    from ..economics.market_ledger import ANIMALS, CROPS, PRODUCTS, SHED_ITEMS
+    from ..economics.rolling_coordinator import canonical_sha256
+except ImportError:
+    from economics.market_ledger import ANIMALS, CROPS, PRODUCTS, SHED_ITEMS
+    from economics.rolling_coordinator import canonical_sha256
 
 
 MOVES = {

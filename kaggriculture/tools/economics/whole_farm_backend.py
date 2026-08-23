@@ -10,6 +10,7 @@ from .animal_milp import (
     solve_animal_oracle,
     verify_result as verify_animal_result,
 )
+from .animal_ledger import ANIMAL_SPECS
 from .land_hire_optimizer import (
     MODES,
     OptimizerInput,
@@ -17,7 +18,7 @@ from .land_hire_optimizer import (
     solve_optimizer,
     verify_result as verify_investment_result,
 )
-from .market_ledger import CROPS, PRODUCTS
+from .market_ledger import CROPS, PRODUCTS, SHED_ITEMS
 from .milp_oracle import (
     OracleInput,
     OracleResult,
@@ -45,6 +46,15 @@ from .space_planner import (
     solve_space_plan,
     verify_result as verify_space_result,
 )
+from ..routing.offline_route_planner import (
+    RouteFailure,
+    RoutePlan,
+    RouteProblem,
+    RouteTask,
+    RouteUnit,
+    plan_routes,
+    verify_plan as verify_route_plan,
+)
 
 
 REGISTERED_SEED = 3_980_000
@@ -54,6 +64,7 @@ SOURCE_COMMITS = (
     ("land-hire", "27225bd"),
     ("space", "c029420"),
     ("shop-coordinator", "1b0c9f5"),
+    ("routes", "f43083f"),
 )
 
 
@@ -99,6 +110,7 @@ class WholeFarmSnapshot:
     cells: tuple[SpaceCell, ...]
     shared: SharedCapacity
     animal_portfolios: tuple[tuple[str, ...], ...] = ()
+    route_units: tuple[RouteUnit, ...] = ()
 
     def __post_init__(self):
         if type(self.registered_seed) is not int:
@@ -136,6 +148,10 @@ class WholeFarmSnapshot:
             raise ValueError("animal portfolio exceeds new animal slots")
         if self.animal_portfolios and self.animal.fixed_slot_animals:
             raise ValueError("animal portfolio enumeration conflicts with fixed slots")
+        if type(self.route_units) is not tuple or any(
+            type(unit) is not RouteUnit for unit in self.route_units
+        ):
+            raise TypeError("route units have wrong type")
         if self.crop.source_step != self.animal.source_step:
             raise ValueError("model source steps differ")
         if self.crop.terminal_step != self.animal.terminal_step:
@@ -290,6 +306,9 @@ class ExecutionHandoff:
     animal_intents: tuple[AnimalExecutionIntent, ...]
     space_targets: tuple[SpaceTarget, ...]
     market_orders: tuple[MarketOrderIntent, ...]
+    route_arm: str = "frozen-1.14"
+    route_plan_fingerprint: str | None = None
+    route_commands: tuple[tuple, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -1055,10 +1074,41 @@ def _crop_targets(snapshot, solved, space_targets):
     return tuple(targets)
 
 
-def _build_handoff(epoch, snapshot, solved, economy, space):
+def _route_commands(route_plan):
+    if route_plan is None:
+        return ()
+    return tuple(
+        (
+            route.unit_identifier,
+            tuple(
+                (
+                    command.identifier,
+                    command.expected_pre_position,
+                    command.action,
+                    command.expected_post_position,
+                    command.task_identifier,
+                    command.effect_fingerprint,
+                )
+                for command in route.commands
+            ),
+        )
+        for route in route_plan.routes
+    )
+
+
+def _build_handoff(
+    epoch,
+    snapshot,
+    solved,
+    economy,
+    space,
+    label="strategy-2.0-execution-1.14",
+    route_arm="frozen-1.14",
+    route_plan=None,
+):
     space_targets = _space_targets(solved)
     return ExecutionHandoff(
-        "strategy-2.0-execution-1.14",
+        label,
         epoch,
         snapshot.source_step,
         economy.fingerprint,
@@ -1067,6 +1117,230 @@ def _build_handoff(epoch, snapshot, solved, economy, space):
         _animal_execution_intents(solved),
         space_targets,
         _market_order_intents(snapshot, solved),
+        route_arm,
+        None if route_plan is None else route_plan.fingerprint,
+        _route_commands(route_plan),
+    )
+
+
+def _route_inventory(snapshot, handoff):
+    counts = {item: 0 for item in SHED_ITEMS}
+    for item, quantity in zip(CROPS, snapshot.crop.goods):
+        counts[item] += quantity
+    for item, quantity in zip(GOODS, snapshot.animal.goods):
+        counts[item] += quantity
+    counts["FERTILIZER"] += snapshot.crop.fertilizer_stock
+    for animal, quantity in zip(ANIMALS, snapshot.animal.shed_animals):
+        counts[animal] += quantity
+    day_end = (snapshot.current_day + 1) * 24 - 1
+    for intent in handoff.market_orders:
+        if not snapshot.source_step <= intent.source_step <= day_end:
+            continue
+        operation = intent.order[0]
+        if operation in ("BUY_ANIMAL", "BUY_PRODUCT"):
+            counts[intent.order[1]] += intent.order[2]
+    return tuple((item, counts[item]) for item in SHED_ITEMS if counts[item] > 0)
+
+
+def _task(
+    identifier,
+    position,
+    action,
+    deadline,
+    dependencies=(),
+    requires=(),
+    produces=(),
+):
+    return RouteTask(
+        identifier,
+        position,
+        action,
+        2,
+        deadline,
+        dependencies,
+        requires,
+        produces,
+        canonical_sha256("whole-farm-route-pre", identifier),
+        canonical_sha256("whole-farm-route-effect", identifier),
+    )
+
+
+def _crop_route_tasks(snapshot, solved, handoff, deadline):
+    options = {
+        _crop_option_key(solved.crop_input, option): option
+        for option in generate_crop_options(solved.crop_input)
+    }
+    available_targets = {}
+    for target in handoff.crop_targets:
+        available_targets.setdefault((target.day, target.crop), []).append(target)
+    tasks = []
+    for decision_index, decision in enumerate(solved.crop_result.decisions):
+        option = options[_crop_decision_key(decision)]
+        positions = []
+        if decision.existing_position is not None:
+            positions = [
+                (decision.existing_position[1], decision.existing_position[0])
+            ]
+        elif decision.plant_day == snapshot.current_day:
+            targets = available_targets.get((decision.plant_day, decision.crop), [])
+            positions = [(target.x, target.y) for target in targets[: decision.count]]
+            del targets[: decision.count]
+        if not positions:
+            continue
+        day_index = snapshot.current_day - solved.crop_input.current_day
+        action_count = option.actions[day_index]
+        fixed_actions = 0
+        if decision.plant_day == snapshot.current_day:
+            fixed_actions += 1
+        if snapshot.current_day in decision.fertilizer_days:
+            fixed_actions += 1
+        harvest_quantity = dict(decision.harvests).get(snapshot.current_day, 0)
+        if harvest_quantity:
+            fixed_actions += 1 + solved.crop_input.terminal_return_actions
+        if decision.release_day == snapshot.current_day:
+            fixed_actions += 1
+        water = action_count > fixed_actions
+        for position_index, position in enumerate(positions):
+            previous = ()
+            operations = []
+            if decision.plant_day == snapshot.current_day:
+                operations.append(("PLANT", ("PLANT", decision.crop), (), ()))
+            if water:
+                operations.append(("WATER", ("WATER",), (), ()))
+            if snapshot.current_day in decision.fertilizer_days:
+                operations.append(
+                    (
+                        "FERTILIZE",
+                        ("FERTILIZE",),
+                        (("FERTILIZER", 1),),
+                        (),
+                    )
+                )
+            if harvest_quantity:
+                operations.append(
+                    (
+                        "HARVEST",
+                        ("HARVEST",),
+                        (),
+                        ((decision.crop, harvest_quantity),),
+                    )
+                )
+            if decision.release_day == snapshot.current_day:
+                operations.append(("DIG", ("DIG",), (), ()))
+            for operation_index, (name, action, requires, produces) in enumerate(
+                operations
+            ):
+                identifier = (
+                    f"crop:{decision_index}:{position_index}:"
+                    f"{snapshot.current_day}:{operation_index}:{name}"
+                )
+                tasks.append(
+                    _task(
+                        identifier,
+                        position,
+                        action,
+                        deadline,
+                        previous,
+                        requires,
+                        produces,
+                    )
+                )
+                previous = (identifier,)
+    return tuple(tasks)
+
+
+def _route_tasks(snapshot, solved, handoff, deadline):
+    tasks = []
+    dependency_by_intent = {}
+    for assignment in solved.space_result.assignments:
+        previous = ()
+        for index, task in enumerate(assignment.tasks):
+            if task.day != snapshot.current_day:
+                continue
+            identifier = f"space:{assignment.intent}:{index}:{task.operation}"
+            requires = ()
+            if task.operation == "PLACE":
+                requires = ((assignment.animal, 1),)
+            tasks.append(
+                _task(
+                    identifier,
+                    (task.position[1], task.position[0]),
+                    (task.operation, assignment.animal)
+                    if task.operation == "PLACE"
+                    else (task.operation,),
+                    deadline,
+                    previous,
+                    requires,
+                )
+            )
+            previous = (identifier,)
+        if previous:
+            dependency_by_intent[assignment.intent] = previous
+    tasks.extend(_crop_route_tasks(snapshot, solved, handoff, deadline))
+    targets = {target.identifier: target for target in handoff.space_targets}
+    existing = {
+        animal.identifier: animal.position for animal in snapshot.animal.existing_animals
+    }
+    for service in solved.animal_result.services:
+        if service.day != snapshot.current_day or not service.active:
+            continue
+        target = targets.get(service.identifier)
+        if target is None:
+            position = existing.get(service.identifier)
+            if position is None:
+                continue
+            position = (position[1], position[0])
+        else:
+            position = (target.x, target.y)
+        previous = dependency_by_intent.get(service.identifier, ())
+        actions = []
+        if service.feed_action:
+            actions.append(("FEED", (), (("WHEAT", 1),), ()))
+        if service.care_action:
+            actions.append(("CARE", (), (), ()))
+        if service.harvest_action:
+            product = ANIMAL_SPECS[service.animal].product
+            actions.append(("HARVEST", (), (), ((product, service.harvested),)))
+        for _ in range(service.fertilizer_collected):
+            actions.append(
+                ("COLLECT_FERTILIZER", (), (), (("FERTILIZER", 1),))
+            )
+        for index, (operation, extra_dependencies, requires, produces) in enumerate(
+            actions
+        ):
+            identifier = f"animal:{service.identifier}:{service.day}:{index}:{operation}"
+            dependencies = previous + extra_dependencies
+            tasks.append(
+                _task(
+                    identifier,
+                    position,
+                    (operation,),
+                    deadline,
+                    dependencies,
+                    requires,
+                    produces,
+                )
+            )
+            previous = (identifier,)
+    return tuple(tasks)
+
+
+def _build_route_problem(snapshot, solved, handoff, observation):
+    if not snapshot.route_units:
+        raise WholeFarmSolveError("route arm requires observed units")
+    remaining = 24 - snapshot.source_step % 24
+    if snapshot.current_day == 29:
+        remaining = 719 - snapshot.source_step
+    deadline = max(1, remaining)
+    return RouteProblem(
+        snapshot.source_step,
+        10,
+        snapshot.route_units,
+        _route_inventory(snapshot, handoff),
+        snapshot.shared.storage[0],
+        _route_tasks(snapshot, solved, handoff, deadline),
+        deadline,
+        observation.route_precondition_fingerprint,
     )
 
 
@@ -1079,6 +1353,8 @@ def _build_decision_trace(
     economy,
     space,
     routes,
+    route_arm,
+    route_plan,
 ):
     investment_errors = dict(solved.verification.investment)
     selected_animals = tuple(
@@ -1127,6 +1403,13 @@ def _build_decision_trace(
             solved.space_result.objective_value,
             "; ".join(solved.verification.space) or None,
         ),
+        CandidateTrace(
+            "route",
+            route_arm,
+            True,
+            None if route_plan is None else -float(route_plan.total_cost),
+            None,
+        ),
     )
     observed = ObservedResourceState(
         snapshot.source_step,
@@ -1169,12 +1452,17 @@ def _build_decision_trace(
         )
         for decision in solved.selected_investment.investments
     )
+    route_constraint = (
+        "routes:conservative-action-reserve"
+        if route_plan is None
+        else "routes:planner-2.0-complete-day"
+    )
     constraints = (
         "cash-owner:crop-ledger",
         "fertilizer-owner:crop-model",
         "iterations:max-5-cycle-detect",
         "resources:shared-fields-actions-storage-orders",
-        "routes:conservative-action-reserve",
+        route_constraint,
         "wheat-owner:crop-model",
     )
     fingerprints = (
@@ -1228,6 +1516,7 @@ class WholeFarmPlannerBackend:
         time_limit=30.0,
         mip_rel_gap=0.0,
         max_iterations=5,
+        route_arm="frozen-1.14",
     ):
         if not callable(snapshot_provider):
             raise TypeError("snapshot provider must be callable")
@@ -1241,14 +1530,19 @@ class WholeFarmPlannerBackend:
             raise TypeError("MIP gap must be numeric")
         if not math.isfinite(mip_rel_gap) or not 0 <= mip_rel_gap < 1:
             raise ValueError("MIP gap must be in 0..1")
+        if route_arm not in ("frozen-1.14", "planner-2.0"):
+            raise ValueError("unknown route arm")
         self._snapshot_provider = snapshot_provider
         self._time_limit = float(time_limit)
         self._mip_rel_gap = float(mip_rel_gap)
         self._max_iterations = max_iterations
+        self._route_arm = route_arm
         self._last_solve = None
         self._last_handoff = None
         self._last_trace = None
         self._last_shop_signature = None
+        self._last_route_plan = None
+        self._last_route_plan_problem = None
 
     @property
     def last_solve(self):
@@ -1262,11 +1556,21 @@ class WholeFarmPlannerBackend:
     def last_trace(self):
         return self._last_trace
 
+    @property
+    def last_route_plan(self):
+        return self._last_route_plan
+
+    @property
+    def last_route_plan_problem(self):
+        return self._last_route_plan_problem
+
     def reset(self):
         self._last_solve = None
         self._last_handoff = None
         self._last_trace = None
         self._last_shop_signature = None
+        self._last_route_plan = None
+        self._last_route_plan_problem = None
 
     def _solve(self, snapshot, forecast):
         investment_results, selected, investment_verification = _select_investment(
@@ -1614,20 +1918,64 @@ class WholeFarmPlannerBackend:
             task_ids,
             (),
         )
-        route_ids = tuple(
-            f"shadow-route:{identifier}" for identifier in task_ids
-        ) or (f"shadow-route-reserve:{epoch}",)
+        route_plan = None
+        route_problem = None
+        handoff = _build_handoff(epoch, snapshot, solved, economy, space)
+        if self._route_arm == "planner-2.0":
+            route_problem = _build_route_problem(
+                snapshot,
+                solved,
+                handoff,
+                observation,
+            )
+            route_result = plan_routes(route_problem)
+            if type(route_result) is RouteFailure:
+                raise WholeFarmSolveError(
+                    f"route {route_result.phase} failed: {route_result.message}"
+                )
+            if type(route_result) is not RoutePlan:
+                raise WholeFarmSolveError("route planner returned wrong type")
+            route_errors = verify_route_plan(route_problem, route_result)
+            if route_errors:
+                raise WholeFarmSolveError(
+                    f"route verification failed: {'; '.join(route_errors)}"
+                )
+            route_plan = route_result
+            route_ids = tuple(
+                f"route-2.0:{route.unit_identifier}"
+                for route in route_plan.routes
+            )
+        else:
+            route_ids = tuple(
+                f"shadow-route:{identifier}" for identifier in task_ids
+            ) or (f"shadow-route-reserve:{epoch}",)
         routes = RoutePlanRef(
             canonical_sha256(
                 "whole-farm-routes",
-                (epoch, economy.fingerprint, space.fingerprint, route_ids),
+                (
+                    epoch,
+                    economy.fingerprint,
+                    space.fingerprint,
+                    route_ids,
+                    None if route_plan is None else route_plan.fingerprint,
+                ),
             ),
             economy.fingerprint,
             space.fingerprint,
             route_ids,
             (),
         )
-        handoff = _build_handoff(epoch, snapshot, solved, economy, space)
+        if route_plan is not None:
+            handoff = _build_handoff(
+                epoch,
+                snapshot,
+                solved,
+                economy,
+                space,
+                "strategy-2.0-execution-route-2.0",
+                "planner-2.0",
+                route_plan,
+            )
         trace = _build_decision_trace(
             epoch,
             reasons,
@@ -1637,11 +1985,15 @@ class WholeFarmPlannerBackend:
             economy,
             space,
             routes,
+            self._route_arm,
+            route_plan,
         )
         self._last_solve = solved
         self._last_handoff = handoff
         self._last_trace = trace
         self._last_shop_signature = forecast.open_shop_signature
+        self._last_route_plan = route_plan
+        self._last_route_plan_problem = route_problem
         return economy, space, routes
 
     def repair_space(self, epoch, observation, economy, previous_space):
@@ -1661,8 +2013,57 @@ class WholeFarmPlannerBackend:
     def repair_routes(self, epoch, observation, economy, space, previous_routes):
         if self._last_solve is None:
             raise WholeFarmSolveError("no whole-farm plan to repair")
-        route_ids = previous_routes.route_ids or (f"shadow-route-reserve:{epoch}",)
-        return RoutePlanRef(
+        snapshot = self._snapshot_provider(observation)
+        if type(snapshot) is not WholeFarmSnapshot:
+            raise TypeError("snapshot provider returned wrong type")
+        if snapshot.source_step != observation.source_step:
+            raise ValueError("snapshot and observation source steps differ")
+        handoff = _build_handoff(
+            epoch,
+            snapshot,
+            self._last_solve,
+            economy,
+            space,
+        )
+        route_plan = None
+        route_problem = None
+        if self._route_arm == "planner-2.0":
+            route_problem = _build_route_problem(
+                snapshot,
+                self._last_solve,
+                handoff,
+                observation,
+            )
+            result = plan_routes(route_problem)
+            if type(result) is RouteFailure:
+                raise WholeFarmSolveError(
+                    f"route {result.phase} failed: {result.message}"
+                )
+            errors = verify_route_plan(route_problem, result)
+            if errors:
+                raise WholeFarmSolveError(
+                    f"route verification failed: {'; '.join(errors)}"
+                )
+            route_plan = result
+            route_ids = tuple(
+                f"route-2.0:{route.unit_identifier}"
+                for route in route_plan.routes
+            )
+            handoff = _build_handoff(
+                epoch,
+                snapshot,
+                self._last_solve,
+                economy,
+                space,
+                "strategy-2.0-execution-route-2.0",
+                "planner-2.0",
+                route_plan,
+            )
+        else:
+            route_ids = previous_routes.route_ids or (
+                f"shadow-route-reserve:{epoch}",
+            )
+        routes = RoutePlanRef(
             canonical_sha256(
                 "whole-farm-route-repair",
                 (
@@ -1678,3 +2079,20 @@ class WholeFarmPlannerBackend:
             route_ids,
             (),
         )
+        trace = _build_decision_trace(
+            epoch,
+            ("route-repair",),
+            snapshot,
+            self._last_solve,
+            handoff,
+            economy,
+            space,
+            routes,
+            self._route_arm,
+            route_plan,
+        )
+        self._last_handoff = handoff
+        self._last_trace = trace
+        self._last_route_plan = route_plan
+        self._last_route_plan_problem = route_problem
+        return routes
