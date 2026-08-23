@@ -1,4 +1,5 @@
 import argparse
+import gzip
 import hashlib
 import importlib.metadata
 import json
@@ -40,9 +41,10 @@ def _game(candidate, champion, seed, candidate_seat, replay_dir):
     agents = (candidate, champion) if candidate_seat == 0 else (champion, candidate)
     env, rewards, statuses = run_match(*agents, seed=seed, debug=True)
     replay = env.toJSON()
-    name = f"round39_8_milp_vs_v1_14_0_{seed}_seat_{candidate_seat}.json"
+    name = f"round39_8_milp_vs_v1_14_0_{seed}_seat_{candidate_seat}.json.gz"
     replay_path = replay_dir / name
-    replay_path.write_text(json.dumps(replay))
+    encoded_replay = json.dumps(replay, separators=(",", ":")).encode()
+    replay_path.write_bytes(gzip.compress(encoded_replay, mtime=0))
     candidate_index = candidate_seat
     champion_index = 1 - candidate_seat
     return {
