@@ -1027,6 +1027,21 @@ def _space_targets(solved):
     )
 
 
+def _projected_unlock_day(snapshot, solved, cell):
+    if cell.unlock_day == 0:
+        return 0
+    y, x = cell.position
+    quadrant = (2 if y >= 5 else 0) + (1 if x >= 5 else 0)
+    if quadrant < snapshot.investment.unlocked_quadrants:
+        return snapshot.current_day
+    candidates = tuple(
+        projection.source_step // 24
+        for projection in solved.selected_investment.projections
+        if projection.unlocked_quadrants >= quadrant + 1
+    )
+    return min(candidates) if candidates else None
+
+
 def _animal_execution_intents(solved):
     purchases = {}
     for purchase in solved.animal_result.purchases:
@@ -1063,11 +1078,13 @@ def _crop_targets(snapshot, solved, space_targets):
         by_day.setdefault(decision.plant_day, []).extend(
             [(decision.crop, decision.release_day)] * decision.count
         )
-    available_from = {
-        cell.position: cell.unlock_day
-        for cell in snapshot.cells
-        if cell.kind == "EMPTY" and cell.position not in blocked
-    }
+    available_from = {}
+    for cell in snapshot.cells:
+        if cell.kind != "EMPTY" or cell.position in blocked:
+            continue
+        unlock_day = _projected_unlock_day(snapshot, solved, cell)
+        if unlock_day is not None:
+            available_from[cell.position] = unlock_day
     plant_positions = {
         cell.position
         for cell in snapshot.cells
@@ -1088,6 +1105,7 @@ def _crop_targets(snapshot, solved, space_targets):
                 if available_day <= day
             ),
             key=lambda position: (
+                available_from[position],
                 abs(position[0] - 4) + abs(position[1] - 4),
                 position,
             ),

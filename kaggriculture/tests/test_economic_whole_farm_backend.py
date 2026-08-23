@@ -29,6 +29,7 @@ from kaggriculture.tools.economics.whole_farm_backend import (
     WholeFarmSolveError,
     _crop_input,
     _crop_profile,
+    _crop_targets,
     verify_shared_ledger,
 )
 from kaggriculture.tools.routing.offline_route_planner import (
@@ -354,6 +355,46 @@ def test_rolling_ledger_reuses_released_existing_crop_tile():
     assert {
         (target.y, target.x) for target in backend.last_handoff.crop_targets
     } == {(4, 4)}
+
+
+def test_crop_target_uses_projected_land_from_unlock_day():
+    snapshot = replace(
+        _snapshot(),
+        cells=(
+            SpaceCell((0, 5), 29, "EMPTY"),
+            SpaceCell((5, 0), 29, "EMPTY"),
+        ),
+    )
+    investment = SimpleNamespace(
+        projections=(SimpleNamespace(source_step=120, unlocked_quadrants=2),),
+    )
+    before = SimpleNamespace(
+        crop="CARROT",
+        count=1,
+        existing_position=None,
+        plant_day=4,
+        release_day=None,
+    )
+    solved = SimpleNamespace(
+        crop_result=SimpleNamespace(decisions=(before,)),
+        selected_investment=investment,
+    )
+    with pytest.raises(WholeFarmSolveError, match="lacks crop target"):
+        _crop_targets(snapshot, solved, ())
+
+    at_unlock = SimpleNamespace(
+        crop="CARROT",
+        count=1,
+        existing_position=None,
+        plant_day=5,
+        release_day=None,
+    )
+    solved = SimpleNamespace(
+        crop_result=SimpleNamespace(decisions=(at_unlock,)),
+        selected_investment=investment,
+    )
+    targets = _crop_targets(snapshot, solved, ())
+    assert tuple((target.y, target.x) for target in targets) == ((0, 5),)
 
 
 def test_second_arm_plans_daily_crop_service_route():
