@@ -3140,3 +3140,103 @@ Final validation:
 | 100 | 75 | forced 100 | 40 | 100% | +$16,919 +/- $2,244 |
 
 Overall decision: do not change root `main.py`. Full physical expansion does not have positive marginal value with the current execution model. The safe result is a capacity gate that stops at 75 when 100 is requested, but 75 still fails the economic acceptance gate against 50. Do not tune 100 again until a 75-tile policy clears movement below 50%, animal neglect below 12% and productive occupancy above 90%.
+
+## Round 38 full-field routing follow-up
+
+Status: one stable improvement to the 75-tile policy, but no policy that makes 75 tiles beat the 50-tile champion.
+
+The candidate is `agents_2.0.x/round38_2_hire_batch/`. Root `main.py` remains unchanged. Every score test used paired, seat-swapped seeds.
+
+### Replay diagnosis
+
+Two strong ladder replays use all 75 tiles and finish with $145,025 and $125,048. Their policies hire earlier and complete more work at one tile before moving.
+
+| Policy | Movement | Work | Consecutive work on same tile | Mean gap between work |
+|:---|---:|---:|---:|---:|
+| Ning Gu replay | 48.1% | 37.6% | 39.8% | 0.83 tiles |
+| Toni Blanco replay | 64.2% | 29.9% | 20.4% | 1.56 tiles |
+| 75-tile 1.14.0 | 55.9% | 30.2% | 19.0% | 1.30 tiles |
+
+Ning Gu also completes 314 `FEED` and 322 `CARE` actions. A representative improved local episode completes 209 and 204. The main remaining loss is animal output.
+
+### Hiring timing
+
+The old settings claim a 14-hand cap but can hire only three hands in each of four hours. They realize 12 hands and 282 unit-turns on a full day. A larger order reaches the same 12 hands earlier without more payroll.
+
+| Maximum hands | Hire batch | Seeds | Paired delta vs old 75 | Decision |
+|---:|---:|---:|---:|:---|
+| 12 | 5 | 20 | +$3,582 +/- $4,479 | neutral |
+| 12 | 10 | 20 | +$5,110 +/- $3,068 | screen pass |
+| 12 | 10 | 40 fresh | +$1,908 +/- $2,521 | neutral-positive |
+| 14 | 5 | 20 | +$363 +/- $3,326 | reject |
+| 14 | 10 | 20 | +$1,961 +/- $4,105 | reject |
+
+Fourteen hands do more work but their Fibonacci payroll does not pay back. Moving hires before land on expansion turns was inert: +$7,729 versus +$7,746 for the same control block.
+
+### Water and low-input acreage
+
+A contiguous snake split improved locality over checkerboard water cohorts but lost -$3,451 +/- $1,861 on 40 seeds. It reported 58.0% movement, 38.6% missed water, 28.8% missed feed and 37.6% missed care.
+
+The low-input outer-crop hypothesis also failed. These arms changed only ongoing strawberries and tomatoes at distance three or more from a shed port.
+
+| Outer policy | Seeds | Paired delta vs old 75 |
+|:---|---:|---:|
+| No fertilizer | 20 | -$20,976 +/- $3,736 |
+| Water only for survival | 20 | -$6,407 +/- $3,100 |
+| Harvest only at capacity | 20 | -$9,574 +/- $2,031 |
+
+The saved operations are worth less than the lost production.
+
+### Tile bundles and local radius
+
+The selected route keeps a unit on a tile for the next legal operation if it worked there on the previous turn. Emergencies can still interrupt the bundle. Selecting every underfoot task without this guard lost -$1,549 +/- $2,786.
+
+The guarded bundle scored +$3,645 +/- $3,576 on 20 seeds and +$1,574 +/- $1,687 on 40 fresh seeds. Combining it with a 10-order hire batch scored +$4,699 +/- $2,940 and confirmed at +$3,390 +/- $2,166.
+
+Reducing the local trip radius from two tiles to one produced the largest extra gain. The screen scored +$8,838 +/- $2,416 against old 75. A fresh 40-seed confirmation scored +$6,752 +/- $2,359. The final 200-seed confirmation scored 77% points and **+$6,454 +/- $1,111**, with 308 wins in 400 games and no failures.
+
+The mechanism probe changed as follows.
+
+| Metric | Old 75 | Selected 75 |
+|:---|---:|---:|
+| Movement | 55.9% | 51.1% |
+| Work | 30.2% | 31.6% |
+| Same-tile work | 19.0% | 33.5% |
+| Mean work gap | 1.30 | 1.12 |
+| Missed water | 16.7% | 14.3% |
+| Missed feed | 29.1% | 19.4% |
+| Missed care | 34.5% | 22.4% |
+
+Productive occupancy is 85.7%. The policy improves every mechanism metric but does not clear the registered 90% occupancy, 50% movement or 12% neglect gates.
+
+### Closed follow-up arms
+
+The following changes did not improve the selected route:
+
+- a continuation weight of 0.5 or 1.0;
+- distance weights of 1.0 or 1.5;
+- no routing RL;
+- zone penalties of zero, two or three;
+- one to three animal specialists, including feed-only specialists;
+- four feeder units, which were inert with pickup-on-demand;
+- `CARE` before safe `WATER`;
+- 14 or 16 animals;
+- 14 hands;
+- strawberry caps of 36 or 42;
+- a strawberry-free outer regime.
+
+The fixed plant-count screen buys 75 tiles but leaves excess tiles bare. It establishes the economic ceiling after the routing gain.
+
+| Plant cap | Seeds | Paired delta vs 50 champion |
+|---:|---:|---:|
+| 42 | 20 | -$3,065 +/- $2,218 |
+| 48 | 20 | -$3,450 +/- $2,753 |
+| 55 | 20 | -$3,465 +/- $3,602 |
+
+Adding 14 or 16 animals to the 42-plant arm lost -$6,850 +/- $1,984 and -$7,043 +/- $3,035. Filling the spare tiles with more animals is not economic.
+
+### Final decision
+
+The selected 75-tile policy still loses to the 50-tile champion: -$12,081 +/- $2,631 on 40 fresh paired seeds. On 50 tiles the full route package is neutral at -$97 +/- $1,706. The scale improvement therefore passes the 50-tile regression gate and strongly beats old 75, but it fails the economic land gate.
+
+Keep the three selected mechanisms in the experimental Agent 2 candidate: hire batch 10, guarded tile bundles and trip radius one. Do not change root `main.py`. Do not test 100 tiles until a 75-tile policy beats the 50-tile champion and clears the mechanism gates.

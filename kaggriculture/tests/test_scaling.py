@@ -9,12 +9,20 @@ from scaling import summarize
 
 def test_summary_uses_paired_seat_delta():
     rows = [
-        collections.Counter(score=100, opponent_score=80, unit_turns=10, movement=5),
-        collections.Counter(score=90, opponent_score=100, unit_turns=10, movement=3),
+        collections.Counter(
+            score=100, opponent_score=80, calls=2, unit_turns=10, movement=5, hire_orders=1,
+        ),
+        collections.Counter(
+            score=90, opponent_score=100, calls=2, unit_turns=10, movement=3, hire_orders=1,
+        ),
     ]
     result = summarize(rows)
     assert result["mean_delta"] == 5
     assert result["movement"] == 0.4
+    assert result["daily_unit_turns"] == 120
+    assert result["daily_hires"] == 12
+    assert result["same_tile_work"] == 0
+    assert result["work_gap_distance"] == 0
 
 
 def test_summary_reports_productive_and_neglect_rates():

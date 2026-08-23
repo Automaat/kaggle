@@ -33,6 +33,7 @@ class ScalingProbe:
         self.inner = inner
         self.counts = collections.Counter()
         self.days = set()
+        self.last_work = {}
 
     def agent(self, obs):
         player = obs["player"]
@@ -44,10 +45,14 @@ class ScalingProbe:
 
         self.counts["calls"] += 1
         self.counts["unit_turns"] += len(ops)
+        self.counts["market_orders"] += len(action.get("market", []))
+        self.counts["hire_orders"] += sum(
+            order and order[0] == "HIRE" for order in action.get("market", [])
+        )
         self.counts["carried_wheat_turns"] += sum(
             inventory.get("WHEAT", 0) > 0 for inventory in inventories
         )
-        for op in ops:
+        for unit_index, (position, op) in enumerate(zip(units, ops)):
             name = op[0]
             if name in MOVES:
                 self.counts["movement"] += 1
@@ -57,6 +62,14 @@ class ScalingProbe:
                 self.counts["overhead"] += 1
             else:
                 self.counts["work"] += 1
+                key = player, obs["day"], unit_index
+                previous = self.last_work.get(key)
+                if previous is not None:
+                    distance = abs(previous[0] - position[0]) + abs(previous[1] - position[1])
+                    self.counts["work_gaps"] += 1
+                    self.counts["work_gap_distance"] += distance
+                    self.counts["same_tile_work_gaps"] += distance == 0
+                self.last_work[key] = tuple(position)
             self.counts["op:" + name] += 1
 
         key = (player, obs["day"])
@@ -126,9 +139,13 @@ def summarize(rows):
         "seeds": len(paired),
         "mean_delta": statistics.mean(paired) if paired else 0.0,
         "margin": margin,
+        "daily_unit_turns": 24 * _rate(total, "unit_turns", "calls"),
+        "daily_hires": 24 * _rate(total, "hire_orders", "calls"),
         "occupancy": _rate(total, "productive_tile_days", "owned_tile_days"),
         "movement": _rate(total, "movement", "unit_turns"),
         "work": _rate(total, "work", "unit_turns"),
+        "same_tile_work": _rate(total, "same_tile_work_gaps", "work_gaps"),
+        "work_gap_distance": _rate(total, "work_gap_distance", "work_gaps"),
         "idle": _rate(total, "idle", "unit_turns"),
         "missed_water": _rate(total, "missed_water_days", "plant_days"),
         "missed_feed": _rate(total, "missed_feed_days", "animal_days"),
@@ -157,9 +174,13 @@ def main():
     result = summarize(rows)
     print(f"{args.agent} vs {args.opponent}, {result['seeds']} paired seeds")
     print(f"  paired delta : {result['mean_delta']:+.0f} +/- {result['margin']:.0f}")
+    print(f"  unit turns   : {result['daily_unit_turns']:.1f} per day")
+    print(f"  hires        : {result['daily_hires']:.1f} per day")
     print(f"  occupancy    : {result['occupancy']:.1%}")
     print(f"  movement     : {result['movement']:.1%}")
     print(f"  work         : {result['work']:.1%}")
+    print(f"  same tile    : {result['same_tile_work']:.1%}")
+    print(f"  work gap     : {result['work_gap_distance']:.2f} tiles")
     print(f"  idle         : {result['idle']:.1%}")
     print(f"  missed water : {result['missed_water']:.1%}")
     print(f"  missed feed  : {result['missed_feed']:.1%}")
