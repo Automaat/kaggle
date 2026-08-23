@@ -1,0 +1,85 @@
+{
+  "boundary_cases": 167,
+  "compared_fields": [
+    "after_units.inventory",
+    "after_units.boards",
+    "after_town.inventory",
+    "after_town.boards",
+    "after_decay.boards",
+    "after_refresh.boards",
+    "partial_exception_state"
+  ],
+  "coverage": {
+    "cell_kinds": {
+      "ANIMAL": 332,
+      "EMPTY": 1001,
+      "LOCKED": 166,
+      "PLANT": 2837,
+      "STRUCTURE": 166,
+      "WEED": 498
+    },
+    "crops": {
+      "CARROT": 1000,
+      "MELON": 1000,
+      "STRAWBERRY": 1000,
+      "TOMATO": 1000,
+      "WHEAT": 1000
+    },
+    "fertilizer_states": {
+      "active": 1253,
+      "inactive": 1584,
+      "not_plant": 2163
+    },
+    "land_counts": {
+      "1": 1320,
+      "2": 1280,
+      "3": 1200,
+      "4": 1200
+    },
+    "operations": {
+      "DIG": 830,
+      "FERTILIZE": 835,
+      "HARVEST": 835,
+      "PASS": 830,
+      "PLANT": 835,
+      "WATER": 835
+    },
+    "players": {
+      "0": 2510,
+      "1": 2490
+    },
+    "source_steps": {
+      "0": 1002,
+      "23": 1002,
+      "24": 1002,
+      "717": 998,
+      "718": 996
+    },
+    "unit_seats": {
+      "0": 2520,
+      "1": 2480
+    },
+    "water_states": {
+      "dry": 1335,
+      "not_plant": 2163,
+      "watered": 1502
+    }
+  },
+  "elapsed_seconds": 32.569030083017424,
+  "environment_version": "1.32.7",
+  "first_failure": null,
+  "first_mismatch": null,
+  "fixtures": 5167,
+  "generator_schema": "crop-v1",
+  "input_sha256": "c071be500b8ccd8897a7c3d53312505779fd7f0b1aec777643cf80f11348e23e",
+  "inventory_model_sha256": "8398e249db8310389544c18003c50815313a6977f6433b30c014d5c1dcc4d9bf",
+  "matched_expected_exceptions": 3,
+  "mismatches": 0,
+  "model_sha256": "d048d1a5e0ec5f7e6470ce3bce85b727f0bd7c45b4c32ce937613844e4bffc11",
+  "processed_fixtures": 5167,
+  "random_cases": 5000,
+  "schema": 1,
+  "seed": 3970000,
+  "simulator_sha256": "bc8a54879ef02c7ea64b8b333d6a976f0ea65c4949149d01f463f23bccee653e",
+  "unexpected_failures": 0
+}

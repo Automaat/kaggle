@@ -3083,3 +3083,60 @@ executable simulator.
 Decision: accept A1b. Start A1c from this commit. A1c adds exact crop creation,
 growth, watering, fertilization, harvest, decay and season boundaries through
 the shared per-unit dispatcher.
+
+## Round 39.5: exact crop ledger A1c
+
+Status: accepted offline model. It makes no score claim and changes no live
+agent action.
+
+Plan commit: `76eedad`. Implementation commit: `2637a20`.
+
+The model composes A1b with a 10x10 crop board for each player. It covers
+planting, watering, crop harvest, fertilization, crop and weed digging, plant
+decay, daily growth, recurring production and land unlocks. It preserves the
+simulator order: player units, market, town demand, decay and daily refresh.
+Animal actions and structure cells remain delegated to A1d.
+
+Planting is atomic for each player. Existing seed inventory is checked before
+the first unit acts. A seed bought in the current market phase cannot satisfy a
+plant action from the same turn. Accepted land purchases unlock the next board
+quadrant only after unit actions.
+
+Validation command:
+
+```bash
+uv run python -m kaggriculture.tools.economics.validate_crop_ledger \
+  --random-cases 5000 --seed 3970000 \
+  --output kaggriculture/research/round39_5_crop_ledger_validation.json
+```
+
+| Gate | Result |
+|:---|---:|
+| Boundary cases | 167 |
+| Stratified cases | 5,000 |
+| Total compared phases | 5,167 |
+| Matched expected exceptions | 3 |
+| Field mismatches | 0 |
+| Unexpected failures | 0 |
+| Elapsed time | 32.569 s |
+| Input SHA-256 | `c071be500b8ccd8897a7c3d53312505779fd7f0b1aec777643cf80f11348e23e` |
+| Model SHA-256 | `d048d1a5e0ec5f7e6470ce3bce85b727f0bd7c45b4c32ce937613844e4bffc11` |
+| A1b SHA-256 | `8398e249db8310389544c18003c50815313a6977f6433b30c014d5c1dcc4d9bf` |
+| Simulator SHA-256 | `bc8a54879ef02c7ea64b8b333d6a976f0ea65c4949149d01f463f23bccee653e` |
+
+The stratified set covers every crop, operation, player, first two unit seats,
+source boundary, cell kind, water state, fertilizer state and land count. Two
+100-case smoke runs produced the same result after elapsed time was removed.
+All 264 tests and Ruff for changed files pass.
+
+Adversarial review found that an exception from a later hand discarded a valid
+earlier farmer mutation. The final model attaches the exact partial state to
+the original exception, and the validator checks this sequence. It also treats
+a negative latest planting day as no feasible planting day.
+
+The terminal helper currently proves only biological maturity. A2 must add the
+remaining route, harvest, shed return and sale deadlines before the MILP can
+permit a terminal planting decision.
+
+Decision: accept A1c. Start A1d from this commit. A1d adds exact animal
+placement, feeding, care, production, movement and end-of-day transitions.
