@@ -32,6 +32,7 @@ from kaggriculture.tools.economics.whole_farm_backend import (
     _crop_input,
     _crop_profile,
     _crop_targets,
+    _build_handoff,
     _market_order_intents,
     _planning_snapshot,
     verify_shared_ledger,
@@ -640,6 +641,45 @@ def test_crop_target_can_precede_future_animal_placement():
     )
     with pytest.raises(WholeFarmSolveError, match="lacks crop target"):
         _crop_targets(snapshot, solved, (animal_target,))
+
+
+def test_current_crop_target_respects_uncommitted_future_animal_slot():
+    snapshot = replace(
+        _rolling_snapshot(0),
+        cells=(
+            SpaceCell((4, 4), 0, "EMPTY"),
+            SpaceCell((0, 0), 0, "EMPTY"),
+        ),
+    )
+    crop_decision = SimpleNamespace(
+        crop="STRAWBERRY",
+        count=1,
+        existing_position=None,
+        plant_day=0,
+        release_day=None,
+    )
+    assignment = SimpleNamespace(
+        intent="animal-0",
+        animal="SHEEP",
+        position=(4, 4),
+        mode="BUILD",
+        placement_day=2,
+    )
+    solved = SimpleNamespace(
+        crop_result=SimpleNamespace(
+            decisions=(crop_decision,),
+            purchases=(),
+            sales=(),
+        ),
+        animal_result=SimpleNamespace(animals=(), purchases=(), sales=()),
+        space_result=SimpleNamespace(assignments=(assignment,)),
+        selected_investment=SimpleNamespace(investments=(), projections=()),
+    )
+    economy = SimpleNamespace(fingerprint="a" * 64)
+    space = SimpleNamespace(fingerprint="b" * 64)
+    handoff = _build_handoff(0, snapshot, solved, economy, space)
+    assert handoff.space_targets == ()
+    assert tuple((target.y, target.x) for target in handoff.crop_targets) == ((0, 0),)
 
 
 def test_second_arm_plans_daily_crop_service_route():

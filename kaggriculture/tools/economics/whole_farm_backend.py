@@ -624,7 +624,11 @@ def _strategic_tail_values(snapshot, forecast, config, cutoff_day):
         exact_days = config.exact_horizon_days or 0
         yield_delay = max(0, spec.first_yield_day - exact_days)
         production_days = max(0, tail_days - yield_delay)
-        productions = 0 if production_days == 0 else 1 + production_days // spec.interval
+        productions = (
+            0
+            if production_days == 0
+            else 1 + (production_days - 1) // spec.interval
+        )
         product_value = inventory_values[PRODUCTS.index(spec.product)]
         future_product = productions * product_value
         future_fertilizer = tail_days * fertilizer_value * 0.15
@@ -1268,7 +1272,7 @@ def _market_order_intents(snapshot, solved):
     )
 
 
-def _space_targets(snapshot, solved):
+def _space_targets(snapshot, solved, commit_day=None):
     return tuple(
         SpaceTarget(
             assignment.intent,
@@ -1279,7 +1283,7 @@ def _space_targets(snapshot, solved):
             assignment.placement_day,
         )
         for assignment in solved.space_result.assignments
-        if assignment.placement_day == snapshot.current_day
+        if commit_day is None or assignment.placement_day == commit_day
     )
 
 
@@ -1431,7 +1435,12 @@ def _build_handoff(
     route_arm="frozen-1.14",
     route_plan=None,
 ):
-    space_targets = _space_targets(snapshot, solved)
+    planned_space_targets = _space_targets(snapshot, solved)
+    space_targets = tuple(
+        target
+        for target in planned_space_targets
+        if target.placement_day == snapshot.current_day
+    )
     return ExecutionHandoff(
         label,
         epoch,
@@ -1441,7 +1450,7 @@ def _build_handoff(
         _crop_targets(
             snapshot,
             solved,
-            space_targets,
+            planned_space_targets,
             snapshot.current_day,
         ),
         _animal_execution_intents(snapshot, solved),

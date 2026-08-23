@@ -358,8 +358,12 @@ def _ongoing_schedule_options(
     covered_until,
     existing_index,
 ):
-    all_productions = scheduled_production_days(crop, plant_day, data.last_day)
-    production_days = tuple(day for day in all_productions if day > data.current_day)
+    all_productions = scheduled_production_days(crop, plant_day, LAST_DAY)
+    production_days = tuple(
+        day
+        for day in all_productions
+        if data.current_day < day <= data.last_day
+    )
     candidates = tuple(
         ([data.current_day] if initial_yield > 0 else [])
         + [day for day in production_days if _terminal_feasible(data, day)]
@@ -594,6 +598,15 @@ def _active_crop_terminal_value(data, option):
     plant_day = option.plant_day
     if option.existing_index is not None:
         plant_day = data.existing_plants[option.existing_index].planted_day
+    if CROP_SPECS[option.crop].ongoing:
+        productions = scheduled_production_days(option.crop, plant_day, LAST_DAY)
+        if (
+            productions
+            and max(productions) <= data.last_day
+            and option.harvests
+            and option.harvests[-1][0] == max(productions)
+        ):
+            return 0.0
     progress_days = max(0, data.last_day - plant_day + 1)
     maturity_days = max(1, CROP_SPECS[option.crop].first_yield_day)
     progress = min(1.0, progress_days / maturity_days)

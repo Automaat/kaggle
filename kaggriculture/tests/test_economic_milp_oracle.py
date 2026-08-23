@@ -416,6 +416,44 @@ def test_three_day_tail_starts_strawberry_without_procrastination(day):
     assert oracle.verify_result(data, result) == ()
 
 
+def test_exact_horizon_does_not_release_ongoing_crop_with_future_yields():
+    data = _input(terminal_day=13)
+    option = next(
+        value
+        for value in oracle.generate_crop_options(data)
+        if value.crop == "STRAWBERRY"
+        and value.plant_day == 0
+        and value.harvests
+        and value.harvests[-1][0] == 12
+    )
+    assert option.release_day is None
+
+
+def test_tail_does_not_value_exhausted_ongoing_crop():
+    terminal_values = oracle.CropTerminalValues(
+        (0, 0, 500, 0, 0),
+        (0,) * len(market.CROPS),
+        (0,) * len(market.CROPS),
+        0,
+    )
+    plant = oracle.ExistingPlant((0, 0), "TOMATO", 0, 0, False, 0, -1)
+    data = _input(
+        day=7,
+        existing=(plant,),
+        terminal_day=11,
+        terminal_values=terminal_values,
+    )
+    option = next(
+        value
+        for value in oracle.generate_crop_options(data)
+        if value.existing_index == 0
+        and value.harvests
+        and value.harvests[-1][0] == 11
+    )
+    assert option.release_day is None
+    assert oracle._active_crop_terminal_value(data, option) == 0
+
+
 def test_terminal_inventory_value_is_separate_from_boundary_cash():
     terminal_values = oracle.CropTerminalValues(
         (0,) * len(market.CROPS),
