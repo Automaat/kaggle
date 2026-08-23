@@ -1,5 +1,6 @@
 import json
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
 try:
@@ -22,6 +23,14 @@ from .whole_farm_backend import (
 
 ROOT = Path(__file__).resolve().parents[2]
 AGENT2_TEMPLATE = ROOT / "agents_2.0.x/round39_8_milp_rollout"
+
+
+@dataclass(slots=True)
+class _MarketOrderProgress:
+    order: tuple
+    planned_quantity: int
+    acknowledged_quantity: int = 0
+    inflight_quantity: int = 0
 
 
 def _world_identity(world):
@@ -136,9 +145,16 @@ class _Agent2Seam:
     def __init__(self, source, crop_strategy):
         self._source = source
         self._crop_strategy = crop_strategy
+        self._market_progress = {}
+        self._inflight_seed_orders = ()
+        self._last_seed_state = None
+        self._last_plants = None
 
     def reset(self):
-        pass
+        self._market_progress.clear()
+        self._inflight_seed_orders = ()
+        self._last_seed_state = None
+        self._last_plants = None
 
     def prepare(self, world):
         handoff = self._source(world)
@@ -152,12 +168,112 @@ class _Agent2Seam:
 
     def plan(self, world, frozen_orders):
         handoff = self._source(world)
-        planned = tuple(
-            intent.order
-            for intent in handoff.market_orders
-            if intent.source_step == world.step
+        self._acknowledge_seed_orders(world)
+        candidates = []
+        for intent in handoff.market_orders:
+            progress = self._market_progress.get(intent.identifier)
+            if progress is None:
+                if intent.source_step != world.step:
+                    continue
+                progress = _MarketOrderProgress(
+                    intent.order,
+                    self._order_quantity(intent.order),
+                )
+                self._market_progress[intent.identifier] = progress
+            else:
+                self._validate_stable_order(intent.order, progress.order)
+                progress.planned_quantity = min(
+                    progress.planned_quantity,
+                    progress.acknowledged_quantity
+                    + progress.inflight_quantity
+                    + self._order_quantity(intent.order),
+                )
+            remaining = (
+                progress.planned_quantity
+                - progress.acknowledged_quantity
+                - progress.inflight_quantity
+            )
+            if remaining <= 0 or intent.source_step > world.step:
+                continue
+            candidates.append((intent.identifier, progress, remaining))
+        selected = candidates[:10]
+        inflight = []
+        result = []
+        for identifier, progress, remaining in selected:
+            order = self._remaining_order(progress.order, remaining)
+            result.append(order)
+            if order[0] == "BUY_SEED":
+                progress.inflight_quantity += remaining
+                inflight.append(identifier)
+            else:
+                progress.acknowledged_quantity += remaining
+        self._inflight_seed_orders = tuple(inflight)
+        return tuple(result)
+
+    @staticmethod
+    def _order_quantity(order):
+        if len(order) == 3:
+            return order[2]
+        return 1
+
+    @staticmethod
+    def _remaining_order(order, remaining):
+        if len(order) == 3:
+            return (*order[:2], remaining)
+        return order
+
+    @staticmethod
+    def _validate_stable_order(current, registered):
+        current_key = current[:2] if len(current) == 3 else current
+        registered_key = registered[:2] if len(registered) == 3 else registered
+        if current_key != registered_key:
+            raise WholeFarmSolveError("market order identity changed")
+
+    @staticmethod
+    def _market_state(world):
+        data = getattr(world, "data", None)
+        if type(data) is not str:
+            return None
+        values = json.loads(data)
+        seeds = values["private"]["seeds"]
+        tiles = values["farms"][world.player]["tiles"]
+        plants = frozenset(
+            (y, x, tile["crop"], tile["planted_day"])
+            for y, row in enumerate(tiles)
+            for x, tile in enumerate(row)
+            if isinstance(tile, Mapping) and tile.get("kind") == "PLANT"
         )
-        return planned[:10]
+        return seeds, plants
+
+    def _acknowledge_seed_orders(self, world):
+        state = self._market_state(world)
+        if state is None:
+            return
+        seeds, plants = state
+        if self._last_seed_state is not None and self._last_plants is not None:
+            new_plants = plants - self._last_plants
+            accepted_by_crop = {
+                crop: max(
+                    0,
+                    seeds.get(crop, 0)
+                    - self._last_seed_state.get(crop, 0)
+                    + sum(plant[2] == crop for plant in new_plants),
+                )
+                for crop in seeds
+            }
+            for identifier in self._inflight_seed_orders:
+                progress = self._market_progress[identifier]
+                crop = progress.order[1]
+                accepted = min(
+                    progress.inflight_quantity,
+                    accepted_by_crop.get(crop, 0),
+                )
+                progress.acknowledged_quantity += accepted
+                progress.inflight_quantity = 0
+                accepted_by_crop[crop] -= accepted
+        self._last_seed_state = dict(seeds)
+        self._last_plants = plants
+        self._inflight_seed_orders = ()
 
 
 class WholeFarmControlProvider:
