@@ -292,31 +292,109 @@ def test_release_champion_finishes_live_episode():
     assert rewards[1] > 3000
 
 
-def test_archive_entrypoint_loads_without_path_help(tmp_path):
-    """Given an archive, When the harness loads main.py by path, Then it imports.
+def test_flattened_agent_matches_the_package(tmp_path):
+    """Given a package agent, When flattened, Then it decides identically.
 
-    Kaggle executes the entrypoint without putting its directory on `sys.path`,
-    while `tools/artifact.py` inserts it. That gap passed every local gate and
-    failed validation on the ladder.
+    The single file exists because the ladder loads a submission by path and
+    guarantees nothing about the working directory. It is only useful if it is
+    the same agent.
     """
+    import copy
     import subprocess
 
-    archive = tmp_path / "agent.tar.gz"
+    from kaggle_environments import make
+
+    flattened = tmp_path / "flat.py"
     subprocess.run(
-        [sys.executable, str(ROOT / "tools" / "package_agent.py"),
-         str(ROOT / "agents_1.0.x" / "v1_15_0_staged_field"), str(archive)],
+        [sys.executable, str(ROOT / "tools" / "flatten_agent.py"),
+         str(ROOT / "agents_1.0.x" / "v1_15_0_staged_field"), str(flattened)],
         check=True, capture_output=True,
     )
-    root = tmp_path / "unpacked"
-    root.mkdir()
-    subprocess.run(["tar", "xzf", str(archive), "-C", str(root)], check=True)
+    flat = load_artifact(flattened)
+    package = load_artifact(ROOT / "agents_1.0.x" / "v1_15_0_staged_field")
+    mismatches = []
+
+    def shadow(obs):
+        action = flat(copy.deepcopy(obs))
+        if action != package(copy.deepcopy(obs)):
+            mismatches.append(obs.get("step"))
+        return action
+
+    environment = make("kaggriculture", configuration={"episodeSteps": 240, "seed": 3700000})
+    environment.run([shadow, str(ROOT / "agents_1.0.x" / "v1_14_0_central_herd.py")])
+    assert not mismatches
+
+
+def test_flattened_agent_loads_without_its_directory(tmp_path):
+    """Given the single file alone, When executed from /, Then it still loads."""
+    import subprocess
+
+    flattened = tmp_path / "flat.py"
+    subprocess.run(
+        [sys.executable, str(ROOT / "tools" / "flatten_agent.py"),
+         str(ROOT / "agents_1.0.x" / "v1_15_0_staged_field"), str(flattened)],
+        check=True, capture_output=True,
+    )
+    alone = tmp_path / "elsewhere" / "main.py"
+    alone.parent.mkdir()
+    alone.write_bytes(flattened.read_bytes())
     probe = (
         "import importlib.util, sys;"
-        f"spec = importlib.util.spec_from_file_location('probe', {str(root / 'main.py')!r});"
+        f"spec = importlib.util.spec_from_file_location('probe', {str(alone)!r});"
         "module = importlib.util.module_from_spec(spec);"
         "sys.modules['probe'] = module;"
         "spec.loader.exec_module(module);"
         "assert callable(module.agent)"
     )
     result = subprocess.run([sys.executable, "-c", probe], cwd="/", capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+
+
+def test_submission_execs_the_way_the_ladder_does(tmp_path):
+    """Given a submission file, When exec'd with bare globals, Then it loads.
+
+    `kaggle_environments.agent.get_last_callable` compiles the file and execs
+    it into an empty dict, so `__file__` does not exist, and it then takes the
+    last callable defined. Three 1.15.0 submissions failed validation on that
+    contract while every local gate passed, because our own loader executes a
+    module properly instead.
+    """
+    import subprocess
+
+    flattened = tmp_path / "flat.py"
+    subprocess.run(
+        [sys.executable, str(ROOT / "tools" / "flatten_agent.py"),
+         str(ROOT / "agents_1.0.x" / "v1_15_0_staged_field"), str(flattened)],
+        check=True, capture_output=True,
+    )
+    namespace = {}
+    exec(compile(flattened.read_text(), "/kaggle_simulations/agent/main.py", "exec"), namespace)
+    last_callable = [value for value in namespace.values() if callable(value)][-1]
+    assert last_callable.__name__ == "agent"
+
+
+def test_submission_parses_on_the_ladder_interpreter(tmp_path):
+    """Given a submission file, When parsed by Python 3.11, Then it is valid.
+
+    The ladder runs 3.11 and this repository runs 3.12, so syntax added in 3.12
+    passes every local gate and fails validation. A `type` alias did exactly
+    that.
+    """
+    import shutil
+    import subprocess
+
+    interpreter = shutil.which("python3.11")
+    if interpreter is None:
+        pytest.skip("python3.11 not available")
+    flattened = tmp_path / "flat.py"
+    subprocess.run(
+        [sys.executable, str(ROOT / "tools" / "flatten_agent.py"),
+         str(ROOT / "agents_1.0.x" / "v1_15_0_staged_field"), str(flattened)],
+        check=True, capture_output=True,
+    )
+    result = subprocess.run(
+        [interpreter, "-c",
+         f"import ast; ast.parse(open({str(flattened)!r}).read())"],
+        capture_output=True, text=True,
+    )
     assert result.returncode == 0, result.stderr

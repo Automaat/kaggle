@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 
-type LegacyTask = tuple[int, int, int, tuple[str, str | None]]
+LegacyTask = tuple[int, int, int, tuple[str, str | None]]
 
 
 @dataclass(frozen=True, slots=True)
