@@ -303,3 +303,94 @@ def test_rejects_fixed_slots_outside_allowed_animals():
 def test_rejects_negative_pending_care():
     with pytest.raises(ValueError, match="nonnegative"):
         _existing(pending_care_bonus=-1)
+
+
+def test_default_terminal_boundary_preserves_legacy_result_contract():
+    data = _input(source_step=576, terminal_step=647)
+    result = _solve(data)
+    assert data.last_day == 26
+    assert data.horizon_days == 3
+    assert result.terminal_value is None
+    assert result.forecast_terminal_cash is None
+
+
+@pytest.mark.parametrize("source_step", (576, 600))
+def test_three_day_terminal_value_starts_animal_without_procrastination(source_step):
+    data = _input(
+        source_step=source_step,
+        terminal_step=source_step + 71,
+        max_new_animals=1,
+        allowed_animals=("GOOSE",),
+        fixed_slot_animals=("GOOSE",),
+    )
+    baseline = _solve(data)
+    terminal_values = oracle.AnimalTerminalValues(
+        active_animals=(500.0, 0.0, 0.0),
+        goods=(100.0, 10.0, 0.0, 0.0, 0.0),
+        shed_animals=(250.0, 0.0, 0.0),
+        empty_structures=(20.0, 0.0),
+    )
+    valued_data = replace(data, terminal_values=terminal_values)
+    valued = oracle.solve_animal_oracle(valued_data, 20, 0)
+    assert valued.success, valued.message
+    assert oracle.verify_result(valued_data, valued) == ()
+    assert baseline.animals == ()
+    assert tuple(value.animal for value in valued.animals) == ("GOOSE",)
+    assert valued.animals[0].placement_day == source_step // 24
+    assert valued.terminal_cash < baseline.terminal_cash
+    assert valued.forecast_terminal_cash > baseline.terminal_cash
+
+
+def test_terminal_value_preserves_wheat_feed_stock():
+    data = _input(
+        source_step=576,
+        terminal_step=647,
+        goods=(3, 0, 0, 0, 0),
+    )
+    terminal_values = oracle.AnimalTerminalValues(
+        active_animals=(0.0, 0.0, 0.0),
+        goods=(100.0, 0.0, 0.0, 0.0, 0.0),
+        shed_animals=(0.0, 0.0, 0.0),
+        empty_structures=(0.0, 0.0),
+    )
+    baseline = _solve(data)
+    valued = _solve(replace(data, terminal_values=terminal_values))
+    assert baseline.terminal_goods[0] == 0
+    assert valued.terminal_goods[0] == 3
+
+
+def test_terminal_value_reports_all_animal_boundary_assets():
+    animal = _existing("GOOSE", placed_day=20, yield_units=4)
+    data = _input(
+        source_step=718,
+        terminal_step=718,
+        goods=(3, 0, 0, 0, 0),
+        shed_animals=(1, 0, 0),
+        existing_animals=(animal,),
+        empty_structures=(1, 0),
+    )
+    terminal_values = oracle.AnimalTerminalValues(
+        active_animals=(100.0, 0.0, 0.0),
+        goods=(5.0, 2.0, 0.0, 0.0, 0.0),
+        shed_animals=(50.0, 0.0, 0.0),
+        empty_structures=(20.0, 0.0),
+    )
+    data = replace(
+        data,
+        market_order_slots=(0,),
+        terminal_values=terminal_values,
+    )
+    result = _solve(data)
+    assert result.terminal_cash == 3000.0
+    assert result.terminal_value == 193.0
+    assert result.forecast_terminal_cash == 3193.0
+
+
+def test_rejects_negative_terminal_value():
+    with pytest.raises(ValueError, match="nonnegative"):
+        oracle.AnimalTerminalValues(
+            active_animals=(-1.0, 0.0, 0.0),
+            goods=(0.0, 0.0, 0.0, 0.0, 0.0),
+            shed_animals=(0.0, 0.0, 0.0),
+            empty_structures=(0.0, 0.0),
+        )

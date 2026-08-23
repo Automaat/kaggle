@@ -70,6 +70,25 @@ class ExistingAnimal:
 
 
 @dataclass(frozen=True, slots=True)
+class AnimalTerminalValues:
+    active_animals: tuple[float, ...]
+    goods: tuple[float, ...]
+    shed_animals: tuple[float, ...]
+    empty_structures: tuple[float, ...]
+
+    def __post_init__(self):
+        for name, values, length in (
+            ("active animal terminal values", self.active_animals, len(ANIMALS)),
+            ("goods terminal values", self.goods, len(GOODS)),
+            ("shed animal terminal values", self.shed_animals, len(ANIMALS)),
+            ("structure terminal values", self.empty_structures, len(STRUCTURES)),
+        ):
+            _validate_float_vector(values, length, name)
+            if any(value < 0 for value in values):
+                raise ValueError(f"{name} must be nonnegative")
+
+
+@dataclass(frozen=True, slots=True)
 class AnimalOracleInput:
     source_step: int
     terminal_step: int
@@ -96,6 +115,7 @@ class AnimalOracleInput:
     fixed_slot_animals: tuple[str, ...]
     scenario: str
     min_new_animals: int = 0
+    terminal_values: AnimalTerminalValues | None = None
 
     def __post_init__(self):
         integer_scalars = (
@@ -144,6 +164,11 @@ class AnimalOracleInput:
             raise ValueError("cash reserve must fit current cash")
         if self.scenario not in SCENARIOS:
             raise ValueError("unknown market scenario")
+        if self.terminal_values is not None and not isinstance(
+            self.terminal_values,
+            AnimalTerminalValues,
+        ):
+            raise TypeError("terminal values must be AnimalTerminalValues")
         _validate_int_vector(self.goods, len(GOODS), "goods")
         _validate_int_vector(self.shed_animals, len(ANIMALS), "shed animals")
         _validate_int_vector(self.empty_structures, len(STRUCTURES), "structures")
@@ -290,6 +315,8 @@ class AnimalOracleResult:
     terminal_shed_animals: tuple[int, ...] | None
     scenario: str
     input_sha256: str
+    terminal_value: float | None = None
+    forecast_terminal_cash: float | None = None
 
 
 def _validate_int_vector(values, length, name):
@@ -320,8 +347,11 @@ def _typed(value):
 
 
 def input_sha256(data):
+    payload = _typed(data)
+    if data.terminal_values is None:
+        payload.pop("terminal_values")
     encoded = json.dumps(
-        _typed(data),
+        payload,
         sort_keys=True,
         separators=(",", ":"),
     ).encode()
@@ -482,6 +512,7 @@ def _build_model(data):
     builder = _Builder()
     days = tuple(range(data.current_day, data.last_day + 1))
     entities = _entities(data)
+    terminal_values = data.terminal_values
     max_quantity = max(
         1,
         sum(data.goods)
@@ -561,6 +592,12 @@ def _build_model(data):
         for day in days:
             active[identifier, day] = builder.variable(
                 ("active", identifier, day),
+                objective=(
+                    -terminal_values.active_animals[ANIMALS.index(animal)]
+                    / data.horizon_days
+                    if terminal_values is not None
+                    else 0.0
+                ),
                 upper=1,
             )
             due[identifier, day] = builder.variable(
@@ -613,6 +650,13 @@ def _build_model(data):
             )
             held_end[identifier, day] = builder.variable(
                 ("held_end", identifier, day),
+                objective=(
+                    -terminal_values.goods[
+                        GOODS.index(ANIMAL_SPECS[animal].product)
+                    ]
+                    if terminal_values is not None and day == data.last_day
+                    else 0.0
+                ),
                 upper=ANIMAL_SPECS[animal].max_held,
             )
             harvest_on[identifier, day] = builder.variable(
@@ -713,6 +757,11 @@ def _build_model(data):
             )
             animal_shed[animal, day] = builder.variable(
                 ("animal_shed", animal, day),
+                objective=(
+                    -terminal_values.shed_animals[ANIMALS.index(animal)]
+                    if terminal_values is not None and day == data.last_day
+                    else 0.0
+                ),
                 upper=sum(data.shed_animals) + data.max_new_animals,
             )
     for structure in STRUCTURES:
@@ -723,6 +772,11 @@ def _build_model(data):
             )
             structure_balance[structure, day] = builder.variable(
                 ("structure_balance", structure, day),
+                objective=(
+                    -terminal_values.empty_structures[STRUCTURES.index(structure)]
+                    if terminal_values is not None and day == data.last_day
+                    else 0.0
+                ),
                 upper=sum(data.empty_structures) + data.max_new_animals,
             )
     for day in days:
@@ -741,6 +795,11 @@ def _build_model(data):
         for item in GOODS:
             goods_balance[item, day] = builder.variable(
                 ("goods_balance", item, day),
+                objective=(
+                    -terminal_values.goods[GOODS.index(item)]
+                    if terminal_values is not None and day == data.last_day
+                    else 0.0
+                ),
                 upper=max_quantity,
             )
             sale_quantity[item, day] = builder.variable(
@@ -1533,6 +1592,36 @@ def _integer(value):
     return int(round(float(value)))
 
 
+def _terminal_value(data, services, balance):
+    values = data.terminal_values
+    if values is None:
+        return None
+    total = 0.0
+    for service in services:
+        if not service.active:
+            continue
+        animal_index = ANIMALS.index(service.animal)
+        total += values.active_animals[animal_index] / data.horizon_days
+        if service.day == data.last_day:
+            product_index = GOODS.index(ANIMAL_SPECS[service.animal].product)
+            total += service.held_end * values.goods[product_index]
+    total += sum(
+        quantity * value for quantity, value in zip(balance.goods, values.goods)
+    )
+    total += sum(
+        quantity * value
+        for quantity, value in zip(balance.shed_animals, values.shed_animals)
+    )
+    total += sum(
+        quantity * value
+        for quantity, value in zip(
+            balance.empty_structures,
+            values.empty_structures,
+        )
+    )
+    return total
+
+
 def solve_animal_oracle(
     data,
     time_limit=120.0,
@@ -1703,6 +1792,10 @@ def solve_animal_oracle(
             )
         )
     terminal_cash = balances[-1].cash
+    terminal_value = _terminal_value(data, services, balances[-1])
+    forecast_terminal_cash = (
+        terminal_cash + terminal_value if terminal_value is not None else None
+    )
     return AnimalOracleResult(
         True,
         int(solved.status),
@@ -1723,6 +1816,8 @@ def solve_animal_oracle(
         balances[-1].shed_animals,
         data.scenario,
         input_sha256(data),
+        terminal_value,
+        forecast_terminal_cash,
     )
 
 
@@ -2021,4 +2116,22 @@ def verify_result(data, result):
         errors.append("terminal goods mismatch")
     if result.terminal_shed_animals != tuple(animal_shed):
         errors.append("terminal animal inventory mismatch")
+    terminal_value = _terminal_value(data, result.services, result.balances[-1])
+    if terminal_value is None:
+        if result.terminal_value is not None:
+            errors.append("unexpected terminal value")
+        if result.forecast_terminal_cash is not None:
+            errors.append("unexpected forecast terminal cash")
+    else:
+        if result.terminal_value is None or not math.isclose(
+            result.terminal_value,
+            terminal_value,
+        ):
+            errors.append("terminal value mismatch")
+        forecast_terminal_cash = result.terminal_cash + terminal_value
+        if result.forecast_terminal_cash is None or not math.isclose(
+            result.forecast_terminal_cash,
+            forecast_terminal_cash,
+        ):
+            errors.append("forecast terminal cash mismatch")
     return tuple(errors)

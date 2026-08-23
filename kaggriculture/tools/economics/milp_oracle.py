@@ -55,6 +55,22 @@ class ExistingPlant:
 
 
 @dataclass(frozen=True, slots=True)
+class CropTerminalValues:
+    active_crops: tuple[float, ...]
+    seeds: tuple[float, ...]
+    goods: tuple[float, ...]
+    fertilizer: float
+
+    def __post_init__(self):
+        _validate_float_vector(self.active_crops, len(CROPS), "active crop values")
+        _validate_float_vector(self.seeds, len(CROPS), "seed values")
+        _validate_float_vector(self.goods, len(CROPS), "goods values")
+        values = (*self.active_crops, *self.seeds, *self.goods, self.fertilizer)
+        if any(value < 0 for value in values):
+            raise ValueError("terminal values must be nonnegative")
+
+
+@dataclass(frozen=True, slots=True)
 class OracleInput:
     source_step: int
     terminal_step: int
@@ -78,6 +94,7 @@ class OracleInput:
     terminal_return_actions: int
     sale_unit_limit: int
     scenario: str
+    terminal_values: CropTerminalValues | None = None
 
     def __post_init__(self):
         integer_scalars = (
@@ -94,7 +111,7 @@ class OracleInput:
             raise ValueError("source step must be in 0..718")
         if self.terminal_step < self.source_step or self.terminal_step > 718:
             raise ValueError("terminal step must be in source_step..718")
-        if self.first_plant_day < self.current_day or self.first_plant_day > LAST_DAY:
+        if self.first_plant_day < self.current_day or self.first_plant_day > self.last_day:
             raise ValueError("first plant day must be in the remaining horizon")
         if (
             self.terminal_return_actions < 0
@@ -115,6 +132,11 @@ class OracleInput:
             raise ValueError("cash reserve must fit current cash")
         if self.scenario not in SCENARIOS:
             raise ValueError("unknown market scenario")
+        if self.terminal_values is not None and not isinstance(
+            self.terminal_values,
+            CropTerminalValues,
+        ):
+            raise TypeError("terminal values must be CropTerminalValues")
         _validate_int_vector(self.seeds, len(CROPS), "seeds")
         _validate_int_vector(self.goods, len(CROPS), "goods")
         if type(self.existing_plants) is not tuple:
@@ -164,7 +186,11 @@ class OracleInput:
 
     @property
     def horizon_days(self):
-        return LAST_DAY - self.current_day + 1
+        return self.last_day - self.current_day + 1
+
+    @property
+    def last_day(self):
+        return self.terminal_step // 24
 
 
 @dataclass(frozen=True, slots=True)
@@ -240,6 +266,8 @@ class OracleResult:
     terminal_unsold_fertilizer: int | None
     scenario: str
     input_sha256: str
+    terminal_value: float | None
+    forecast_terminal_cash: float | None
 
 
 def _validate_int_vector(values, length, name):
@@ -269,7 +297,7 @@ def _terminal_feasible(data, harvest_day):
 def _actions(data, values):
     result = [0] * data.horizon_days
     for day, quantity in values.items():
-        if data.current_day <= day <= LAST_DAY:
+        if data.current_day <= day <= data.last_day:
             result[day - data.current_day] += quantity
     return tuple(result)
 
@@ -278,10 +306,10 @@ def _new_one_time_options(data, crop):
     spec = CROP_SPECS[crop]
     result = []
     window_start = (spec.max_yield_day + 1) // 2
-    for plant_day in range(data.first_plant_day, LAST_DAY + 1):
+    for plant_day in range(data.first_plant_day, data.last_day + 1):
         for age in range(spec.first_yield_day, spec.max_yield_day + 1):
             harvest_day = plant_day + age
-            if harvest_day > LAST_DAY or not _terminal_feasible(data, harvest_day):
+            if harvest_day > data.last_day or not _terminal_feasible(data, harvest_day):
                 continue
             yield_units = min(
                 spec.max_yield,
@@ -330,7 +358,7 @@ def _ongoing_schedule_options(
     covered_until,
     existing_index,
 ):
-    all_productions = scheduled_production_days(crop, plant_day, LAST_DAY)
+    all_productions = scheduled_production_days(crop, plant_day, data.last_day)
     production_days = tuple(day for day in all_productions if day > data.current_day)
     candidates = tuple(
         ([data.current_day] if initial_yield > 0 else [])
@@ -377,11 +405,11 @@ def _ongoing_schedule_options(
                 final_production_day + 1
                 if harvests[-1][0] == final_production_day
                 and held == 0
-                and final_production_day < LAST_DAY
+                and final_production_day < data.last_day
                 else None
             )
             active_days = (
-                tuple(range(plant_day, release_day or LAST_DAY + 1))
+                tuple(range(plant_day, release_day or data.last_day + 1))
                 if existing_index is None
                 else ()
             )
@@ -435,7 +463,7 @@ def _ongoing_schedule_options(
 
 def _new_ongoing_options(data, crop):
     result = []
-    for plant_day in range(data.first_plant_day, LAST_DAY + 1):
+    for plant_day in range(data.first_plant_day, data.last_day + 1):
         result.extend(
             _ongoing_schedule_options(
                 data,
@@ -454,7 +482,7 @@ def _existing_one_time_options(data, existing_index, plant):
     spec = CROP_SPECS[plant.crop]
     first_day = max(data.current_day, plant.planted_day + spec.first_yield_day)
     final_growth_day = plant.planted_day + spec.max_yield_day
-    last_day = min(LAST_DAY, max(data.current_day, final_growth_day + 1))
+    last_day = min(data.last_day, max(data.current_day, final_growth_day + 1))
     window_start = (spec.max_yield_day + 1) // 2
     result = []
     for harvest_day in range(first_day, last_day + 1):
@@ -508,6 +536,70 @@ def _existing_ongoing_options(data, existing_index, plant):
     )
 
 
+def _pipeline_option(data, crop, plant_day, existing_index, watered_today):
+    active_start = max(data.current_day, plant_day)
+    action_values = {
+        day: 1
+        for day in range(active_start, data.last_day + 1)
+        if not (day == data.current_day and watered_today)
+    }
+    if existing_index is None:
+        action_values[plant_day] = action_values.get(plant_day, 0) + 1
+    prefix = "new" if existing_index is None else f"existing-{existing_index}"
+    return CropOption(
+        f"{prefix}-{crop}-{plant_day}-pipeline-{data.last_day}",
+        crop,
+        plant_day if existing_index is None else None,
+        data.last_day,
+        data.last_day,
+        0,
+        tuple(range(plant_day, data.last_day + 1))
+        if existing_index is None
+        else (),
+        _actions(data, action_values),
+        (),
+        (),
+        None,
+        existing_index,
+    )
+
+
+def _pipeline_options(data):
+    if data.terminal_values is None or data.last_day >= LAST_DAY:
+        return ()
+    result = []
+    for crop in CROPS:
+        spec = CROP_SPECS[crop]
+        for plant_day in range(data.first_plant_day, data.last_day + 1):
+            if plant_day + spec.first_yield_day <= LAST_DAY:
+                result.append(
+                    _pipeline_option(data, crop, plant_day, None, False)
+                )
+    for index, plant in enumerate(data.existing_plants):
+        result.append(
+            _pipeline_option(
+                data,
+                plant.crop,
+                plant.planted_day,
+                index,
+                plant.watered_today,
+            )
+        )
+    return tuple(result)
+
+
+def _active_crop_terminal_value(data, option):
+    if data.terminal_values is None or option.release_day is not None:
+        return 0.0
+    plant_day = option.plant_day
+    if option.existing_index is not None:
+        plant_day = data.existing_plants[option.existing_index].planted_day
+    progress_days = max(0, data.last_day - plant_day + 1)
+    maturity_days = max(1, CROP_SPECS[option.crop].first_yield_day)
+    progress = min(1.0, progress_days / maturity_days)
+    return data.terminal_values.active_crops[CROPS.index(option.crop)] * progress
+
+
 def generate_crop_options(data):
     if not isinstance(data, OracleInput):
         raise TypeError("data must be an OracleInput")
@@ -522,6 +614,7 @@ def generate_crop_options(data):
             options.extend(_existing_ongoing_options(data, index, plant))
         else:
             options.extend(_existing_one_time_options(data, index, plant))
+    options.extend(_pipeline_options(data))
     return tuple(options)
 
 
@@ -589,8 +682,11 @@ def _typed(value):
 
 
 def input_sha256(data):
+    payload = _typed(data)
+    if data.terminal_values is None:
+        payload.pop("terminal_values")
     encoded = json.dumps(
-        _typed(data),
+        payload,
         sort_keys=True,
         separators=(",", ":"),
     ).encode()
@@ -652,11 +748,13 @@ def _build_model(data, options, first_day_crop_counts=None):
     for option in new_options:
         option_vars[option.identifier] = builder.variable(
             ("option", option.identifier),
+            objective=-_active_crop_terminal_value(data, option),
             upper=new_tile_limit,
         )
     for option in existing_options:
         option_vars[option.identifier] = builder.variable(
             ("existing", option.identifier),
+            objective=-_active_crop_terminal_value(data, option),
             upper=1,
         )
     seed_buy = {}
@@ -673,7 +771,12 @@ def _build_model(data, options, first_day_crop_counts=None):
     marginal_prices = _marginal_prices(data)
     for day_index in range(data.horizon_days):
         day = data.current_day + day_index
-        for crop in CROPS:
+        for crop_index, crop in enumerate(CROPS):
+            seed_terminal_value = 0.0
+            goods_terminal_value = 0.0
+            if data.terminal_values is not None and day == data.last_day:
+                seed_terminal_value = data.terminal_values.seeds[crop_index]
+                goods_terminal_value = data.terminal_values.goods[crop_index]
             seed_buy[crop, day] = builder.variable(
                 ("seed_buy", crop, day),
                 objective=CROP_SPECS[crop].seed,
@@ -685,10 +788,12 @@ def _build_model(data, options, first_day_crop_counts=None):
             )
             seed_balance[crop, day] = builder.variable(
                 ("seed_balance", crop, day),
+                objective=-seed_terminal_value,
                 upper=quantity_limit,
             )
             goods_balance[crop, day] = builder.variable(
                 ("goods_balance", crop, day),
+                objective=-goods_terminal_value,
                 upper=quantity_limit * 6,
             )
             sale_on[crop, day] = builder.variable(
@@ -713,8 +818,12 @@ def _build_model(data, options, first_day_crop_counts=None):
             upper=quantity_limit,
         )
         fertilizer_on[day] = builder.variable(("fertilizer_on", day), upper=1)
+        fertilizer_terminal_value = 0.0
+        if data.terminal_values is not None and day == data.last_day:
+            fertilizer_terminal_value = data.terminal_values.fertilizer
         fertilizer_balance[day] = builder.variable(
             ("fertilizer_balance", day),
+            objective=-fertilizer_terminal_value,
             upper=quantity_limit,
         )
     for existing_index in range(len(data.existing_plants)):
@@ -734,7 +843,7 @@ def _build_model(data, options, first_day_crop_counts=None):
             }
             builder.constraint(values, lower=count, upper=count)
     builder.constraint(
-        {wheat_buy[day]: 1 for day in range(data.current_day, LAST_DAY + 1)},
+        {wheat_buy[day]: 1 for day in range(data.current_day, data.last_day + 1)},
         upper=sum(data.wheat_demand),
     )
     for day_index in range(data.horizon_days):
@@ -974,6 +1083,8 @@ def solve_oracle(
             None,
             data.scenario,
             input_sha256(data),
+            None,
+            None,
         )
     values = solved.x
     decisions = []
@@ -1052,6 +1163,29 @@ def solve_oracle(
         )
     terminal_cash = balances[-1].cash
     incremental = terminal_cash - data.cash - sum(data.fixed_cash_flow)
+    terminal_value = None
+    if data.terminal_values is not None:
+        terminal_value = sum(
+            _integer(values[option_vars[option.identifier]])
+            * _active_crop_terminal_value(data, option)
+            for option in options
+            if option.release_day is None
+        )
+        terminal_value += sum(
+            quantity * value
+            for quantity, value in zip(
+                balances[-1].seeds,
+                data.terminal_values.seeds,
+            )
+        )
+        terminal_value += sum(
+            quantity * value
+            for quantity, value in zip(
+                balances[-1].goods,
+                data.terminal_values.goods,
+            )
+        )
+        terminal_value += balances[-1].fertilizer * data.terminal_values.fertilizer
     return OracleResult(
         True,
         int(solved.status),
@@ -1070,6 +1204,8 @@ def solve_oracle(
         balances[-1].fertilizer,
         data.scenario,
         input_sha256(data),
+        terminal_value,
+        terminal_cash + terminal_value if terminal_value is not None else None,
     )
 
 
@@ -1143,7 +1279,7 @@ def verify_result(data, result, first_day_crop_counts=None):
     wheat_buys = {}
     fertilizer_buys = {}
     for purchase in result.purchases:
-        if purchase.day < data.current_day or purchase.day > LAST_DAY:
+        if purchase.day < data.current_day or purchase.day > data.last_day:
             errors.append("purchase day outside horizon")
             continue
         if type(purchase.quantity) is not int or purchase.quantity <= 0:
@@ -1174,7 +1310,7 @@ def verify_result(data, result, first_day_crop_counts=None):
         if sale.crop not in CROPS:
             errors.append("unknown sale crop")
             continue
-        if sale.day < data.current_day or sale.day > LAST_DAY:
+        if sale.day < data.current_day or sale.day > data.last_day:
             errors.append("sale day outside horizon")
             continue
         if type(sale.quantity) is not int or not 0 < sale.quantity <= data.sale_unit_limit:
@@ -1293,4 +1429,38 @@ def verify_result(data, result, first_day_crop_counts=None):
         abs_tol=1e-7,
     ):
         errors.append("incremental profit mismatch")
+    terminal_value = None
+    if data.terminal_values is not None:
+        terminal_value = sum(
+            count * _active_crop_terminal_value(data, option)
+            for option, count in selected
+            if option.release_day is None
+        )
+        terminal_value += sum(
+            quantity * value
+            for quantity, value in zip(seed_balance, data.terminal_values.seeds)
+        )
+        terminal_value += sum(
+            quantity * value
+            for quantity, value in zip(goods_balance, data.terminal_values.goods)
+        )
+        terminal_value += fertilizer_balance * data.terminal_values.fertilizer
+    if terminal_value is None:
+        if result.terminal_value is not None:
+            errors.append("unexpected terminal value")
+        if result.forecast_terminal_cash is not None:
+            errors.append("unexpected forecast terminal cash")
+    else:
+        if result.terminal_value is None or not math.isclose(
+            result.terminal_value,
+            terminal_value,
+            abs_tol=1e-7,
+        ):
+            errors.append("terminal value mismatch")
+        if result.forecast_terminal_cash is None or not math.isclose(
+            result.forecast_terminal_cash,
+            cash + terminal_value,
+            abs_tol=1e-7,
+        ):
+            errors.append("forecast terminal cash mismatch")
     return tuple(errors)

@@ -29,11 +29,13 @@ def _input(
     slots=5,
     return_actions=0,
     sale_limit=20,
+    terminal_day=29,
+    terminal_values=None,
 ):
-    horizon = 30 - day
+    horizon = terminal_day - day + 1
     return oracle.OracleInput(
         source_step=day * 24,
-        terminal_step=718,
+        terminal_step=min(718, (terminal_day + 1) * 24 - 1),
         cash=cash,
         cash_reserve=reserve,
         seeds=seeds or (0,) * len(market.CROPS),
@@ -54,6 +56,7 @@ def _input(
         terminal_return_actions=return_actions,
         sale_unit_limit=sale_limit,
         scenario="no-future-opponent-orders-v1",
+        terminal_values=terminal_values,
     )
 
 
@@ -370,7 +373,72 @@ def test_unsold_goods_have_zero_terminal_value():
     )
     assert result.success
     assert result.terminal_cash == 0
+    assert result.terminal_value is None
+    assert result.forecast_terminal_cash is None
     assert result.terminal_unsold_goods[1] == 2
+
+
+@pytest.mark.parametrize("day", (0, 1))
+def test_three_day_tail_starts_strawberry_without_procrastination(day):
+    terminal_values = oracle.CropTerminalValues(
+        (0, 0, 0, 500, 0),
+        (0,) * len(market.CROPS),
+        (0,) * len(market.CROPS),
+        0,
+    )
+    data = _input(
+        day=day,
+        cash=0,
+        seeds=(0, 0, 0, 1, 0),
+        slots=0,
+        terminal_day=day + 2,
+        terminal_values=terminal_values,
+    )
+    result = oracle.solve_oracle(data, 10, 0)
+    assert result.success
+    assert result.decisions == (
+        oracle.CropDecision(
+            "STRAWBERRY",
+            day,
+            day + 2,
+            day + 2,
+            1,
+            0,
+            (),
+            (),
+            None,
+            None,
+        ),
+    )
+    assert result.terminal_cash == 0
+    assert result.terminal_value == 150
+    assert result.forecast_terminal_cash == 150
+    assert oracle.verify_result(data, result) == ()
+
+
+def test_terminal_inventory_value_is_separate_from_boundary_cash():
+    terminal_values = oracle.CropTerminalValues(
+        (0,) * len(market.CROPS),
+        (2, 3, 4, 5, 6),
+        (7, 8, 9, 10, 11),
+        12,
+    )
+    data = _input(
+        day=29,
+        cash=20,
+        seeds=(1, 0, 0, 0, 0),
+        goods=(0, 2, 0, 0, 0),
+        fertilizer=3,
+        tiles=0,
+        slots=0,
+        terminal_values=terminal_values,
+    )
+    result = oracle.solve_oracle(data, 10, 0)
+    assert result.success
+    assert result.terminal_cash == 20
+    assert result.terminal_value == 54
+    assert result.forecast_terminal_cash == 74
+    assert oracle.verify_result(data, result) == ()
 
 
 def test_crop_storage_capacity_blocks_excess_inventory():
