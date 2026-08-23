@@ -17,7 +17,7 @@ from routing.execution_provider import (
     observe_execution,
     view_handoff,
 )
-from routing.run_execution_provider_replay import analyze_replay
+from routing.run_execution_provider_replay import analyze_replay, build_result
 
 
 REAL_REPLAY = pathlib.Path(
@@ -482,3 +482,8 @@ def test_real_replay_covers_execution_observation_shapes():
         "DIG",
         "WATER",
     }
+    registered = build_result(REAL_REPLAY)
+    assert registered["coverage"] == result
+    assert registered["comparator"]["commit"] == "b74a3ea"
+    assert registered["game_played"] is False
+    assert len(registered["result_sha256"]) == 64

@@ -1,11 +1,16 @@
 import argparse
 import gzip
+import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
 
 from economics.rolling_coordinator import canonical_sha256
 from routing.execution_provider import convert_execution
+
+
+COMPARATOR_COMMIT = "b74a3ea"
+COMPARATOR_SHA256 = "86951703eac27253938500eac664650c1e927d1b86b26ed84be008f24739d699"
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,12 +102,58 @@ def analyze_replay(path, seat=0):
     }
 
 
+def _source_sha256(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def build_result(path, seat=0):
+    replay_path = Path(path)
+    coverage = analyze_replay(replay_path, seat)
+    result = {
+        "comparator": {
+            "commit": COMPARATOR_COMMIT,
+            "name": "frozen 1.14.0 control arm",
+            "sha256": COMPARATOR_SHA256,
+        },
+        "coverage": coverage,
+        "experiment": "39.16C",
+        "game_days": 30,
+        "game_played": False,
+        "limitations": [
+            "the replay validates observation coverage, not Agent 2.0 actions",
+            "the frozen 1.14.0 control remains a separate provider",
+            "same-route production cannot satisfy later requirements",
+            "large task sets use the accepted deterministic fallback",
+            "no full-game score comparison was produced",
+        ],
+        "replay_sha256": _source_sha256(replay_path),
+        "schema": "agent2-execution-provider-replay-v1",
+        "source_sha256": {
+            "provider": _source_sha256(
+                Path(__file__).with_name("execution_provider.py")
+            ),
+            "runner": _source_sha256(Path(__file__)),
+        },
+        "status": "accepted-offline-seam",
+    }
+    result["result_sha256"] = canonical_sha256(
+        "round39-16c-result",
+        result,
+    )
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("replay")
     parser.add_argument("--seat", type=int, default=0)
+    parser.add_argument("--output", type=Path)
     arguments = parser.parse_args()
-    print(json.dumps(analyze_replay(arguments.replay, arguments.seat), sort_keys=True))
+    result = build_result(arguments.replay, arguments.seat)
+    text = json.dumps(result, indent=2, sort_keys=True) + "\n"
+    if arguments.output is not None:
+        arguments.output.write_text(text)
+    print(text, end="")
 
 
 if __name__ == "__main__":
