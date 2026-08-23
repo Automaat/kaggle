@@ -32,6 +32,31 @@ def _source_hash(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def _result_summary(result):
+    return {
+        "source_step": result.source_step,
+        "terminal_step": result.terminal_step,
+        "open_shop_signature": result.open_shop_signature,
+        "next_daily_replan_step": result.next_daily_replan_step,
+        "next_shop_replan_step": result.next_shop_replan_step,
+        "action_end_step": result.action_end_step,
+        "strategy_end_step": result.strategy_end_step,
+        "investment_end_step": result.investment_end_step,
+        "scenarios": tuple(
+            {
+                "name": scenario.name,
+                "probability": scenario.probability,
+                "next_shop": scenario.next_shop,
+                "total_drain": scenario.total_drain,
+            }
+            for scenario in result.scenarios
+        ),
+        "expected_drain_by_day": result.expected_drain_by_day,
+        "expected_total_drain": result.expected_total_drain,
+        "input_hash": result.input_hash,
+    }
+
+
 def run():
     cases = []
     for name, data in registered_cases():
@@ -40,7 +65,7 @@ def run():
             {
                 "name": name,
                 "input": asdict(data),
-                "result": asdict(result),
+                "result": _result_summary(result),
                 "verification_errors": verify_forecast(data, result),
             }
         )

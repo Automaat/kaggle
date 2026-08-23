@@ -12,6 +12,7 @@ TOOLS = pathlib.Path(__file__).resolve().parent.parent / "tools"
 sys.path.insert(0, str(TOOLS))
 forecast = importlib.import_module("economics.shop_forecast")
 market = importlib.import_module("economics.market_ledger")
+runner = importlib.import_module("economics.run_shop_forecast")
 
 
 def _data(source_step=0, shops=(), terminal_step=718, **values):
@@ -231,3 +232,12 @@ def test_verifier_rejects_missing_next_shop_branches():
         "scenario probabilities are not uniform",
         "scenario names mismatch",
     )
+
+
+def test_registered_result_omits_hourly_payload():
+    payload = runner.run()
+    assert all(not case["verification_errors"] for case in payload["cases"])
+    for case in payload["cases"]:
+        result = case["result"]
+        assert "expected_drain_by_step" not in result
+        assert all("drain_by_step" not in value for value in result["scenarios"])
