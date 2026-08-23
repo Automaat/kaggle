@@ -2,7 +2,7 @@
 
 ## Cel
 
-Połączyć istniejące modele w rzeczywisty backend `PlannerBackend.solve_whole_farm`. Backend ma uruchamiać i weryfikować modele upraw, zwierząt, ziemi i pracowników oraz przestrzeni. Wynik pozostaje eksperymentem shadow. Nie steruje symulatorem i nie zgłasza wyniku gry.
+Połączyć istniejące modele w rzeczywisty backend `PlannerBackend.solve_whole_farm`, a następnie rozegrać pełną grę offline. Backend ma uruchamiać i weryfikować modele upraw, zwierząt, ziemi i pracowników oraz przestrzeni. Strategia 2.0 ma sterować ekonomią. Frozen 1.14 ma wykonać ruchy i akcje.
 
 ## Źródła
 
@@ -44,6 +44,29 @@ Ledger odrzuci ujemne salda i przekroczenia limitów.
 9. Utworzyć zamiary zakupu zwierząt i rozwiązać planer przestrzeni.
 10. Gdy przestrzeń odrzuci zakup lub ledger wykryje konflikt, dodać cięcie i ponowić obliczenie. Limit to pięć iteracji. Powtórzony podpis cięcia kończy cykl błędem.
 11. Utworzyć zależne `EconomicPlanRef`, `SpacePlanRef` i `RoutePlanRef`. Trasy pozostają konserwatywną rezerwą shadow.
+12. Wyeksportować jawny `ExecutionHandoff`. Frozen 1.14 wykona kroki i akcje przez istniejące seam'y `Agent2Policy` i `BaselinePolicy`.
+13. Zbudować adapter `observation → WholeFarmSnapshot` z aktualnej obserwacji symulatora.
+14. Wywołać `RollingCoordinator.prepare` dla każdej obserwacji.
+15. Wymusić pełny solve na krokach `0, 24, ..., 696`. Brak dowolnego dziennego solve zakończy grę błędem.
+16. Przeliczyć plan także po zmianie podpisu sklepów i po zdarzeniu, które unieważnia ekonomię, przestrzeń lub trasę.
+17. Zachować ostatni poprawny handoff między przeliczeniami. Frozen 1.14 wykona go krokowo.
+18. Uruchomić dwa ramiona wykonania: kontrolne `strategy-2.0-execution-1.14` oraz drugie z planerem tras 2.0.
+19. Rozegrać 30-dniową grę offline przeciwko frozen 1.14 i zapisać osobny replay.
+
+Pierwsza grywalna wersja będzie oznaczona `strategy-2.0-execution-1.14`. Nie będzie zgłoszona jako pełny agent 2.0.
+
+## Ślad decyzji
+
+Każdy epoch i dzień zapisze kompaktowy, deterministyczny `DecisionTrace`:
+
+- powody przeliczenia
+- obserwowany wspólny ledger zasobów
+- wszystkie kandydaty ziemi i zatrudniania z wynikiem lub powodem odrzucenia
+- wybrane plany upraw, zwierząt, inwestycji i przestrzeni
+- zlecenia rynku i cele przestrzenne przekazane wykonawcy 1.14
+- ograniczenia, cięcia i stabilne fingerprinty
+
+Replay gry będzie osobnym plikiem.
 
 ## Walidacja
 
@@ -53,8 +76,12 @@ Ledger odrzuci ujemne salda i przekroczenia limitów.
 - test limitów pól, akcji, magazynu i zleceń
 - test cięcia oraz wykrycia cyklu
 - uruchomienie wszystkich modeli i ich weryfikatorów dla zarejestrowanego scenariusza `3980000`
+- test adaptera obserwacji dla stanu początkowego, zmian dziennych, sklepów i zdarzeń
+- test 30 obowiązkowych dziennych epochów
+- pełna gra offline z osobnym replayem i śladem minimum 30 dziennych decyzji
+- porównanie wyniku gry z frozen 1.14
 - Ruff dla zmienionych plików
 
 ## Wynik etapu
 
-Etap dostarczy wykonujący się backend shadow i zweryfikowany artefakt. Pełna gra offline wymaga kolejnego etapu: mapowania obserwacji symulatora na `WholeFarmSnapshot` oraz zamiany planów na akcje.
+Etap dostarczy pełny hybrydowy agent offline, zweryfikowany artefakt, replay, komplet minimum 30 dziennych śladów decyzji oraz wynik przeciwko frozen 1.14. Wynik będzie oznaczony `strategy-2.0-execution-1.14`. Nie będzie zgłoszony jako pełny agent 2.0.
