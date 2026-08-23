@@ -3367,3 +3367,99 @@ The held-out regression pool used 10 paired seeds per opponent. The release scor
 Two independent archive builds were byte-identical. The archive SHA-256 is `daaaea0121ac370efe4da1a37b6b0fd620df10c090613fadb7671360d1bf1067`. Its manifest records candidate `1.15.0`, stage `39`, source commit `f2dd7895c05003c1ee0a90f2b96eda56dcbfd05b`, `kaggle-environments==1.32.7` and the frozen 1.14.0 baseline hash.
 
 `tools/runner.py` now resolves `champion` to the immutable 1.15.0 source directory. Root `main.py` remains the historical one-file 1.14.0 submission. Kaggle submission uses the 1.15.0 tar archive.
+
+## Round 42 demand-driven herd and field scaling
+
+Status: dynamic herd mix accepted and released locally as 1.16.0. All work used the isolated `kaggriculture-fourth-quadrant-round42` worktree.
+
+### Latest 1.15.0 ladder games
+
+The pull contains the nine newest public games and one validation game. Version 1.15.0 won seven of nine public games, averaged $92,814 and averaged a +$28,801 margin. All three opponents that bought 100 tiles lost. At day 21 our farm averaged 47.1 plants, 12 animals and 15.7 empty owned tiles.
+
+The empty tiles are not caused by a large seed stock. Mean seed stock was 1.65 and the per-game maximum averaged 9.33. The first extra quadrant was bought on day 9 in six games and day 11 in three. The second extra quadrant was bought on day 11 in all nine games. A representative land failure had $3,149 against a $3,400 land-and-seed gate and bought animals before the next sale restored the missing cash.
+
+Late animal service remained the visible execution loss. At hour 23 the farm averaged 1.46 unfed animals, 1.66 uncared animals, 12.89 wheat carried by units and 10.03 wheat in the shed. This is delivery failure, not wheat scarcity.
+
+### Dynamic herd mix
+
+The planner recalculates the value of each animal from visible shops and market state. It projects product revenue and fertilizer revenue, then subtracts animal cost, wheat cost and primitive service work. Existing and carried animals remain part of the target. A goose is admitted only when its full margin is positive.
+
+Direct confirmation against frozen 1.15.0 used 200 paired seeds and both seats.
+
+| Games | Wins | Ties | Points | Paired delta | Failures |
+|---:|---:|---:|---:|---:|---:|
+| 400 | 249 | 10 | 64% | **+$2,268 +/- $752** | 0 |
+
+The target changed from the fixed seven cows and five sheep in seven of nine ladder states on day 3 and five of nine on day 9. No measured market made geese profitable after purchase, feed and work costs.
+
+The 50-tile regression used 40 paired seeds. Dynamic mix scored 70% points and **+$2,200 +/- $1,368**, with no failures.
+
+### Dynamic herd count
+
+The mix can vary, but the service limit fixes the accepted total at 12. Lower and higher bounds were tested directly against the accepted planner.
+
+| Count policy | Paired delta | FEED backlog | CARE backlog |
+|:---|---:|---:|---:|
+| Minimum 9 | -$3,404 +/- $4,264 | 9.3% | 10.0% |
+| No minimum | -$5,940 +/- $3,266 | 8.2% | 8.8% |
+| Dynamic limit 14 | -$4,858 +/- $2,820 | 12.2% | 13.3% |
+| Dynamic limit 16 | -$4,170 +/- $3,076 | 13.7% | 15.2% |
+
+Less service failure did not pay for lost milk and wool. More margin-positive animals created enough service failure to erase their projected value. Twelve is the measured execution boundary, not an untested constant.
+
+### Land timing and blocked cash
+
+Three direct changes all failed on ten paired seeds.
+
+| Arm | Paired delta | Wins |
+|:---|---:|---:|
+| Same-turn sale-funded land | -$17,823 +/- $5,609 | 2/20 |
+| One-day seed reserve | -$75,524 +/- $11,078 | 0/20 |
+| Post-land hiring to 20 | -$67,947 +/- $14,117 | 0/20 |
+
+Holding one animal purchase when the land gate was less than $600 away was action-neutral on ten fresh pairs and on the ladder replay seed. The current wait preserves the valuable opening crop. Earlier land without enough seeds or workers destroys more value than the idle cash costs.
+
+### The last 15 tiles and the fourth quadrant
+
+Route-priced marginal admission, fixed full admission, more hands and a bounded late crop calendar all failed.
+
+| Arm | Paired delta |
+|:---|---:|
+| Marginal field, work price 30 | -$2,501 +/- $3,316 |
+| 63 plants, 12 animals, 14 hands | -$9,714 +/- $12,107 |
+| 63 plants, 7 animals, 14 hands | -$29,975 +/- $6,337 |
+| Day 20 one-shot crop cohort 3 | -$1,179 +/- $2,035 |
+| Day 18 one-shot crop cohort 6 | -$2,311 +/- $2,894 |
+| Day 18 one-shot crop cohort 13 | -$5,136 +/- $4,732 |
+
+The calendar stopped refill and removed most standing terminal yield. Large cohorts still discarded 31 to 56 units at the shed. The limit is the complete production, transport and sale chain, not the planting decision alone.
+
+Forcing 100 tiles also failed on 20 paired seeds. Default fourth-quadrant expansion lost $4,438 +/- $2,175. Plant caps 63, 72 and 88 lost $9,488, $15,469 and $19,006. The fourth quadrant remains closed until extra assets on the existing 75 tiles have positive marginal value.
+
+### Feed delivery
+
+A broad late FEED selector lost $371 +/- $659 on 20 pairs. Limiting pickup to selected carriers lost $2.7k to $4.0k. Disabling pickup-on-demand and using four feeder units first screened at +$1,187, then failed the 40-pair confirmation at **-$1,035 +/- $2,295**. It reduced movement and service misses but did not improve score reliably.
+
+`tools/scaling.py` now reports carrier calls, multi-carrier calls, wheat per carrier, end-of-day carriers and end-of-day carried wheat.
+
+### Release 1.16.0
+
+The release is `agents_1.0.x/v1_16_0_dynamic_herd` and `agents_1.0.x/v1_16_0_dynamic_herd.tar.gz`. It changes only the herd planner from 1.15.0. The 75-tile, 12-hand, route, feed, care and 42-to-48 plant policy remains unchanged.
+
+The regression pool used ten paired seeds per opponent. Version 1.16.0 scored 97% points, won 407 of 420 games and was positive against all 21 opponents, with no failures.
+
+Archive equivalence used 100 seeds and both seats. It compared 143,800 actions over 200 complete episodes and found zero mismatches and zero failures. Archive decision p99 was 7.00 ms against the one-second action limit.
+
+The archive SHA-256 is `623859249435332fc4099f66f5e1c7ebdf82627a6be25450d068c34324078833`. Its manifest records candidate `1.16.0`, stage `42`, source commit `b80184f6020d125b837ae0682956c814f1b1e596`, `kaggle-environments==1.32.7` and the frozen 1.14.0 baseline hash. Root `main.py` remains the historical one-file 1.14.0 submission.
+
+The post-release review identified two model inaccuracies. The current marginal inventory term treats every placed, shed and carried animal as a new animal with the full horizon. It also omits known MILK, WOOL and EGG already held privately. Nine ladder replays showed that an age-aware estimate changes the next-animal choice in eight of 36 sampled states, including three states before the herd cap.
+
+The corrected model counts each placed animal's remaining phase-aligned production through day 29, keeps already harvested tile yield exact and models held or planned animals from their future placement. Direct testing used 20 paired seeds per arm.
+
+| Arm | Paired delta | Decision |
+|:---|---:|:---|
+| Age-aware existing animals | -$1,647 +/- $1,574 | reject |
+| Private product stock | $0 +/- $0 | inert |
+| Both corrections | -$1,647 +/- $1,574 | reject |
+
+The more accurate supply estimate changes the mix in the wrong economic direction under the current execution policy. Version 1.16.0 remains unchanged. Future wheat still uses one current quote; test any buy-curve forecast independently rather than adding it to this rejected arm.

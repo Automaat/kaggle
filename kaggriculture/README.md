@@ -19,7 +19,7 @@ uv run python tools/bench.py main.py --pool default --held-out
 uv run python tools/bandit.py --grid KAGG_LAND=1,2 --floor 40
 uv run python tools/trace.py main.py starter 42
 uv run python tools/labour.py main.py champion
-uv run python tools/package_agent.py agents_1.0.x/v1_15_0_staged_field /tmp/agent.tar.gz --stage 39 --candidate 1.15.0
+uv run python tools/package_agent.py agents_1.0.x/v1_16_0_dynamic_herd /tmp/agent.tar.gz --stage 42 --candidate 1.16.0
 uv run python tools/equivalence.py /tmp/agent.tar.gz --seeds 100
 uv run pytest -q tests/
 ```
@@ -57,15 +57,15 @@ Agents follow semantic versioning. `0.N.0` is the historical line: one minor per
 
 A **major** bump means the strategy itself changed, not that it was tuned. 1.0.0 is the first such change: the farm buys a quadrant, staffs it with 12 hands and runs a larger herd, which no amount of tuning had ever made pay. It comes from measuring the labour cost of a tile and from 26 real ladder replays, not from another self-play sweep.
 
-1.15.0 uses the package artifact format developed on the Agent 2 branch but remains in the 1.x release line. The immutable source directory and deterministic tar archive carry the same version.
+1.16.0 uses the package artifact format developed on the Agent 2 branch but remains in the 1.x release line. The immutable source directory and deterministic tar archive carry the same version.
 
-## Current agent (1.15.0)
+## Current agent (1.16.0)
 
-The champion is `agents_1.0.x/v1_15_0_staged_field`. It buys 75 tiles, hires 12 hands in larger early batches and limits concurrent plants to 42 during expansion, then 48 from day 18. Guarded same-tile work and a one-tile trip radius reduce movement. Same-turn sales can fund urgent wheat, and urgent care can run before delayed feed.
+The champion is `agents_1.0.x/v1_16_0_dynamic_herd`. It keeps the proven 75-tile, 12-hand and 42-to-48 plant schedule from 1.15.0. It recalculates the herd mix from visible shop demand, projected sale prices, purchase cost, wheat cost and service work. Twelve animals remain the execution limit; the selected mix changes between cows and sheep. Geese are bought only when their full net margin is positive.
 
-Against frozen 1.14.0, the release scored 77% points and **+$3,447 +/- $720** over 400 fresh paired seeds. It won 614 of 800 games with no failures. The regression pool scored 96% points, 403 wins in 420 games and a positive mean against all 21 opponents.
+Against frozen 1.15.0, the release scored 64% points and **+$2,268 +/- $752** over 200 fresh paired seeds. It won 249 of 400 games, tied 10 and had no failures. At 50 tiles the same change scored 70% points and +$2,200 +/- $1,368 over 40 paired seeds. The regression pool scored 97% points, won 407 of 420 games and was positive against all 21 opponents.
 
-The source directory and packed archive are behavior-identical. The archive is deterministic and has SHA-256 `daaaea0121ac370efe4da1a37b6b0fd620df10c090613fadb7671360d1bf1067`.
+The source directory and packed archive are behavior-identical. The archive is deterministic and has SHA-256 `623859249435332fc4099f66f5e1c7ebdf82627a6be25450d068c34324078833`.
 
 ## Previous 1.x strategy
 
@@ -120,13 +120,13 @@ The champion is the gate, not the whole test. It is a mirror, so a candidate can
 
 The plan for the next version is [agents_1.0.x/PLAN.md](agents_1.0.x/PLAN.md), and the replay track it leans on is [replays_kaggle/PLAN.md](replays_kaggle/PLAN.md). See [EXPERIMENTS.md](EXPERIMENTS.md) for the full list. The open leads, in order:
 
-1. Plan a unit's day as a route, not as a sequence of nearest jobs. Round 9 measured the cost of not doing it: plants die of thirst at 3.1% per tile-day at home and 8.4% in a bought quadrant, and that leak is what makes a third quadrant lose.
-2. A third quadrant is worth about $50,000 of standing crop if it can be tended. Everything else on this list is smaller.
-3. Adapt herd composition to realized shops without stranding bought animals.
+1. Price every added crop with its route insertion cost and the animal work it displaces.
+2. Remove late carried-wheat delivery failures without concentrating feed in one worker.
+3. Test the fourth quadrant only after the full 75-tile portfolio has positive marginal value.
 4. Submit weekly. The ladder is the only gate that is not our own mirror.
 
 ## Submit
 
 ```bash
-uv run kaggle competitions submit kaggriculture -f agents_1.0.x/v1_15_0_staged_field.tar.gz -m "1.15.0 staged 75-tile field"
+uv run kaggle competitions submit kaggriculture -f agents_1.0.x/v1_16_0_dynamic_herd.tar.gz -m "1.16.0 dynamic demand herd"
 ```

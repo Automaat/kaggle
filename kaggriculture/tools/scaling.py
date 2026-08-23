@@ -52,6 +52,12 @@ class ScalingProbe:
         self.counts["carried_wheat_turns"] += sum(
             inventory.get("WHEAT", 0) > 0 for inventory in inventories
         )
+        carriers = sum(inventory.get("WHEAT", 0) > 0 for inventory in inventories)
+        self.counts["carrier_calls"] += carriers > 0
+        self.counts["multi_carrier_calls"] += carriers > 1
+        self.counts["carried_wheat_units"] += sum(
+            inventory.get("WHEAT", 0) for inventory in inventories
+        )
         for unit_index, (position, op) in enumerate(zip(units, ops)):
             name = op[0]
             if name in MOVES:
@@ -80,6 +86,11 @@ class ScalingProbe:
             self.counts["productive_tile_days"] += sum(_productive(tile) for tile in owned)
 
         if obs["hour"] == 23:
+            self.counts["eod_calls"] += 1
+            self.counts["eod_carriers"] += carriers
+            self.counts["eod_wheat"] += sum(
+                inventory.get("WHEAT", 0) for inventory in inventories
+            )
             completed = {
                 tuple(position): op[0]
                 for position, op in zip(units, ops)
@@ -151,6 +162,11 @@ def summarize(rows):
         "missed_feed": _rate(total, "missed_feed_days", "animal_days"),
         "missed_care": _rate(total, "missed_care_days", "animal_days"),
         "carried_wheat_turns": total["carried_wheat_turns"],
+        "carrier_calls": _rate(total, "carrier_calls", "calls"),
+        "multi_carrier_calls": _rate(total, "multi_carrier_calls", "calls"),
+        "wheat_per_carrier": _rate(total, "carried_wheat_units", "carried_wheat_turns"),
+        "eod_carriers": _rate(total, "eod_carriers", "eod_calls"),
+        "eod_wheat": _rate(total, "eod_wheat", "eod_calls"),
         "failures": total["failures"],
     }
 
@@ -186,6 +202,11 @@ def main():
     print(f"  missed feed  : {result['missed_feed']:.1%}")
     print(f"  missed care  : {result['missed_care']:.1%}")
     print(f"  wheat turns  : {result['carried_wheat_turns']}")
+    print(f"  carrier calls: {result['carrier_calls']:.1%}")
+    print(f"  multi carrier: {result['multi_carrier_calls']:.1%}")
+    print(f"  wheat/carrier: {result['wheat_per_carrier']:.2f}")
+    print(f"  EOD carriers : {result['eod_carriers']:.2f}")
+    print(f"  EOD wheat    : {result['eod_wheat']:.2f}")
     print(f"  failures     : {result['failures']}")
 
 

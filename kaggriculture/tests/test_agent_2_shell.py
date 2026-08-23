@@ -7,6 +7,8 @@ import subprocess
 import sys
 import types
 
+import pytest
+
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tools"))
 
 from artifact import load_artifact
@@ -18,8 +20,8 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 CANDIDATE = ROOT / "agents_2.0.x/round37_0_shell"
 BASELINE = ROOT / "agents_1.0.x/v1_14_0_central_herd.py"
 REPLAY = ROOT / "replays/main_vs_champion_42.json"
-RELEASE = ROOT / "agents_1.0.x/v1_15_0_staged_field"
-RELEASE_ARCHIVE = ROOT / "agents_1.0.x/v1_15_0_staged_field.tar.gz"
+RELEASE = ROOT / "agents_1.0.x/v1_16_0_dynamic_herd"
+RELEASE_ARCHIVE = ROOT / "agents_1.0.x/v1_16_0_dynamic_herd.tar.gz"
 
 
 def _observations(seat, limit=720):
@@ -261,18 +263,18 @@ def test_release_archive_is_the_champion(tmp_path):
     manifest = build_archive(
         RELEASE,
         generated,
-        source_commit="f2dd7895c05003c1ee0a90f2b96eda56dcbfd05b",
-        stage="39",
-        candidate="1.15.0",
+        source_commit="b80184f6020d125b837ae0682956c814f1b1e596",
+        stage="42",
+        candidate="1.16.0",
     )
-    assert CHAMPION == "agents_1.0.x/v1_15_0_staged_field"
+    assert CHAMPION == "agents_1.0.x/v1_16_0_dynamic_herd"
     assert generated.read_bytes() == RELEASE_ARCHIVE.read_bytes()
-    assert manifest["candidate"] == "1.15.0"
-    assert manifest["stage"] == "39"
+    assert manifest["candidate"] == "1.16.0"
+    assert manifest["stage"] == "42"
 
 
 def test_release_source_matches_selected_candidate():
-    selected = ROOT / "agents_2.0.x/round38_2_hire_batch"
+    selected = ROOT / "agents_2.0.x/round42_1_dynamic_herd"
     selected_files = {
         path.relative_to(selected): path.read_bytes()
         for path in selected.rglob("*.py")
@@ -307,11 +309,11 @@ def test_flattened_agent_matches_the_package(tmp_path):
     flattened = tmp_path / "flat.py"
     subprocess.run(
         [sys.executable, str(ROOT / "tools" / "flatten_agent.py"),
-         str(ROOT / "agents_1.0.x" / "v1_15_0_staged_field"), str(flattened)],
+         str(RELEASE), str(flattened)],
         check=True, capture_output=True,
     )
     flat = load_artifact(flattened)
-    package = load_artifact(ROOT / "agents_1.0.x" / "v1_15_0_staged_field")
+    package = load_artifact(RELEASE)
     mismatches = []
 
     def shadow(obs):
@@ -332,7 +334,7 @@ def test_flattened_agent_loads_without_its_directory(tmp_path):
     flattened = tmp_path / "flat.py"
     subprocess.run(
         [sys.executable, str(ROOT / "tools" / "flatten_agent.py"),
-         str(ROOT / "agents_1.0.x" / "v1_15_0_staged_field"), str(flattened)],
+         str(RELEASE), str(flattened)],
         check=True, capture_output=True,
     )
     alone = tmp_path / "elsewhere" / "main.py"
@@ -364,7 +366,7 @@ def test_submission_execs_the_way_the_ladder_does(tmp_path):
     flattened = tmp_path / "flat.py"
     subprocess.run(
         [sys.executable, str(ROOT / "tools" / "flatten_agent.py"),
-         str(ROOT / "agents_1.0.x" / "v1_15_0_staged_field"), str(flattened)],
+         str(RELEASE), str(flattened)],
         check=True, capture_output=True,
     )
     namespace = {}
@@ -389,7 +391,7 @@ def test_submission_parses_on_the_ladder_interpreter(tmp_path):
     flattened = tmp_path / "flat.py"
     subprocess.run(
         [sys.executable, str(ROOT / "tools" / "flatten_agent.py"),
-         str(ROOT / "agents_1.0.x" / "v1_15_0_staged_field"), str(flattened)],
+         str(RELEASE), str(flattened)],
         check=True, capture_output=True,
     )
     result = subprocess.run(

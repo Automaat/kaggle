@@ -37,6 +37,14 @@ def test_summary_reports_productive_and_neglect_rates():
             animal_days=2,
             missed_feed_days=1,
             missed_care_days=2,
+            calls=2,
+            carrier_calls=1,
+            multi_carrier_calls=1,
+            carried_wheat_units=6,
+            carried_wheat_turns=2,
+            eod_calls=1,
+            eod_carriers=2,
+            eod_wheat=6,
         ),
         collections.Counter(score=1, opponent_score=1),
     ]
@@ -45,3 +53,8 @@ def test_summary_reports_productive_and_neglect_rates():
     assert result["missed_water"] == 0.125
     assert result["missed_feed"] == 0.5
     assert result["missed_care"] == 1.0
+    assert result["carrier_calls"] == 0.5
+    assert result["multi_carrier_calls"] == 0.5
+    assert result["wheat_per_carrier"] == 3
+    assert result["eod_carriers"] == 2
+    assert result["eod_wheat"] == 6
