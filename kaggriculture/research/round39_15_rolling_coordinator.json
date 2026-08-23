@@ -1,0 +1,296 @@
+{
+  "comparator": {
+    "commit": "b74a3ea",
+    "sha256": "86951703eac27253938500eac664650c1e927d1b86b26ed84be008f24739d699",
+    "version": "1.14.0"
+  },
+  "deterministic_sha256": "18259a87880214d320eb22d0de83500c465cbd51481fada247267d4dd4e46b11",
+  "experiment": "round39_15_rolling_coordinator",
+  "model_sha256": "f559119c2e809e5efcf5af5b9480cbb2bae9e724683e6649f42990a145ee02a9",
+  "runner_sha256": "7c8015dd40554a927dac36680a8c054f24aa56637ce7617fd8369387f4462e68",
+  "scope": {
+    "economic_ranking_claim": false,
+    "live_integration": false,
+    "runtime_claim": false,
+    "simulator_score_claim": false
+  },
+  "sequence": {
+    "backend_calls": [
+      {
+        "epoch": 0,
+        "phase": "whole",
+        "shop_signature": [],
+        "step": 0,
+        "window": {
+          "action_end_step": 23,
+          "investment_end_step": 718,
+          "strategy_end_step": 71
+        }
+      },
+      {
+        "epoch": 1,
+        "phase": "whole",
+        "shop_signature": [],
+        "step": 24,
+        "window": {
+          "action_end_step": 47,
+          "investment_end_step": 718,
+          "strategy_end_step": 71
+        }
+      },
+      {
+        "epoch": 2,
+        "phase": "whole",
+        "shop_signature": [],
+        "step": 48,
+        "window": {
+          "action_end_step": 71,
+          "investment_end_step": 718,
+          "strategy_end_step": 71
+        }
+      },
+      {
+        "epoch": 2,
+        "phase": "whole",
+        "shop_signature": [],
+        "step": 48,
+        "window": {
+          "action_end_step": 71,
+          "investment_end_step": 718,
+          "strategy_end_step": 71
+        }
+      },
+      {
+        "epoch": 3,
+        "phase": "whole",
+        "shop_signature": [
+          [
+            "PET_CAFE",
+            1
+          ]
+        ],
+        "step": 72,
+        "window": {
+          "action_end_step": 95,
+          "investment_end_step": 718,
+          "strategy_end_step": 143
+        }
+      },
+      {
+        "epoch": 4,
+        "phase": "space",
+        "previous": "e57d5c0325a6e19600536dcdcefe163b2d11882a88c3da3013c104059c798c14",
+        "step": 73
+      },
+      {
+        "epoch": 4,
+        "phase": "routes",
+        "previous": "6a632ccf88c2491ca15db1f6771afb5230ea2ea96df9ca59f794be56c813399d",
+        "step": 73
+      },
+      {
+        "epoch": 5,
+        "phase": "whole",
+        "shop_signature": [
+          [
+            "PET_CAFE",
+            1
+          ]
+        ],
+        "step": 96,
+        "window": {
+          "action_end_step": 119,
+          "investment_end_step": 718,
+          "strategy_end_step": 143
+        }
+      },
+      {
+        "epoch": 6,
+        "phase": "routes",
+        "previous": "c017a237c6f2bc047d31295221965171430bd5ea83996af16e0edc357b5331b4",
+        "step": 97
+      }
+    ],
+    "events": [
+      {
+        "creation_step": 0,
+        "epoch": 0,
+        "label": "day-0-initial",
+        "parents_valid": true,
+        "reasons": [
+          "initial"
+        ],
+        "status": "intent",
+        "window": {
+          "action_end_step": 23,
+          "investment_end_step": 718,
+          "strategy_end_step": 71
+        }
+      },
+      {
+        "creation_step": 0,
+        "epoch": 0,
+        "label": "day-0-expected-effect",
+        "parents_valid": true,
+        "reasons": [
+          "initial"
+        ],
+        "status": "intent",
+        "window": {
+          "action_end_step": 23,
+          "investment_end_step": 718,
+          "strategy_end_step": 71
+        }
+      },
+      {
+        "creation_step": 24,
+        "epoch": 1,
+        "label": "day-1-replan",
+        "parents_valid": true,
+        "reasons": [
+          "new-day"
+        ],
+        "status": "intent",
+        "window": {
+          "action_end_step": 47,
+          "investment_end_step": 718,
+          "strategy_end_step": 71
+        }
+      },
+      {
+        "attempted_epoch": 2,
+        "label": "day-2-injected-failure",
+        "last_committed_epoch": 1,
+        "phase": "whole",
+        "status": "failure"
+      },
+      {
+        "creation_step": 48,
+        "epoch": 2,
+        "label": "day-2-retry",
+        "parents_valid": true,
+        "reasons": [
+          "new-day"
+        ],
+        "status": "intent",
+        "window": {
+          "action_end_step": 71,
+          "investment_end_step": 718,
+          "strategy_end_step": 71
+        }
+      },
+      {
+        "creation_step": 72,
+        "epoch": 3,
+        "label": "day-3-shop-open",
+        "parents_valid": true,
+        "reasons": [
+          "economy-diverged",
+          "new-day",
+          "shop-changed"
+        ],
+        "status": "intent",
+        "window": {
+          "action_end_step": 95,
+          "investment_end_step": 718,
+          "strategy_end_step": 143
+        }
+      },
+      {
+        "creation_step": 73,
+        "epoch": 4,
+        "label": "day-3-weed",
+        "parents_valid": true,
+        "reasons": [
+          "topology-changed"
+        ],
+        "status": "intent",
+        "window": {
+          "action_end_step": 95,
+          "investment_end_step": 718,
+          "strategy_end_step": 143
+        }
+      },
+      {
+        "creation_step": 96,
+        "epoch": 5,
+        "label": "day-4-replan",
+        "parents_valid": true,
+        "reasons": [
+          "new-day"
+        ],
+        "status": "intent",
+        "window": {
+          "action_end_step": 119,
+          "investment_end_step": 718,
+          "strategy_end_step": 143
+        }
+      },
+      {
+        "creation_step": 97,
+        "epoch": 6,
+        "label": "day-4-route-failure",
+        "parents_valid": true,
+        "reasons": [
+          "route-precondition-failed"
+        ],
+        "status": "intent",
+        "window": {
+          "action_end_step": 119,
+          "investment_end_step": 718,
+          "strategy_end_step": 143
+        }
+      }
+    ],
+    "expected_backend_calls": [
+      [
+        "whole",
+        0,
+        0
+      ],
+      [
+        "whole",
+        1,
+        24
+      ],
+      [
+        "whole",
+        2,
+        48
+      ],
+      [
+        "whole",
+        2,
+        48
+      ],
+      [
+        "whole",
+        3,
+        72
+      ],
+      [
+        "space",
+        4,
+        73
+      ],
+      [
+        "routes",
+        4,
+        73
+      ],
+      [
+        "whole",
+        5,
+        96
+      ],
+      [
+        "routes",
+        6,
+        97
+      ]
+    ],
+    "failure_atomic": true,
+    "parent_validation_errors": 0
+  },
+  "status": "accepted-contract-only"
+}

@@ -3366,3 +3366,58 @@ ended with a clean review. All 20 focused tests and the full suite pass.
 
 Decision: accept the information-safe forecast for later coordinator
 integration. Do not read future shops from a replay or simulator seed.
+
+## Round 39.15: rolling whole-farm coordinator
+
+Status: accepted contract-only experiment. It changes no agent action and
+makes no simulator-score claim.
+
+Plan commit: `397398a`. Implementation commit: `ce5342b`. Review fix commits:
+`ba16637`, `4d50864`, `0ae5366`.
+
+The coordinator creates one typed whole-farm intent and gives it an epoch. It
+replans the complete economy once per day or after a changed shop multiset or
+an unexplained economic delta. An unexpected topology delta repairs space and
+routes. A route-precondition failure repairs routes only. Exact planned state
+transitions do not trigger another solve.
+
+Every observation carries separate economy, topology, route and progress
+fingerprints plus exact `before -> after` deltas. Plan references are immutable
+and parent-bound. A backend failure changes no committed observation, intent
+or epoch, so the same observation can retry. A failed episode reset remains
+pending until the backend reset succeeds.
+
+Registered command:
+
+```bash
+.venv/bin/python -m kaggriculture.tools.economics.run_rolling_coordinator \
+  --output kaggriculture/research/round39_15_rolling_coordinator.json
+```
+
+| Gate | Result |
+|:---|---:|
+| Registered days | 0 through 4 |
+| Whole-farm calls | 5 successful, 1 injected failure |
+| Space repairs | 1 |
+| Route repairs | 2 |
+| Parent validation errors | 0 |
+| Atomic failure violations | 0 |
+| Focused tests | 49 passed |
+| Full tests | 378 passed |
+| Deterministic SHA-256 | `18259a87880214d320eb22d0de83500c465cbd51481fada247267d4dd4e46b11` |
+| Model SHA-256 | `f559119c2e809e5efcf5af5b9480cbb2bae9e724683e6649f42990a145ee02a9` |
+
+Adversarial review found three classes of state-integrity errors. The final
+coordinator retains a failed reset for retry, deeply freezes sequence target
+keys, rejects mapping target keys and compares observed deltas through a
+type-sensitive canonical identity. Both final review passes returned `CLEAN`.
+
+The registered backend records calls and returns valid plan references. It does
+not run the crop, animal, investment, space or route models. The next offline
+stage must combine those models through one resource ledger, add complete
+daily routes and translate the selected plan into simulator actions. Only then
+can Agent 2.0 play a complete 30-day game against frozen 1.14.0.
+
+Decision: accept the rolling contract. Continue with a real whole-farm backend,
+complete routes and an offline replay executor. Kaggle packaging is out of
+scope for this comparison.
