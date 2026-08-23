@@ -2923,3 +2923,61 @@ failure, duplicate calls, reset, seat isolation and packed artifact execution.
 Decision: keep this coordinator as the base for the next economy experiments.
 Do not merge it into root `main.py`. The next stage must replace only the economy
 planner and compare every economic arm separately with frozen 1.14.0.
+
+## Round 39.2: neutral crop-strategy seam
+
+Status: accepted locally as Agent 2.0 infrastructure. It makes no score claim.
+
+Source commit: `ca2546d`. Roadmap commit: `c870cc0`.
+
+The candidate adds a pre-decision crop-strategy seam. The default policy creates
+no strategy planner and keeps the accepted coordinator path. A configured
+planner returns immutable crop targets. The coordinator validates the complete
+plan before the frozen baseline starts. The baseline wraps `_dynamic_plan` for
+one call, preserves every animal target and restores the exact callable in a
+`finally` block. Market planning remains the accepted post-decision phase.
+
+The code adversary found two validation bugs: a mutable outer target list and
+an `int` subclass passed the first validation. Exact tuple and exact integer
+checks now reject both before baseline execution.
+
+Exact 1.14.0 differential command:
+
+```bash
+uv run python tools/equivalence.py agents_2.0.x/round37_1_task_graph \
+  --baseline agents_1.0.x/v1_14_0_central_herd.py \
+  --opponent agents_1.0.x/v1_13_0_rl_routing.py \
+  --seed-start 3940000 --seeds 40 --workers 8 \
+  --output research/round39_2_strategy_seam_equivalence.json
+```
+
+| Gate | Result |
+|:---|---:|
+| Complete episodes | 80 |
+| Compared calls | 57,520 |
+| Action mismatches | 0 |
+| Failures | 0 |
+| Candidate mean money | $79,439 |
+| Frozen 1.13.0 opponent mean money | $78,165 |
+| Candidate mean call | 0.898 ms |
+| Frozen 1.14.0 mean call | 0.729 ms |
+| p99 overhead | 0.283 ms |
+| Candidate worst call | 35.652 ms |
+| Summed CPU ratio versus frozen 1.14.0 | 1.231x |
+
+The incremental harness always measures the candidate before the comparator.
+On the same seeds, accepted coordinator versus itself reported `1.0305x` and
+`0.0324 ms` p99 overhead. New seam versus accepted coordinator reported
+`1.0257x` and `0.0279 ms`. The A/A-normalized ratio is `0.9954x`. The raw
+`1.02x` incremental gate is therefore invalid under this biased harness; the
+normalized result shows no measurable default-path cost. Both raw result files
+remain registered.
+
+All 194 tests and Ruff pass. Tests cover default replay equivalence, exact
+wrapper restoration, one baseline call, all animal target protection, strict
+immutable validation, axis order, duplicate handling, reset, seat isolation,
+fixed planner mode and the packed artifact.
+
+Decision: accept the seam. The next stages build the exact offline ledger and
+the slow research MILP. They compare realized score with frozen 1.14.0 before
+any Kaggle runtime optimization.

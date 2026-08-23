@@ -181,7 +181,8 @@ land, hiring or feed functions.
 - 40 registered seeds, both seats, zero action, observation, reward, status and
   failure mismatches against frozen 1.14.0;
 - summed CPU ratio at most `1.25x`;
-- default-seam CPU ratio at most `1.02x` against commit `87f5d30`;
+- default-seam CPU ratio at most `1.02x` against commit `87f5d30` after
+  division by a same-run A/A ordering control; keep both raw measurements;
 - cached/default p99 overhead at most 2 ms;
 - worst call below 750 ms;
 - signed conventional implementation commit;
