@@ -178,6 +178,25 @@ def _total(rows):
     return tuple(sum(row[index] for row in rows) for index in range(len(PRODUCTS)))
 
 
+def _valid_drain_rows(rows, length):
+    return (
+        type(rows) is tuple
+        and len(rows) == length
+        and all(
+            type(row) is tuple
+            and len(row) == len(PRODUCTS)
+            and all(
+                type(value) in (int, float)
+                and not isinstance(value, bool)
+                and math.isfinite(value)
+                and value >= 0
+                for value in row
+            )
+            for row in rows
+        )
+    )
+
+
 def _input_hash(data):
     payload = json.dumps(
         asdict(data),
@@ -309,8 +328,12 @@ def verify_forecast(data, result):
     probability = sum(scenario.probability for scenario in result.scenarios)
     if not math.isclose(probability, 1.0, abs_tol=1e-12):
         errors.append("scenario probability does not sum to one")
-    if len(result.expected_drain_by_step) != expected_steps:
-        errors.append("expected step horizon has wrong length")
+    expected_rows_valid = _valid_drain_rows(
+        result.expected_drain_by_step,
+        expected_steps,
+    )
+    if not expected_rows_valid:
+        errors.append("expected step demand is invalid")
     if len(result.expected_drain_by_day) != expected_days:
         errors.append("expected day horizon has wrong length")
     if result.input_hash != _input_hash(data):
@@ -320,16 +343,38 @@ def verify_forecast(data, result):
     if result.investment_end_step != data.terminal_step:
         errors.append("investment horizon mismatch")
     for scenario in result.scenarios:
-        if len(scenario.drain_by_step) != expected_steps:
-            errors.append(f"{scenario.name} step horizon has wrong length")
+        rows_valid = _valid_drain_rows(scenario.drain_by_step, expected_steps)
+        if not rows_valid:
+            errors.append(f"{scenario.name} step demand is invalid")
         if len(scenario.drain_by_day) != expected_days:
             errors.append(f"{scenario.name} day horizon has wrong length")
-        if any(value < 0 for row in scenario.drain_by_step for value in row):
-            errors.append(f"{scenario.name} has negative demand")
-    if result.expected_total_drain != _total(result.expected_drain_by_step):
-        errors.append("expected total demand mismatch")
-    if result.expected_drain_by_day != _drain_by_day(
-        data, result.expected_drain_by_step
-    ):
-        errors.append("expected daily demand mismatch")
+        if rows_valid:
+            if scenario.drain_by_day != _drain_by_day(data, scenario.drain_by_step):
+                errors.append(f"{scenario.name} daily demand mismatch")
+            if scenario.total_drain != _total(scenario.drain_by_step):
+                errors.append(f"{scenario.name} total demand mismatch")
+    if expected_rows_valid:
+        if result.expected_total_drain != _total(result.expected_drain_by_step):
+            errors.append("expected total demand mismatch")
+        if result.expected_drain_by_day != _drain_by_day(
+            data, result.expected_drain_by_step
+        ):
+            errors.append("expected daily demand mismatch")
+        if all(
+            _valid_drain_rows(scenario.drain_by_step, expected_steps)
+            for scenario in result.scenarios
+        ):
+            weighted = tuple(
+                tuple(
+                    sum(
+                        scenario.probability
+                        * scenario.drain_by_step[row_index][item_index]
+                        for scenario in result.scenarios
+                    )
+                    for item_index in range(len(PRODUCTS))
+                )
+                for row_index in range(expected_steps)
+            )
+            if result.expected_drain_by_step != weighted:
+                errors.append("probability-weighted demand mismatch")
     return tuple(errors)

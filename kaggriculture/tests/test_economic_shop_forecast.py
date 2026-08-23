@@ -175,3 +175,35 @@ def test_verifier_rejects_forged_timing_boundaries():
         "action horizon mismatch",
         "strategy horizon mismatch",
     )
+
+
+def test_verifier_rejects_forged_scenario_aggregates():
+    data = _data()
+    valid = forecast.forecast_shops(data)
+    first = replace(
+        valid.scenarios[0],
+        drain_by_day=((0.0,) * len(market.PRODUCTS),) * 30,
+        total_drain=(0.0,) * len(market.PRODUCTS),
+    )
+    forged = replace(valid, scenarios=(first, *valid.scenarios[1:]))
+    assert forecast.verify_forecast(data, forged) == (
+        f"{first.name} daily demand mismatch",
+        f"{first.name} total demand mismatch",
+    )
+
+
+def test_verifier_rejects_forged_weighted_demand():
+    data = _data(source_step=71, terminal_step=72)
+    valid = forecast.forecast_shops(data)
+    forged_rows = (valid.expected_drain_by_step[0],) * 2
+    forged = replace(
+        valid,
+        expected_drain_by_step=forged_rows,
+        expected_drain_by_day=forged_rows,
+        expected_total_drain=tuple(
+            sum(row[index] for row in forged_rows) for index in range(9)
+        ),
+    )
+    assert forecast.verify_forecast(data, forged) == (
+        "probability-weighted demand mismatch",
+    )
