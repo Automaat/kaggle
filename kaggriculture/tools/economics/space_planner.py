@@ -362,9 +362,17 @@ def _arrays(data, candidates):
 def solve_space_plan(data, time_limit=30.0, mip_rel_gap=0.0):
     if not isinstance(data, SpacePlannerInput):
         raise TypeError("data must be SpacePlannerInput")
-    if type(time_limit) not in (int, float) or time_limit <= 0:
+    if (
+        type(time_limit) not in (int, float)
+        or not math.isfinite(time_limit)
+        or time_limit <= 0
+    ):
         raise ValueError("time limit must be positive")
-    if type(mip_rel_gap) not in (int, float) or not 0 <= mip_rel_gap < 1:
+    if (
+        type(mip_rel_gap) not in (int, float)
+        or not math.isfinite(mip_rel_gap)
+        or not 0 <= mip_rel_gap < 1
+    ):
         raise ValueError("MIP gap must be in 0..1")
     candidates = generate_candidates(data)
     if not candidates:

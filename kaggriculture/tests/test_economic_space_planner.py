@@ -265,3 +265,19 @@ def test_registered_cases_pass_solver_and_verifier_gates():
     assert result["verification_error_count"] == 0
     assert result["realized_simulator_score"] is None
     assert result["live_agent_changed"] is False
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("time_limit", float("nan")),
+        ("time_limit", float("inf")),
+        ("mip_rel_gap", float("nan")),
+        ("mip_rel_gap", float("inf")),
+    ],
+)
+def test_solver_rejects_nonfinite_settings(field, value):
+    data = _input(cells=(_cell((4, 4)),), intents=(_intent(),))
+    values = {field: value}
+    with pytest.raises(ValueError):
+        space.solve_space_plan(data, **values)
