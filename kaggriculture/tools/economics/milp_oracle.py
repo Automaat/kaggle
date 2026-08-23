@@ -910,6 +910,7 @@ def solve_oracle(
     time_limit=120.0,
     mip_rel_gap=0.0,
     first_day_crop_counts=None,
+    accept_feasible=False,
 ):
     if not isinstance(data, OracleInput):
         raise TypeError("data must be an OracleInput")
@@ -917,6 +918,8 @@ def solve_oracle(
         raise ValueError("time limit must be positive")
     if type(mip_rel_gap) not in (int, float) or not 0 <= mip_rel_gap < 1:
         raise ValueError("MIP gap must be in 0..1")
+    if type(accept_feasible) is not bool:
+        raise TypeError("feasible acceptance must be a boolean")
     first_day_crop_counts = _validate_first_day_counts(first_day_crop_counts)
     options = generate_crop_options(data)
     built = _build_model(data, options, first_day_crop_counts)
@@ -946,7 +949,7 @@ def solve_oracle(
         },
     )
     wall_seconds = time.perf_counter() - started
-    success = bool(solved.success and solved.x is not None)
+    success = bool(solved.x is not None and (solved.success or accept_feasible))
     gap = getattr(solved, "mip_gap", None)
     if gap is not None and math.isfinite(float(gap)):
         gap = float(gap)
@@ -1028,7 +1031,7 @@ def solve_oracle(
                 if _integer(values[sale_units[crop, day, unit]])
             ]
             if selected:
-                revenue = sum(marginal_prices[crop, day][unit] for unit in selected)
+                revenue = sum(marginal_prices[crop, day][: len(selected)])
                 cumulative_revenue += revenue
                 sales.append(SaleDecision(crop, day, len(selected), revenue))
         cumulative_fixed += data.fixed_cash_flow[day_index]

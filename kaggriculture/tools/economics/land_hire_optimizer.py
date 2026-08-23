@@ -579,7 +579,13 @@ def _projections(data, investments, work_vars, values):
     return tuple(result)
 
 
-def solve_optimizer(data, mode, time_limit=120.0, mip_rel_gap=0.0):
+def solve_optimizer(
+    data,
+    mode,
+    time_limit=120.0,
+    mip_rel_gap=0.0,
+    accept_feasible=False,
+):
     if not isinstance(data, OptimizerInput):
         raise TypeError("data must be an OptimizerInput")
     if mode not in MODES:
@@ -592,6 +598,8 @@ def solve_optimizer(data, mode, time_limit=120.0, mip_rel_gap=0.0):
         raise TypeError("MIP gap must be numeric")
     if not math.isfinite(mip_rel_gap) or not 0 <= mip_rel_gap < 1:
         raise ValueError("MIP gap must be in 0..1")
+    if type(accept_feasible) is not bool:
+        raise TypeError("feasible acceptance must be a boolean")
     built = _build_model(data, mode)
     builder, land_vars, hire_vars, hire_specs, work_vars = built
     objective, integrality, bounds, constraints = builder.arrays()
@@ -613,7 +621,7 @@ def solve_optimizer(data, mode, time_limit=120.0, mip_rel_gap=0.0):
         gap = float(gap)
     else:
         gap = None
-    success = bool(solved.success and solved.x is not None)
+    success = bool(solved.x is not None and (solved.success or accept_feasible))
     _, _, baseline_terminal_cash = _baseline(data)
     if not success:
         return OptimizerResult(

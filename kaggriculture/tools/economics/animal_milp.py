@@ -95,6 +95,7 @@ class AnimalOracleInput:
     allowed_animals: tuple[str, ...]
     fixed_slot_animals: tuple[str, ...]
     scenario: str
+    min_new_animals: int = 0
 
     def __post_init__(self):
         integer_scalars = (
@@ -106,6 +107,7 @@ class AnimalOracleInput:
             self.sale_unit_limit,
             self.wheat_buy_unit_limit,
             self.max_new_animals,
+            self.min_new_animals,
         )
         if any(type(value) is not int for value in integer_scalars):
             raise TypeError("oracle integer settings must be integers")
@@ -117,6 +119,7 @@ class AnimalOracleInput:
             self.placement_travel_actions,
             self.return_actions,
             self.max_new_animals,
+            self.min_new_animals,
         )
         if (
             any(value < 0 for value in limits)
@@ -124,6 +127,8 @@ class AnimalOracleInput:
             or self.wheat_buy_unit_limit < 1
         ):
             raise ValueError("oracle limits must be nonnegative")
+        if self.min_new_animals > self.max_new_animals:
+            raise ValueError("minimum animals exceed new animal slots")
         if self.feed_actions_per_unit < 1:
             raise ValueError("feed actions must be positive")
         if type(self.cash) not in (int, float) or isinstance(self.cash, bool):
@@ -654,6 +659,15 @@ def _build_model(data):
                 for identifier in slot_identifiers[slot]
             },
             upper=1,
+        )
+    if data.min_new_animals:
+        builder.constraint(
+            {
+                selected[identifier]: 1
+                for identifier, _, existing_index, _ in entities
+                if existing_index is None
+            },
+            lower=data.min_new_animals,
         )
     if data.fixed_slot_animals:
         for animal in ANIMALS:
@@ -1519,13 +1533,20 @@ def _integer(value):
     return int(round(float(value)))
 
 
-def solve_animal_oracle(data, time_limit=120.0, mip_rel_gap=0.0):
+def solve_animal_oracle(
+    data,
+    time_limit=120.0,
+    mip_rel_gap=0.0,
+    accept_feasible=False,
+):
     if not isinstance(data, AnimalOracleInput):
         raise TypeError("data must be an AnimalOracleInput")
     if type(time_limit) not in (int, float) or time_limit <= 0:
         raise ValueError("time limit must be positive")
     if type(mip_rel_gap) not in (int, float) or not 0 <= mip_rel_gap < 1:
         raise ValueError("MIP gap must be in 0..1")
+    if type(accept_feasible) is not bool:
+        raise TypeError("feasible acceptance must be a boolean")
     built = _build_model(data)
     builder = built["builder"]
     objective, integrality, bounds, constraints = builder.arrays()
@@ -1547,7 +1568,7 @@ def solve_animal_oracle(data, time_limit=120.0, mip_rel_gap=0.0):
         gap = float(gap)
     else:
         gap = None
-    success = bool(solved.success and solved.x is not None)
+    success = bool(solved.x is not None and (solved.success or accept_feasible))
     if not success:
         return AnimalOracleResult(
             False,
