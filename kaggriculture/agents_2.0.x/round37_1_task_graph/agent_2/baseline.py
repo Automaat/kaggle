@@ -1,3 +1,4 @@
+import copy
 import types
 from dataclasses import dataclass
 from pathlib import Path
@@ -55,6 +56,23 @@ class BaselinePolicy:
         day = int(obs["day"])
         graph = TaskGraph.from_legacy(day, self._captured_tasks or ())
         return BaselineDecision(action, graph)
+
+    def market_order_limit(self) -> int:
+        if self.module is None:
+            self.reset()
+        return int(self.module.MAX_ORDERS)
+
+    def remember_market(self, player: int, orders) -> None:
+        if self.module is None:
+            self.reset()
+        state = self.module._opponent_state.get(player)
+        previous = copy.deepcopy(state.get("orders")) if state is not None else None
+        try:
+            self.module._remember_market_orders(player, orders)
+        except Exception:
+            if state is not None:
+                state["orders"] = previous
+            raise
 
     def act(self, obs) -> dict:
         return self.decide(obs).action
