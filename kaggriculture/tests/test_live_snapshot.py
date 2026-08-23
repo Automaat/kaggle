@@ -194,6 +194,37 @@ def test_carried_goods_extend_only_current_inventory_capacity():
     assert snapshot.shared.storage[1:] == (100,) * 19
 
 
+def test_fingerprints_ignore_expected_midday_progress_and_cover_events():
+    adapter = LiveSnapshotAdapter(3_980_000)
+    first = adapter.observe(_observation())
+    moved_values = _observation(1)
+    moved_values["farms"][0]["farmer"] = [3, 4]
+    moved_values["farms"][0]["money"] = 2990.0
+
+    moved = adapter.observe(moved_values)
+
+    assert moved.economy_fingerprint == first.economy_fingerprint
+    assert moved.topology_fingerprint == first.topology_fingerprint
+    assert moved.route_precondition_fingerprint == first.route_precondition_fingerprint
+    assert moved.progress_fingerprint != first.progress_fingerprint
+    assert moved.execution_signal.observed_deltas == ()
+
+    weed_values = _observation(2)
+    weed_values["farms"][0]["tiles"][0][0] = {"kind": "WEED"}
+    weed = adapter.observe(weed_values)
+
+    assert tuple(
+        delta.domain for delta in weed.execution_signal.observed_deltas
+    ) == ("topology",)
+
+    hand_values = _observation(3, ("NW",), ((4, 5),))
+    hand = adapter.observe(hand_values)
+
+    assert tuple(
+        delta.domain for delta in hand.execution_signal.observed_deltas
+    ) == ("topology", "route")
+
+
 def test_snapshot_rejects_unmatched_rolling_observation():
     first = LiveSnapshotAdapter(1)
     second = LiveSnapshotAdapter(2)

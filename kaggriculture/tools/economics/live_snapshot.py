@@ -6,7 +6,12 @@ from .animal_milp import ANIMALS, GOODS, AnimalOracleInput, ExistingAnimal
 from .land_hire_optimizer import OptimizerInput
 from .market_ledger import CROPS, PRODUCTS, SHED_ITEMS, SHOP_DEMAND
 from .milp_oracle import ExistingPlant, OracleInput
-from .rolling_coordinator import ExecutionSignal, RollingObservation, canonical_sha256
+from .rolling_coordinator import (
+    ExecutionSignal,
+    ObservedDelta,
+    RollingObservation,
+    canonical_sha256,
+)
 from .space_planner import SpaceCell
 from .whole_farm_backend import SharedCapacity, WholeFarmSnapshot
 
@@ -458,6 +463,10 @@ class LiveSnapshotAdapter:
         self._registered_seed = registered_seed
         self._last_identity = None
         self._last_snapshot = None
+        self._last_day = None
+        self._fingerprints = None
+        self._weed_positions = None
+        self._unit_count = None
 
     @property
     def last_snapshot(self):
@@ -466,6 +475,10 @@ class LiveSnapshotAdapter:
     def reset(self):
         self._last_identity = None
         self._last_snapshot = None
+        self._last_day = None
+        self._fingerprints = None
+        self._weed_positions = None
+        self._unit_count = None
 
     def observe(self, value):
         values = _plain_observation(value)
@@ -474,10 +487,9 @@ class LiveSnapshotAdapter:
             self._registered_seed,
         )
         step = snapshot.source_step
-        economy = canonical_sha256(
+        raw_economy = canonical_sha256(
             "live-economy",
             (
-                step,
                 snapshot.crop.cash,
                 snapshot.crop.seeds,
                 snapshot.crop.goods,
@@ -488,7 +500,7 @@ class LiveSnapshotAdapter:
                 shops,
             ),
         )
-        topology = canonical_sha256(
+        raw_topology = canonical_sha256(
             "live-topology",
             tuple(
                 (
@@ -501,7 +513,7 @@ class LiveSnapshotAdapter:
                 for cell in snapshot.cells
             ),
         )
-        route = canonical_sha256(
+        raw_route = canonical_sha256(
             "live-route",
             (
                 values["farms"][values["player"]]["farmer"],
@@ -509,6 +521,36 @@ class LiveSnapshotAdapter:
                 values["private"]["inventories"],
             ),
         )
+        weeds = frozenset(
+            cell.position for cell in snapshot.cells if cell.kind == "WEED"
+        )
+        unit_count = len(values["farms"][values["player"]]["hands"]) + 1
+        raw = {
+            "economy": raw_economy,
+            "topology": raw_topology,
+            "route": raw_route,
+        }
+        previous = self._fingerprints
+        if previous is None or self._last_day != snapshot.current_day:
+            fingerprints = raw
+        else:
+            fingerprints = dict(previous)
+            if weeds != self._weed_positions:
+                fingerprints["topology"] = raw_topology
+            if unit_count != self._unit_count:
+                fingerprints["route"] = raw_route
+        deltas = ()
+        if previous is not None:
+            deltas = tuple(
+                ObservedDelta(
+                    domain,
+                    ("live", domain),
+                    previous[domain],
+                    fingerprints[domain],
+                )
+                for domain in ("economy", "topology", "route")
+                if previous[domain] != fingerprints[domain]
+            )
         progress = canonical_sha256(
             "live-progress",
             (
@@ -536,14 +578,18 @@ class LiveSnapshotAdapter:
         observation = RollingObservation(
             step,
             shops,
-            economy,
-            topology,
-            route,
+            fingerprints["economy"],
+            fingerprints["topology"],
+            fingerprints["route"],
             progress,
-            ExecutionSignal(),
+            ExecutionSignal(deltas),
         )
         self._last_identity = observation.identity
         self._last_snapshot = snapshot
+        self._last_day = snapshot.current_day
+        self._fingerprints = fingerprints
+        self._weed_positions = weeds
+        self._unit_count = unit_count
         return observation
 
     def snapshot(self, observation):
