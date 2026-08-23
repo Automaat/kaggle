@@ -3030,3 +3030,56 @@ has a regression test.
 
 Decision: accept A1a. Start A1b from this commit. A1b adds the complete shed,
 unit inventory and purchase-availability transitions before crop modeling.
+
+## Round 39.4: exact inventory ledger A1b
+
+Status: accepted offline model. It makes no score claim and changes no live
+agent action.
+
+Plan commit: `56abc37`. Implementation commit: `7f28361`.
+
+The model composes A1a with exact ordered inventories for each farmer and hand.
+It covers `PASS`, shed `PICKUP`, `DROP`, shed `PLACE`, shed capacity, overflow,
+same-turn market availability, accepted hires and the inventory part of the
+full end-of-day reset. Crop and animal operations remain outside A1b.
+
+The model uses external shed-adjacency facts. The later board model must compute
+those facts immediately before each unit action. Matching animal `PLACE`
+remains owned by A1d and has priority over shed placement.
+
+Validation command:
+
+```bash
+uv run python -m kaggriculture.tools.economics.validate_inventory_ledger \
+  --random-cases 5000 --seed 3960000 --stop-first \
+  --output kaggriculture/research/round39_4_inventory_ledger_validation.json
+```
+
+| Gate | Result |
+|:---|---:|
+| Boundary cases | 164 |
+| Stratified cases | 5,000 |
+| Total compared phases | 5,164 |
+| Matched expected exceptions | 136 |
+| Field mismatches | 0 |
+| Unexpected failures | 0 |
+| Elapsed time | 35.123 s |
+| Input SHA-256 | `22a5b70a456e772baaadc583959316e4199ce098cbe4e8eadb2bbfde5d96250b` |
+| Model SHA-256 | `8398e249db8310389544c18003c50815313a6977f6433b30c014d5c1dcc4d9bf` |
+| A1a SHA-256 | `879b055b62775b880cdbb08144bd59ef73a3184b5f540ecc045f84e79df17bff` |
+| Simulator SHA-256 | `bc8a54879ef02c7ea64b8b333d6a976f0ea65c4949149d01f463f23bccee653e` |
+
+Two 100-case smoke runs produced identical results after elapsed time was
+removed. All 242 tests and Ruff for changed files pass.
+
+Adversarial review found an exception mismatch for an unhashable operation and
+a stale result hash after the first fix. The final validator includes that
+input, and the regenerated result hash matches the committed model.
+
+Simulator 1.32.7 retains shed-`PLACE` overflow in the unit inventory. This
+differs from `RULES.md`, which says the overflow is lost. A1b follows the
+executable simulator.
+
+Decision: accept A1b. Start A1c from this commit. A1c adds exact crop creation,
+growth, watering, fertilization, harvest, decay and season boundaries through
+the shared per-unit dispatcher.
