@@ -6,7 +6,7 @@ import pytest
 from kaggriculture.tools.economics.animal_milp import GOODS, solve_animal_oracle
 from kaggriculture.tools.economics.land_hire_optimizer import OptimizerInput
 from kaggriculture.tools.economics.market_ledger import CROPS
-from kaggriculture.tools.economics.milp_oracle import ExistingPlant
+from kaggriculture.tools.economics.milp_oracle import CropDecision, ExistingPlant
 from kaggriculture.tools.economics.rolling_coordinator import (
     ExecutionSignal,
     PlanFailure,
@@ -741,6 +741,52 @@ def test_second_arm_replans_route_and_exports_new_epoch():
         backend.last_route_plan_problem,
         backend.last_route_plan,
     ) == ()
+
+
+def test_route_repair_drops_crop_target_completed_before_hire():
+    current = [_snapshot()]
+    backend = WholeFarmPlannerBackend(lambda observation: current[0], 5, 0, 5)
+    intent = RollingCoordinator(backend).prepare(_observation())
+    crop_decision = CropDecision(
+        "MELON",
+        29,
+        29,
+        29,
+        1,
+        0,
+        (),
+        (),
+        None,
+        None,
+    )
+    backend._last_solve = replace(
+        backend.last_solve,
+        crop_result=replace(
+            backend.last_solve.crop_result,
+            decisions=(crop_decision,),
+        ),
+    )
+    backend._last_handoff = replace(
+        backend.last_handoff,
+        crop_targets=(CropTargetIntent(29, 4, 4, "MELON"),),
+    )
+    current[0] = replace(
+        current[0],
+        cells=(SpaceCell((4, 4), 0, "PLANT", "MELON", 0, 29),),
+        route_units=tuple(
+            RouteUnit(f"hand-{index}", (4, 4)) for index in range(6)
+        ),
+    )
+    backend.repair_routes(
+        1,
+        _observation(),
+        intent.economy,
+        intent.space,
+        intent.routes,
+    )
+    assert backend.last_handoff.epoch == 1
+    assert backend.last_handoff.crop_targets == ()
+    assert backend.last_trace.reasons == ("route-repair",)
 
 
 def test_shared_capacity_rejects_route_overcommit():

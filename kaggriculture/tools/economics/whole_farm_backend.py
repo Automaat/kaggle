@@ -1462,6 +1462,24 @@ def _build_handoff(
     )
 
 
+def _repair_handoff(epoch, snapshot, economy, space, previous):
+    empty_positions = {
+        cell.position for cell in snapshot.cells if cell.kind == "EMPTY"
+    }
+    return replace(
+        previous,
+        epoch=epoch,
+        source_step=snapshot.source_step,
+        economic_fingerprint=economy.fingerprint,
+        space_fingerprint=space.fingerprint,
+        crop_targets=tuple(
+            target
+            for target in previous.crop_targets
+            if (target.y, target.x) in empty_positions
+        ),
+    )
+
+
 def _route_inventory(snapshot, handoff):
     counts = {item: 0 for item in SHED_ITEMS}
     for item, quantity in zip(CROPS, snapshot.crop.goods):
@@ -2404,17 +2422,19 @@ class WholeFarmPlannerBackend:
     def repair_routes(self, epoch, observation, economy, space, previous_routes):
         if self._last_solve is None:
             raise WholeFarmSolveError("no whole-farm plan to repair")
+        if self._last_handoff is None:
+            raise WholeFarmSolveError("no execution handoff to repair")
         snapshot = self._snapshot_provider(observation)
         if type(snapshot) is not WholeFarmSnapshot:
             raise TypeError("snapshot provider returned wrong type")
         if snapshot.source_step != observation.source_step:
             raise ValueError("snapshot and observation source steps differ")
-        handoff = _build_handoff(
+        handoff = _repair_handoff(
             epoch,
             snapshot,
-            self._last_solve,
             economy,
             space,
+            self._last_handoff,
         )
         route_plan = None
         route_problem = None
@@ -2440,15 +2460,12 @@ class WholeFarmPlannerBackend:
                 f"route-2.0:{route.unit_identifier}"
                 for route in route_plan.routes
             )
-            handoff = _build_handoff(
-                epoch,
-                snapshot,
-                self._last_solve,
-                economy,
-                space,
-                "strategy-2.0-execution-route-2.0",
-                "planner-2.0",
-                route_plan,
+            handoff = replace(
+                handoff,
+                label="strategy-2.0-execution-route-2.0",
+                route_arm="planner-2.0",
+                route_plan_fingerprint=route_plan.fingerprint,
+                route_commands=_route_commands(route_plan),
             )
         else:
             route_ids = previous_routes.route_ids or (
