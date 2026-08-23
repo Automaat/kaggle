@@ -81,6 +81,7 @@ def test_ongoing_options_stop_at_four_productions():
     assert final.yield_units == 4
     assert final.active_days[-1] == 16
     assert final.release_day == 17
+    assert final.actions[16] == 1
     assert final.actions[17] == 1
 
 
@@ -301,6 +302,26 @@ def test_existing_one_time_harvest_releases_tile_for_replanting():
     assert result.success
     assert any(value.existing_position == (0, 0) for value in result.decisions)
     assert any(value.plant_day is not None for value in result.decisions)
+
+
+def test_existing_ongoing_release_creates_capacity_without_empty_tiles():
+    plant = oracle.ExistingPlant((0, 0), "STRAWBERRY", 0, 3, False, 0, -1)
+    seeds = (0, 1, 0, 0, 0)
+    result = oracle.solve_oracle(
+        _input(day=14, cash=0, seeds=seeds, existing=(plant,), tiles=0),
+        10,
+        0,
+    )
+    assert result.success
+    existing = next(
+        value for value in result.decisions if value.existing_position == (0, 0)
+    )
+    assert existing.release_day == 17
+    assert any(value.plant_day == 17 for value in result.decisions)
+    assert oracle.verify_result(
+        _input(day=14, cash=0, seeds=seeds, existing=(plant,), tiles=0),
+        result,
+    ) == ()
 
 
 def test_zero_action_capacity_blocks_new_crops():

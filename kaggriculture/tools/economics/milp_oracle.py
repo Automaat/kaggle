@@ -385,11 +385,16 @@ def _ongoing_schedule_options(
                 if existing_index is None
                 else ()
             )
+            final_water_day = max(
+                production_days,
+                default=data.current_day,
+            )
+            water_stop = final_water_day if release_day is not None else final_water_day + 1
             action_values = {
                 day: 1
                 for day in range(
                     active_start,
-                    (max(production_days) if production_days else data.current_day) + 1,
+                    water_stop,
                 )
                 if not (day == data.current_day and watered_today)
             }
@@ -626,9 +631,12 @@ def _build_model(data, options, first_day_crop_counts=None):
     first_day_crop_counts = _validate_first_day_counts(first_day_crop_counts)
     builder = _Builder()
     max_tiles = max(data.tile_capacity, default=0)
-    new_tile_limit = max_tiles + sum(
-        not CROP_SPECS[plant.crop].ongoing for plant in data.existing_plants
-    )
+    releasable_existing = {
+        option.existing_index
+        for option in options
+        if option.existing_index is not None and option.release_day is not None
+    }
+    new_tile_limit = max_tiles + len(releasable_existing)
     quantity_limit = max(
         1,
         (sum(data.tile_capacity) + new_tile_limit) * 6
