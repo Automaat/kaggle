@@ -1,0 +1,14 @@
+{
+  "arm": "control-1.14",
+  "candidate_seat": 0,
+  "error": "WholeFarmSolveError: execution handoff lacks crop target cells",
+  "failure_step": 456,
+  "game_completed": false,
+  "last_completed_day": 17,
+  "last_progress_source_step": 432,
+  "progress_records": 18,
+  "replay_written": false,
+  "seed": 3980000,
+  "status": "rejected-temporal-space-targets",
+  "trace_written": false
+}
