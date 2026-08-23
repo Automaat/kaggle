@@ -212,6 +212,21 @@ def test_provider_is_structurally_compatible_and_resets_source():
     assert provider.plans_built == 0
 
 
+def test_source_reset_failure_still_clears_execution_state():
+    source = Source(_handoff(crops=(CropTarget(0, 4, 4, "WHEAT"),)))
+    provider = ExecutionRouteProvider(source)
+    provider.act(_observation(seeds={"WHEAT": 1}))
+
+    def fail_reset():
+        raise RuntimeError("reset")
+
+    source.reset = fail_reset
+    with pytest.raises(RuntimeError, match="reset"):
+        provider.reset()
+    assert provider.plan is None
+    assert provider.plans_built == 0
+
+
 def test_crop_target_becomes_complete_plant_water_chain():
     handoff = _handoff(crops=(CropTarget(0, 4, 4, "WHEAT"),))
     tasks = _tasks(_observation(seeds={"WHEAT": 1}), handoff)
@@ -219,6 +234,14 @@ def test_crop_target_becomes_complete_plant_water_chain():
     assert set(operations) == {"PLANT", "WATER"}
     assert operations["PLANT"].requires == ()
     assert operations["WATER"].dependencies == (operations["PLANT"].identifier,)
+
+
+def test_crop_target_rejects_incompatible_occupied_cell():
+    board = _board()
+    board[4][4] = _plant("CARROT", 0)
+    handoff = _handoff(crops=(CropTarget(0, 4, 4, "WHEAT"),))
+    with pytest.raises(ValueError, match="incompatible tile"):
+        _tasks(_observation(tiles=board), handoff)
 
 
 def test_existing_crop_adds_fertilizer_water_and_harvest():
@@ -268,6 +291,16 @@ def test_space_target_builds_one_weed_chain_and_services_animal():
     assert by_operation["CARE"].dependencies == (
         by_operation["FEED"].identifier,
     )
+
+
+def test_animal_intents_and_space_targets_must_be_a_bijection():
+    animal = AnimalIntent("cow-0", "COW", 0, 0)
+    with pytest.raises(ValueError, match="must match"):
+        view_handoff(_handoff(animals=(animal,)), 0)
+
+    space = SpaceTarget("cow-0", "COW", 2, 2, "use_empty", 1)
+    with pytest.raises(ValueError, match="lacks matching"):
+        view_handoff(_handoff(animals=(animal,), spaces=(space,)), 0)
 
 
 def test_dig_crop_does_not_schedule_destroyed_crop_service():

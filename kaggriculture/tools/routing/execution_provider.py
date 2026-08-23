@@ -383,8 +383,14 @@ def view_handoff(handoff, current_step):
         raise ValueError("space target cells must be unique")
     for target in space_targets:
         intent = animal_by_id.get(target.identifier)
-        if intent is None or intent.animal != target.animal:
+        if (
+            intent is None
+            or intent.animal != target.animal
+            or intent.placement_day != target.placement_day
+        ):
             raise ValueError("space target lacks matching animal intent")
+    if {target.identifier for target in space_targets} != set(animal_by_id):
+        raise ValueError("animal intents and space targets must match")
     if len({order.identifier for order in market_orders}) != len(market_orders):
         raise ValueError("market order identifiers must be unique")
     if len({(target.day, target.x, target.y) for target in crop_targets}) != len(
@@ -774,7 +780,13 @@ def build_route_tasks(observation, handoff):
             continue
         tile = observation.tiles[target.y][target.x]
         if tile is not None and not _is_weed(tile):
-            continue
+            if (
+                isinstance(tile, Mapping)
+                and tile.get("kind") == "PLANT"
+                and tile.get("crop") == target.crop
+            ):
+                continue
+            raise ValueError("crop target contains incompatible tile")
         dependency = None
         if _is_weed(tile):
             dependency = _task_identifier(
@@ -987,11 +999,6 @@ class ExecutionRouteProvider:
         return self._handoff_identity
 
     def reset(self):
-        reset = getattr(self._source, "reset", None)
-        if reset is not None:
-            if not callable(reset):
-                raise TypeError("handoff source reset must be callable")
-            reset()
         self._executor.reset()
         self._pending = None
         self._planned_task_ids = frozenset()
@@ -999,6 +1006,11 @@ class ExecutionRouteProvider:
         self._planned_day = None
         self._planned_unit_ids = ()
         self._plans_built = 0
+        reset = getattr(self._source, "reset", None)
+        if reset is not None:
+            if not callable(reset):
+                raise TypeError("handoff source reset must be callable")
+            reset()
 
     def _current_handoff(self, observation, step):
         try:
