@@ -2863,3 +2863,63 @@ uv run python tools/equivalence.py agents_2.0.x/round37_1_task_graph --seed-star
 All 174 tests pass. New tests cover stable IDs, duplicate ordinals, immutable graph storage, exact action preservation, observation immutability, duplicate calls, episode reset and disabled capture.
 
 Decision: accept Stage 37.1. It meets zero-difference and runtime gates. Start 37.2A from this commit in a new worktree. Do not merge it into root `main.py`.
+
+## Round 39.0: simple Agent 2.0 coordinator
+
+Status: accepted locally as an architecture seam. It makes no score claim.
+
+Source commit: `678eb6efdb0e72d561aa60550bf95caa5aad6d30`.
+
+The candidate starts from the accepted Stage 37.1 task graph. `Agent2Policy`
+remains the sole owner of `BaselinePolicy` and `EpisodeState`. The new
+`Agent2Coordinator` owns one economy planner. Frozen layout, task generation,
+unit assignment and routing still execute inside 1.14.0.
+
+Only `action["market"]` is replaceable. The economy planner receives the frozen
+`World` and a tuple of tuple orders. It never receives the mutable baseline
+action. The coordinator validates every returned order, copies it, applies the
+simulator limit of ten and writes the exact emitted list back into the frozen
+opponent-market state. `farmer`, `hands` and `TaskGraph` remain unchanged.
+
+The default `FrozenEconomyPlanner` returns the frozen orders. An invalid result
+or planner exception resets the economy planner and emits the frozen orders. A
+synchronization exception also restores the frozen action and frozen remembered
+orders. Duplicate observations do not call either planner. Episode rollback
+reloads the private baseline module and resets the economy planner. The adapter
+accepts a factory so each loaded policy owns a separate planner instance.
+
+Exact differential command:
+
+```bash
+uv run python tools/equivalence.py agents_2.0.x/round37_1_task_graph \
+  --baseline agents_1.0.x/v1_14_0_central_herd.py \
+  --opponent agents_1.0.x/v1_13_0_rl_routing.py \
+  --seed-start 3900000 --seeds 40 --workers 8 \
+  --output research/round39_0_coordinator_equivalence.json
+```
+
+| Gate | Result |
+|:---|---:|
+| Complete episodes | 80 |
+| Compared calls | 57,520 |
+| Action mismatches | 0 |
+| Failures | 0 |
+| Candidate mean money | $87,185 |
+| Frozen 1.13.0 opponent mean money | $85,788 |
+| Candidate mean call | 0.922 ms |
+| Baseline mean call | 0.752 ms |
+| p99 overhead | 0.249 ms |
+| Candidate worst call | 38.894 ms |
+| Summed agent CPU ratio | 1.227x |
+
+The frozen 1.14.0 SHA-256 remains
+`86951703eac27253938500eac664650c1e927d1b86b26ed84be008f24739d699`.
+The run used `kaggle-environments==1.32.7`. The CPU ratio stays below the 1.25x
+gate. All 184 tests and Ruff pass. Tests cover full saved replays in both seats,
+market-only replacement, immutable planner input, ten-order truncation, exact
+market-state synchronization, invalid output, planner and synchronization
+failure, duplicate calls, reset, seat isolation and packed artifact execution.
+
+Decision: keep this coordinator as the base for the next economy experiments.
+Do not merge it into root `main.py`. The next stage must replace only the economy
+planner and compare every economic arm separately with frozen 1.14.0.
