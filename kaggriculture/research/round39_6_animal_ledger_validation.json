@@ -1,0 +1,90 @@
+{
+  "boundary_cases": 392,
+  "compared_fields": [
+    "positions",
+    "animal_boards",
+    "crop_state",
+    "market_and_town",
+    "plant_decay",
+    "crop_refresh",
+    "animal_refresh",
+    "weeds",
+    "full_day_end",
+    "partial_exception_state"
+  ],
+  "coverage": {
+    "animals": {
+      "COW": 1667,
+      "GOOSE": 1667,
+      "SHEEP": 1666
+    },
+    "land_counts": {
+      "1": 1300,
+      "2": 1300,
+      "3": 1200,
+      "4": 1200
+    },
+    "operations": {
+      "BUILD_COOP": 333,
+      "BUILD_PASTURE": 333,
+      "CARE": 333,
+      "COLLECT_FERTILIZER": 333,
+      "DIG": 333,
+      "DROP": 333,
+      "EAST": 333,
+      "FEED": 333,
+      "HARVEST": 333,
+      "NORTH": 336,
+      "PASS": 333,
+      "PICKUP": 333,
+      "PLACE": 333,
+      "SOUTH": 335,
+      "WEST": 333
+    },
+    "players": {
+      "0": 2520,
+      "1": 2480
+    },
+    "source_steps": {
+      "0": 1000,
+      "23": 1000,
+      "24": 1000,
+      "717": 1000,
+      "718": 1000
+    },
+    "tile_states": {
+      "ANIMAL": 833,
+      "COOP": 833,
+      "EMPTY": 835,
+      "LOCKED": 833,
+      "PASTURE": 833,
+      "WEED": 833
+    },
+    "unit_seats": {
+      "0": 2520,
+      "1": 2480
+    },
+    "weed_regimes": {
+      "0": 1672,
+      "0.005": 1656,
+      "1": 1672
+    }
+  },
+  "crop_model_sha256": "d048d1a5e0ec5f7e6470ce3bce85b727f0bd7c45b4c32ce937613844e4bffc11",
+  "elapsed_seconds": 34.15055433299858,
+  "environment_version": "1.32.7",
+  "first_failure": null,
+  "first_mismatch": null,
+  "fixtures": 5392,
+  "generator_schema": "animal-v1",
+  "input_sha256": "5b29b1cc4e15862e073355831693aceb1681844a00f0d8323ac1784ae8497ebb",
+  "matched_expected_exceptions": 3,
+  "mismatches": 0,
+  "model_sha256": "97136bace3016c8e8a6608238fd2ce9a710e0ee7ba41aa8228799fc344c61122",
+  "processed_fixtures": 5392,
+  "random_cases": 5000,
+  "schema": 1,
+  "seed": 3980000,
+  "simulator_sha256": "bc8a54879ef02c7ea64b8b333d6a976f0ea65c4949149d01f463f23bccee653e",
+  "unexpected_failures": 0
+}

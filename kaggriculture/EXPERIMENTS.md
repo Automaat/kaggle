@@ -3140,3 +3140,57 @@ permit a terminal planting decision.
 
 Decision: accept A1c. Start A1d from this commit. A1d adds exact animal
 placement, feeding, care, production, movement and end-of-day transitions.
+
+## Round 39.6: exact animal ledger A1d
+
+Status: accepted offline model. It makes no score claim and changes no live
+agent action.
+
+Plan commit: `3c4bca7`. Implementation commit: `38b0d2a`.
+
+The model composes A1a-A1c with exact unit positions, structures and animal
+state. It covers cardinal movement, building, animal placement, feeding, care,
+animal harvest, fertilizer collection, production, escape after two unfed
+days, deterministic weeds, hired-unit spawn positions and the complete
+end-of-day reset.
+
+The shared dispatcher follows simulator order: movement, matching animal
+placement, shed transfer, crop operation and remaining animal operation.
+Matching animal placement consumes the action even when the unit lacks the
+animal. A nonmatching placement can still place an item in the shed.
+
+Validation command:
+
+```bash
+.venv/bin/python -m kaggriculture.tools.economics.validate_animal_ledger \
+  --random-cases 5000 --seed 3980000 --stop-first \
+  --output kaggriculture/research/round39_6_animal_ledger_validation.json
+```
+
+| Gate | Result |
+|:---|---:|
+| Boundary cases | 392 |
+| Stratified cases | 5,000 |
+| Total compared phases | 5,392 |
+| Matched expected exceptions | 3 |
+| Field mismatches | 0 |
+| Unexpected failures | 0 |
+| Elapsed time | 34.151 s |
+| Input SHA-256 | `5b29b1cc4e15862e073355831693aceb1681844a00f0d8323ac1784ae8497ebb` |
+| Model SHA-256 | `97136bace3016c8e8a6608238fd2ce9a710e0ee7ba41aa8228799fc344c61122` |
+| A1c SHA-256 | `d048d1a5e0ec5f7e6470ce3bce85b727f0bd7c45b4c32ce937613844e4bffc11` |
+| Simulator SHA-256 | `bc8a54879ef02c7ea64b8b333d6a976f0ea65c4949149d01f463f23bccee653e` |
+
+The stratified set covers every animal, unit operation, player, first two unit
+seats, delegated tile state, source boundary, weed regime and land count. Two
+100-case smoke runs produced the same result after elapsed time was removed.
+All 282 tests and Ruff for changed files pass.
+
+The validator compares partial player state, full unit state, market and town,
+hire positions, land, plant decay, crop refresh, animal refresh, weeds and the
+complete end-of-day state. The weed and shop projection uses the simulator's
+seeded RNG order. Adversarial review returned `CLEAN` in both passes.
+
+Decision: accept A1d. The exact offline transition stack is complete. Start
+A2a from this commit and build the correctness-first whole-horizon MILP before
+any live Kaggle runtime optimization.
