@@ -207,6 +207,7 @@ def test_transition_work_uses_capacity_without_repeated_tasks():
     assignment = space.solve_space_plan(data).assignments[0]
     assert assignment.transition_actions == 4
     assert [task.operation for task in assignment.tasks] == ["BUILD_COOP", "PLACE"]
+    assert [task.action_count for task in assignment.tasks] == [3, 1]
 
 
 def test_tasks_never_move_a_plant_or_animal():

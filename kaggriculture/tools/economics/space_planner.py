@@ -143,6 +143,7 @@ class SpaceTask:
     position: tuple[int, int]
     operation: str
     subject: str
+    action_count: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -208,20 +209,34 @@ def _tasks(cell, intent, day, mode, data):
     result = []
     structure = ANIMAL_STRUCTURES[intent.animal]
     if mode in ("dig_crop", "clear_weed"):
-        result.append(SpaceTask(day, cell.position, "DIG", cell.crop or cell.kind))
+        result.append(
+            SpaceTask(day, cell.position, "DIG", cell.crop or cell.kind, 1)
+        )
     compatible = cell.kind == structure and mode == "use_structure"
     if not compatible:
         result.append(
-            SpaceTask(day, cell.position, f"BUILD_{structure}", intent.animal)
+            SpaceTask(
+                day,
+                cell.position,
+                f"BUILD_{structure}",
+                intent.animal,
+                data.build_actions,
+            )
         )
-    result.append(SpaceTask(day, cell.position, "PLACE", intent.animal))
+    result.append(
+        SpaceTask(
+            day,
+            cell.position,
+            "PLACE",
+            intent.animal,
+            data.placement_actions,
+        )
+    )
     return tuple(result)
 
 
-def _transition_actions(cell, mode, data):
-    dig = 1 if mode in ("dig_crop", "clear_weed") else 0
-    build = 0 if mode == "use_structure" else data.build_actions
-    return dig + build + data.placement_actions
+def _transition_actions(tasks):
+    return sum(task.action_count for task in tasks)
 
 
 def _candidate(data, cell, intent, mode, placement_day, crop_loss):
@@ -237,7 +252,7 @@ def _candidate(data, cell, intent, mode, placement_day, crop_loss):
         * active_days
         * data.action_value
     )
-    transition_actions = _transition_actions(cell, mode, data)
+    transition_actions = _transition_actions(tasks)
     transition = transition_actions * data.action_value
     net = gross - travel - transition - crop_loss
     return _Candidate(
