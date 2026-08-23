@@ -33,6 +33,12 @@ class BaselinePolicy:
         self._observation = None
         self._bundle_positions = {}
         self._specialists = set()
+        self._wheat_carriers = set()
+        self._normal_max_hands = 12
+        self._expansion_day = None
+        self._normal_seed_batch = 1
+        self._seed_expansion_day = None
+        self._sale_seed_proceeds = 0
         self.reset()
 
     def reset(self) -> None:
@@ -63,15 +69,32 @@ class BaselinePolicy:
         original = module._protected_underfoot_tasks
         original_selector = module._route_rl_choice
         original_plan = module._dynamic_plan
+        original_animal_tasks = module._animal_tasks
+        original_sell_orders = module._sell_orders
+        original_seed_orders = module._seed_orders
 
         def capture(tasks, units, inventories):
             tasks[:] = [task for task in tasks if self._keep_task(module, task)]
             result = original(tasks, units, inventories)
             self._captured_tasks = tuple(tasks)
+            self._wheat_carriers = {
+                index for index, inventory in enumerate(inventories)
+                if inventory.get("WHEAT", 0) > 0
+            }
             self._select_specialists(tasks, units, inventories)
             return result
 
         def select(player, step, candidates, tasks, taken, unit_index, targets):
+            def finish(choice):
+                return self._production_feed_choice(module, candidates, choice)
+
+            if (os.environ.get("AGENT2_CRISIS_FEED", "0") == "1"
+                    and int(unit_index) in self._wheat_carriers):
+                feed = [candidate for candidate in candidates if candidate[4][0] == "FEED!"]
+                if feed:
+                    return finish(original_selector(
+                        player, step, feed, tasks, taken, unit_index, targets
+                    ))
             bundle_mode = os.environ.get("AGENT2_TILE_BUNDLES", default_bundles)
             if bundle_mode != "0":
                 position = self._bundle_positions.get((int(player), int(unit_index)))
@@ -79,22 +102,34 @@ class BaselinePolicy:
                          if candidate[5] == 0
                          and (bundle_mode == "always" or position == (candidate[2], candidate[3]))]
                 if local:
-                    return min(local, key=lambda candidate: (candidate[1], candidate[0]))[0]
+                    return finish(min(local, key=lambda candidate: (candidate[1], candidate[0]))[0])
             specialist_count = int(os.environ.get("AGENT2_ANIMAL_SPECIALISTS", "0"))
             if specialist_count > 0 and self._specialists:
                 animal = [candidate for candidate in candidates if self._is_animal_task(candidate)]
                 crops = [candidate for candidate in candidates if not self._is_animal_task(candidate)]
                 feed = [candidate for candidate in animal if candidate[4][0] in {"FEED!", "FEED"}]
                 if int(unit_index) in self._specialists and feed:
-                    return original_selector(player, step, feed, tasks, taken, unit_index, targets)
+                    return finish(original_selector(
+                        player, step, feed, tasks, taken, unit_index, targets
+                    ))
                 if (os.environ.get("AGENT2_RESERVE_ANIMAL_TASKS", "0") == "1"
                         and int(unit_index) not in self._specialists and crops):
-                    return original_selector(player, step, crops, tasks, taken, unit_index, targets)
-            return original_selector(player, step, candidates, tasks, taken, unit_index, targets)
+                    return finish(original_selector(
+                        player, step, crops, tasks, taken, unit_index, targets
+                    ))
+            return finish(original_selector(
+                player, step, candidates, tasks, taken, unit_index, targets
+            ))
 
         def plan(tiles, day, inventory, shops, board_size=10, budget=None, seeds=None):
             result = original_plan(tiles, day, inventory, shops, board_size, budget, seeds)
-            plant_cap = int(os.environ.get("AGENT2_PLANT_CAP", "0"))
+            plant_cap = int(os.environ.get("AGENT2_PLANT_CAP", "42"))
+            release_day = int(os.environ.get("AGENT2_PLANT_CAP_RELEASE_DAY", "18"))
+            if plant_cap > 0 and day >= release_day:
+                plant_cap = int(os.environ.get("AGENT2_PLANT_CAP_RELEASE", "48"))
+            final_day = int(os.environ.get("AGENT2_PLANT_CAP_FINAL_DAY", "99"))
+            if plant_cap > 0 and day >= final_day:
+                plant_cap = int(os.environ.get("AGENT2_PLANT_CAP_FINAL", "0"))
             standing_plants = sum(
                 isinstance(tile, dict) and tile.get("kind") == "PLANT"
                 for _x, _y, tile in tiles
@@ -154,14 +189,60 @@ class BaselinePolicy:
                 projected[crop] += module._effective_yield(crop)
             return result
 
+        def animal_tasks(tile, day):
+            result = original_animal_tasks(tile, day)
+            care_animals = set(filter(None, os.environ.get("AGENT2_CARE_ANIMALS", "").split(",")))
+            if care_animals and tile["animal"] not in care_animals:
+                result = [job for job in result if job[0] != "CARE"]
+            if os.environ.get("AGENT2_PRECARE", "1") != "1":
+                return result
+            feed_pays = not module.FEED_DEADLINE or any(
+                production >= day + 1 for production in module._animal_production_days(tile)
+            )
+            urgency = int(os.environ.get("AGENT2_PRECARE_URGENCY", "1"))
+            precare_animals = set(filter(
+                None, os.environ.get("AGENT2_PRECARE_ANIMALS", "").split(",")
+            ))
+            if (not tile["cared_today"] and day < module.LAST_DAY and feed_pays
+                    and tile.get("consecutive_unfed", 0) >= urgency
+                    and (not precare_animals or tile["animal"] in precare_animals)):
+                care = ("CARE", None)
+                if care not in result:
+                    result.append(care)
+            return result
+
+        def sell_orders(*args, **kwargs):
+            result = original_sell_orders(*args, **kwargs)
+            inventory = args[1]
+            self._sale_seed_proceeds = sum(
+                module._sale_revenue(item, inventory.get(item, module.MARKET_I0), count)
+                for operation, item, count in result if operation == "SELL"
+            )
+            return result
+
+        def seed_orders(wanted, money, hour=0):
+            if os.environ.get("AGENT2_SALE_FUNDED_SEEDS", "0") == "1":
+                share = float(os.environ.get("AGENT2_SALE_SEED_SHARE", "1"))
+                money += self._sale_seed_proceeds * share
+            return original_seed_orders(wanted, money, hour)
+
         module._protected_underfoot_tasks = capture
         module._route_rl_choice = select
         module._dynamic_plan = plan
+        module._animal_tasks = animal_tasks
+        module._sell_orders = sell_orders
+        module._seed_orders = seed_orders
         self.module = module
         self._captured_tasks = None
         self._observation = None
         self._bundle_positions = {}
         self._specialists = set()
+        self._wheat_carriers = set()
+        self._normal_max_hands = module.MAX_HANDS
+        self._expansion_day = None
+        self._normal_seed_batch = module.SEED_BUY_BATCH
+        self._seed_expansion_day = None
+        self._sale_seed_proceeds = 0
 
     def _keep_task(self, module, task):
         _priority, x, y, operation_data = task
@@ -202,9 +283,12 @@ class BaselinePolicy:
         if self.module is None:
             self.reset()
         self._captured_tasks = None
+        self._sale_seed_proceeds = 0
         self._observation = obs
         try:
+            self._set_expansion_settings(obs)
             action = self.module.agent(obs)
+            self._add_sale_funded_feed(obs, action)
             self._prioritize_hires(action)
             self._record_bundles(obs, action)
             day = int(obs["day"])
@@ -240,6 +324,37 @@ class BaselinePolicy:
         action["market"] = orders[:10]
         self.module._remember_market_orders(self._observation["player"], action["market"])
 
+    def _add_sale_funded_feed(self, obs, action):
+        if os.environ.get("AGENT2_SALE_FUNDED_FEED", "1") != "1" or obs["day"] >= self.module.LAST_DAY:
+            return
+        farm = obs["farms"][obs["player"]]
+        animals = [tile for row in farm["tiles"] for tile in row
+                   if isinstance(tile, dict) and "animal" in tile]
+        urgent = sum(tile.get("consecutive_unfed", 0) >= 1 for tile in animals)
+        urgency = int(os.environ.get("AGENT2_SALE_FEED_URGENCY", "1"))
+        orders = list(action.get("market", []))
+        sells = [order for order in orders if order and order[0] == "SELL"]
+        if urgent < urgency or not sells:
+            return
+        inventories = obs["private"].get("inventories", [])
+        stock = obs["private"].get("shed", {}).get("WHEAT", 0)
+        stock += sum(inventory.get("WHEAT", 0) for inventory in inventories)
+        existing = sum(order[2] for order in orders
+                       if order and order[:2] == ["BUY_PRODUCT", "WHEAT"])
+        feed_days = int(os.environ.get("AGENT2_SALE_FEED_DAYS", str(self.module.FEED_DAYS)))
+        short = len(animals) * feed_days - stock - existing
+        if short <= 0:
+            return
+        prices = obs["market"]["prices"]
+        proceeds = sum(order[2] * prices.get(order[1], 0) for order in sells)
+        wheat_price = max(1, prices.get("WHEAT", 25))
+        affordable = int((farm["money"] + proceeds * 0.5) // wheat_price)
+        take = min(short, affordable)
+        if take <= 0:
+            return
+        non_sells = [order for order in orders if not order or order[0] != "SELL"]
+        action["market"] = sells + [["BUY_PRODUCT", "WHEAT", take]] + non_sells
+
     def _select_specialists(self, tasks, units, inventories):
         count = int(os.environ.get("AGENT2_ANIMAL_SPECIALISTS", "0"))
         targets = [(x, y) for task in tasks if self._is_animal_task(task) for x, y in [(task[1], task[2])]]
@@ -256,6 +371,31 @@ class BaselinePolicy:
         )
         self._specialists = set(ranked[:count])
 
+    def _production_feed_choice(self, module, candidates, chosen):
+        if os.environ.get("AGENT2_PRODUCTION_FEED", "0") != "1":
+            return chosen
+        selected = next((candidate for candidate in candidates if candidate[0] == chosen), None)
+        if selected is None or selected[4][0] not in {"FEED", "FEED!"}:
+            return chosen
+        obs = self._observation
+        farm = obs["farms"][obs["player"]]
+        eligible = [
+            candidate for candidate in candidates
+            if candidate[4][0] in {"FEED", "FEED!"}
+            and candidate[1] == selected[1]
+            and candidate[-1] == selected[-1]
+        ]
+
+        def value(candidate):
+            tile = farm["tiles"][candidate[3]][candidate[2]]
+            produces = obs["day"] + 1 in module._animal_production_days(tile)
+            product = module.ANIMALS[tile["animal"]]["product"]
+            price = obs["market"]["prices"].get(product, 0)
+            return produces, tile.get("pending_care_bonus", 0) * price, price, -candidate[6]
+
+        best = max(eligible, key=value, default=selected)
+        return best[0] if value(best) > value(selected) else chosen
+
     def _is_animal_task(self, task):
         if len(task) > 4:
             x, y, operation_data = task[2], task[3], task[4]
@@ -269,3 +409,25 @@ class BaselinePolicy:
         obs = self._observation
         tile = obs["farms"][obs["player"]]["tiles"][y][x]
         return isinstance(tile, dict) and "animal" in tile
+
+    def _set_expansion_settings(self, obs):
+        surge_hands = int(os.environ.get("AGENT2_EXPANSION_HANDS", "0"))
+        self.module.MAX_HANDS = self._normal_max_hands
+        farm = obs["farms"][obs["player"]]
+        empty_tiles = sum(tile is None for row in farm["tiles"] for tile in row)
+        if surge_hands > self._normal_max_hands and self.module._land_orders(
+                farm, obs["day"], empty_tiles):
+            self._expansion_day = obs["day"]
+        duration = int(os.environ.get("AGENT2_EXPANSION_HAND_DAYS", "2"))
+        if self._expansion_day is not None and 0 <= obs["day"] - self._expansion_day < duration:
+            self.module.MAX_HANDS = surge_hands
+        self.module.SEED_BUY_BATCH = self._normal_seed_batch
+        seed_batch = int(os.environ.get("AGENT2_EXPANSION_SEED_BATCH", "0"))
+        if seed_batch <= self._normal_seed_batch:
+            return
+        if len(farm.get("unlocked_quadrants", ["NW"])) >= 3 and self._seed_expansion_day is None:
+            self._seed_expansion_day = obs["day"]
+        seed_days = int(os.environ.get("AGENT2_EXPANSION_SEED_DAYS", "2"))
+        if (self._seed_expansion_day is not None
+                and 0 <= obs["day"] - self._seed_expansion_day < seed_days):
+            self.module.SEED_BUY_BATCH = seed_batch

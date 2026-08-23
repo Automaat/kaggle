@@ -3240,3 +3240,67 @@ Adding 14 or 16 animals to the 42-plant arm lost -$6,850 +/- $1,984 and -$7,043 
 The selected 75-tile policy still loses to the 50-tile champion: -$12,081 +/- $2,631 on 40 fresh paired seeds. On 50 tiles the full route package is neutral at -$97 +/- $1,706. The scale improvement therefore passes the 50-tile regression gate and strongly beats old 75, but it fails the economic land gate.
 
 Keep the three selected mechanisms in the experimental Agent 2 candidate: hire batch 10, guarded tile bundles and trip radius one. Do not change root `main.py`. Do not test 100 tiles until a 75-tile policy beats the 50-tile champion and clears the mechanism gates.
+
+## Round 39 staged 75-tile utilization
+
+Status: accepted. The 75-tile candidate beats the frozen 50-tile champion.
+
+All experiments used `agents_2.0.x/round38_2_hire_batch` in the isolated worktree. Root `main.py` stayed unchanged. Screens were paired and seat-swapped.
+
+### Cash and animal diagnosis
+
+The fast hire batch exposed a market-order timing error. On expansion mornings, workers spawned at the shed before bought wheat arrived and then left empty-handed. On seed 3762600, three animals escaped the next morning. Moving an urgent wheat purchase after same-turn sales and before hires reduced that episode's gap from -$26.8k to -$5.0k.
+
+The environment also permits `CARE` before `FEED`. The frozen task generator hid `CARE` until the animal was fed. Full pre-care overloaded the queue. Pre-care restricted to animals with one unfed day improved the combined policy.
+
+| Arm | Seeds | Delta vs 50 champion | Decision |
+|:---|---:|---:|:---|
+| Sale-funded feed, urgency 1, two feed-days | 20 | -$4,394 +/- $2,870 | keep |
+| Full pre-care | 20 | -$6,762 +/- $3,061 | reject |
+| Urgent pre-care plus sale-funded feed | 20 | -$3,495 +/- $2,381 | keep |
+| One feed specialist | 20 | -$6,719 +/- $3,643 | reject |
+| Two feed specialists | 20 | -$7,079 +/- $2,483 | reject |
+| Expansion-only 14 hands | 20 | -$5,352 +/- $2,221 | reject |
+
+### Closed cash and routing arms
+
+Same-turn sale funding did not generalize beyond urgent feed. Funding seeds, prioritizing a carried-wheat emergency, and changing the selected feed target all lost after the feed fix was present.
+
+| Arm | Seeds | Delta vs 50 champion |
+|:---|---:|---:|
+| Sale-funded seeds | 20 | -$3,735 +/- $3,003 |
+| Production-night feed tiebreak | 20 | -$4,357 +/- $2,702 |
+| Both | 20 | -$7,502 +/- $3,028 |
+| Expansion seed batch 4 for two days | 20 | -$4,483 +/- $2,084 |
+| Carried-wheat crisis routing | 20 | -$4,453 +/- $2,566 |
+| Both seed batch and crisis routing | 20 | -$6,287 +/- $2,712 |
+| Thirteen hands all season | 20 | -$5,374 +/- $2,427 |
+| Fourteen hands, batch 10 | 20 | -$11,556 +/- $3,525 |
+
+Strawberry caps of 42 and 48 lost -$11,210 and -$7,140. The issue was total concurrent work, not crop identity.
+
+### Staged utilization
+
+A fixed cap of 42 plants first crossed the old 50-tile score on the screen at +$2,061 +/- $1,993, but fell to +$520 +/- $1,962 on a fresh 40-seed block. Releasing capacity after the expansion shock was stronger.
+
+| Schedule | Seeds | Delta vs 50 champion | Decision |
+|:---|---:|---:|:---|
+| 42 plants, then 48 on day 18 | 40 fresh | +$2,544 +/- $2,000 | pass |
+| 42 plants, then 55 on day 22 | 40 fresh | +$1,942 +/- $1,728 | pass |
+| 42, then 48, then 63 on day 24 | 40 fresh | +$2,449 +/- $2,408 | screen pass |
+| 42, then 48 on day 18 | 200 fresh | **+$3,581 +/- $944** | accept |
+| 42, then 48, then 63 on day 24 | 200 fresh | +$842 +/- $987 | reject |
+
+The accepted 200-seed confirmation scored 74% points, won 296 of 400 games, averaged $82,732 and had no failures. Its lower 95% confidence bound is +$2,637.
+
+The full 63-plant release would combine with 12 animals to occupy all 75 tiles, but its 200-seed lower confidence bound was -$145. Full physical occupancy therefore remains rejected. The accepted policy buys 75 tiles and uses only the positive-marginal part of the field during the measured season.
+
+### Mechanism and regression gates
+
+The ten-seed probe for the accepted default reported 45.3% movement, 30.7% work, 35.1% same-tile work, a 1.01-tile mean work gap, 2.7% missed water, 8.7% missed feed and 9.5% missed care. Movement and animal-neglect gates now pass. Mean productive occupancy is 69.7% because capacity is intentionally held at 42 and then 48 plants.
+
+On 50 tiles, the same routing, feed and urgent pre-care package scored 100% points and +$7,015 +/- $772 over 40 fresh seeds against the frozen champion. There is no 50-tile regression.
+
+### Final decision
+
+Keep land 2, 12 hands, hire batch 10, guarded tile bundles, radius 1, sale-funded urgent feed, urgent pre-care, a 42-plant expansion cap and release to 48 plants on day 18 as the Agent 2 default. Do not enable the day-24 release to 63. Root `main.py` remains unchanged.
