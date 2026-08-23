@@ -540,7 +540,14 @@ def _existing_ongoing_options(data, existing_index, plant):
     )
 
 
-def _pipeline_option(data, crop, plant_day, existing_index, watered_today):
+def _pipeline_option(
+    data,
+    crop,
+    plant_day,
+    existing_index,
+    watered_today,
+    held_units=0,
+):
     active_start = max(data.current_day, plant_day)
     action_values = {
         day: 1
@@ -556,7 +563,7 @@ def _pipeline_option(data, crop, plant_day, existing_index, watered_today):
         plant_day if existing_index is None else None,
         data.last_day,
         data.last_day,
-        0,
+        held_units,
         tuple(range(plant_day, data.last_day + 1))
         if existing_index is None
         else (),
@@ -611,6 +618,7 @@ def _pipeline_options(data):
                 plant.planted_day,
                 index,
                 plant.watered_today,
+                plant.yield_units,
             )
         )
     return tuple(result)
@@ -624,13 +632,12 @@ def _active_crop_terminal_value(data, option):
         plant_day = data.existing_plants[option.existing_index].planted_day
     if CROP_SPECS[option.crop].ongoing:
         productions = scheduled_production_days(option.crop, plant_day, LAST_DAY)
-        if (
-            productions
-            and max(productions) <= data.last_day
-            and option.harvests
-            and option.harvests[-1][0] == max(productions)
-        ):
-            return 0.0
+        if productions and max(productions) <= data.last_day:
+            if option.harvests:
+                return 0.0
+            return option.yield_units * data.terminal_values.goods[
+                CROPS.index(option.crop)
+            ]
     progress_days = max(0, data.last_day - plant_day + 1)
     maturity_days = max(1, CROP_SPECS[option.crop].first_yield_day)
     progress = min(1.0, progress_days / maturity_days)

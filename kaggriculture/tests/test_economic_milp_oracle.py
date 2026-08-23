@@ -525,6 +525,53 @@ def test_pipeline_excludes_expired_existing_one_time_crop():
     )
 
 
+def test_exhausted_ongoing_crop_values_only_held_goods():
+    terminal_values = oracle.CropTerminalValues(
+        (0, 0, 500, 0, 0),
+        (0,) * len(market.CROPS),
+        (0, 0, 10, 0, 0),
+        0,
+    )
+    plant = oracle.ExistingPlant((0, 0), "TOMATO", 0, 1, False, 0, -1)
+    data = _input(
+        day=12,
+        cash=0,
+        existing=(plant,),
+        terminal_day=14,
+        terminal_values=terminal_values,
+    )
+    option = next(
+        value
+        for value in oracle.generate_crop_options(data)
+        if value.existing_index == 0 and not value.harvests
+    )
+    assert option.yield_units == 1
+    assert oracle._active_crop_terminal_value(data, option) == 10
+
+
+def test_harvested_exhausted_crop_does_not_double_count_active_tail():
+    terminal_values = oracle.CropTerminalValues(
+        (0, 0, 180, 0, 0),
+        (0,) * len(market.CROPS),
+        (0, 0, 36, 0, 0),
+        0,
+    )
+    plant = oracle.ExistingPlant((0, 0), "TOMATO", 0, 1, False, 0, -1)
+    data = _input(
+        day=12,
+        cash=0,
+        existing=(plant,),
+        slots=0,
+        terminal_day=16,
+        terminal_values=terminal_values,
+    )
+    result = oracle.solve_oracle(data, 10, 0)
+    assert result.success
+    assert result.terminal_value == 36
+    assert result.forecast_terminal_cash == 36
+    assert oracle.verify_result(data, result) == ()
+
+
 def test_terminal_inventory_value_is_separate_from_boundary_cash():
     terminal_values = oracle.CropTerminalValues(
         (0,) * len(market.CROPS),
