@@ -50,6 +50,9 @@ class BaselinePolicy:
         module.MAX_HANDS = int(os.environ.get("AGENT2_MAX_HANDS", "12"))
         module.HANDS_PER_TILE = float(os.environ.get("AGENT2_HANDS_PER_TILE", "0.2"))
         module.HIRES_PER_TURN = int(os.environ.get("AGENT2_HIRE_BATCH", "10"))
+        module.SEED_BUY_STOP_HOUR = int(os.environ.get(
+            "AGENT2_SEED_BUY_STOP_HOUR", str(module.SEED_BUY_STOP_HOUR)
+        ))
         default_radius = "1"
         default_bundles = "1"
         module.TRIP_RADIUS = int(os.environ.get("AGENT2_TRIP_RADIUS", default_radius))
@@ -72,6 +75,7 @@ class BaselinePolicy:
         original_animal_tasks = module._animal_tasks
         original_sell_orders = module._sell_orders
         original_seed_orders = module._seed_orders
+        original_fertilize_pays = module._fertilize_pays
 
         def capture(tasks, units, inventories):
             tasks[:] = [task for task in tasks if self._keep_task(module, task)]
@@ -123,13 +127,7 @@ class BaselinePolicy:
 
         def plan(tiles, day, inventory, shops, board_size=10, budget=None, seeds=None):
             result = original_plan(tiles, day, inventory, shops, board_size, budget, seeds)
-            plant_cap = int(os.environ.get("AGENT2_PLANT_CAP", "42"))
-            release_day = int(os.environ.get("AGENT2_PLANT_CAP_RELEASE_DAY", "18"))
-            if plant_cap > 0 and day >= release_day:
-                plant_cap = int(os.environ.get("AGENT2_PLANT_CAP_RELEASE", "48"))
-            final_day = int(os.environ.get("AGENT2_PLANT_CAP_FINAL_DAY", "99"))
-            if plant_cap > 0 and day >= final_day:
-                plant_cap = int(os.environ.get("AGENT2_PLANT_CAP_FINAL", "0"))
+            plant_cap = self._plant_cap(day)
             standing_plants = sum(
                 isinstance(tile, dict) and tile.get("kind") == "PLANT"
                 for _x, _y, tile in tiles
@@ -148,6 +146,41 @@ class BaselinePolicy:
                 )
                 for position in planned_crops[:plant_excess]:
                     result[position] = None
+            final_crop = os.environ.get("AGENT2_FINAL_EXTRA_CROP", "")
+            final_day = int(os.environ.get("AGENT2_PLANT_CAP_FINAL_DAY", "99"))
+            if final_crop in module.CROPS and day >= final_day:
+                base_cap = int(os.environ.get("AGENT2_FINAL_BASE_CAP", "48"))
+                positions = [position for position, crop in result.items() if crop in module.CROPS]
+                extra = max(0, standing_plants + len(positions) - base_cap)
+                middle = board_size // 2
+                ports = ((middle - 1, middle - 1), (middle, middle - 1),
+                         (middle - 1, middle), (middle, middle))
+                positions.sort(
+                    key=lambda position: min(
+                        abs(position[0] - port[0]) + abs(position[1] - port[1]) for port in ports
+                    ),
+                    reverse=True,
+                )
+                for position in positions[:extra]:
+                    result[position] = final_crop
+            if os.environ.get("AGENT2_SERVICE_FLOW_LAYOUT", "0") == "1":
+                middle = board_size // 2
+                ports = ((middle - 1, middle - 1), (middle, middle - 1),
+                         (middle - 1, middle), (middle, middle))
+                positions = [position for position, crop in result.items() if crop in module.CROPS]
+                crops = [result[position] for position in positions]
+                order = os.environ.get(
+                    "AGENT2_SERVICE_FLOW_ORDER",
+                    "CARROT,WHEAT,TOMATO,MELON,STRAWBERRY",
+                ).split(",")
+                rank = {crop: index for index, crop in enumerate(order)}
+                positions.sort(key=lambda position: (
+                    min(abs(position[0] - port[0]) + abs(position[1] - port[1]) for port in ports),
+                    position,
+                ))
+                crops.sort(key=lambda crop: (rank.get(crop, len(rank)), crop))
+                for position, crop in zip(positions, crops):
+                    result[position] = crop
             cap = int(os.environ.get("AGENT2_STRAWBERRY_CAP", "0"))
             if cap <= 0:
                 return result
@@ -226,12 +259,22 @@ class BaselinePolicy:
                 money += self._sale_seed_proceeds * share
             return original_seed_orders(wanted, money, hour)
 
+        def fertilize_pays(tile, crop, age, day):
+            if original_fertilize_pays(tile, crop, age, day):
+                return True
+            final_day = int(os.environ.get("AGENT2_PLANT_CAP_FINAL_DAY", "99"))
+            crops = set(filter(
+                None, os.environ.get("AGENT2_TERMINAL_FERTILIZE", "").split(",")
+            ))
+            return crop in crops and tile.get("planted_day", -1) >= final_day and age == 1
+
         module._protected_underfoot_tasks = capture
         module._route_rl_choice = select
         module._dynamic_plan = plan
         module._animal_tasks = animal_tasks
         module._sell_orders = sell_orders
         module._seed_orders = seed_orders
+        module._fertilize_pays = fertilize_pays
         self.module = module
         self._captured_tasks = None
         self._observation = None
@@ -247,9 +290,26 @@ class BaselinePolicy:
     def _keep_task(self, module, task):
         _priority, x, y, operation_data = task
         operation, _item = operation_data
+        obs = self._observation
+        if os.environ.get("AGENT2_TERMINAL_PRUNE", "0") == "1":
+            day = obs["day"]
+            if day >= module.LAST_DAY and operation in {
+                    "WATER!", "WATER", "FERTILIZE", "CARE", "DIG"}:
+                return False
+            if day >= module.LAST_DAY - 1 and operation == "CARE":
+                return False
+            if operation == "DIG" and not any(
+                    day + module.LIFESPAN[crop] <= module.LAST_DAY for crop in module.CROPS):
+                return False
+        if operation == "DIG" and os.environ.get("AGENT2_SKIP_CAP_WEEDS", "0") == "1":
+            farm = obs["farms"][obs["player"]]
+            standing = sum(
+                isinstance(tile, dict) and tile.get("kind") == "PLANT"
+                for row in farm["tiles"] for tile in row
+            )
+            return standing < self._plant_cap(obs["day"])
         if operation not in ("WATER", "FERTILIZE", "HARVEST"):
             return True
-        obs = self._observation
         player = obs["player"]
         farm = obs["farms"][player]
         tile = farm["tiles"][y][x]
@@ -315,6 +375,16 @@ class BaselinePolicy:
 
     def _prioritize_hires(self, action):
         orders = list(action.get("market", []))
+        late_day = int(os.environ.get("AGENT2_LATE_HIRE_FIRST_DAY", "99"))
+        if self._observation["day"] >= late_day:
+            sells = [order for order in orders if order and order[0] == "SELL"]
+            feed = [order for order in orders
+                    if order and order[:2] == ["BUY_PRODUCT", "WHEAT"]]
+            hires = [order for order in orders if order and order[0] == "HIRE"]
+            others = [order for order in orders
+                      if order and order[0] not in {"SELL", "HIRE"}
+                      and order[:2] != ["BUY_PRODUCT", "WHEAT"]]
+            orders = sells + feed + hires + others
         if os.environ.get("AGENT2_HIRE_FIRST", "0") == "1" and any(
                 order and order[0] == "BUY_LAND" for order in orders):
             sells = [order for order in orders if order and order[0] == "SELL"]
@@ -339,6 +409,9 @@ class BaselinePolicy:
         inventories = obs["private"].get("inventories", [])
         stock = obs["private"].get("shed", {}).get("WHEAT", 0)
         stock += sum(inventory.get("WHEAT", 0) for inventory in inventories)
+        if os.environ.get("AGENT2_FEED_ACTION_LEDGER", "0") == "1":
+            operations = [action.get("farmer"), *action.get("hands", [])]
+            stock -= sum(operation and operation[0] == "FEED" for operation in operations)
         existing = sum(order[2] for order in orders
                        if order and order[:2] == ["BUY_PRODUCT", "WHEAT"])
         feed_days = int(os.environ.get("AGENT2_SALE_FEED_DAYS", str(self.module.FEED_DAYS)))
@@ -409,6 +482,23 @@ class BaselinePolicy:
         obs = self._observation
         tile = obs["farms"][obs["player"]]["tiles"][y][x]
         return isinstance(tile, dict) and "animal" in tile
+
+    @staticmethod
+    def _plant_cap(day):
+        plant_cap = int(os.environ.get("AGENT2_PLANT_CAP", "42"))
+        ramp = int(os.environ.get("AGENT2_PLANT_CAP_RAMP", "0"))
+        if ramp > 0:
+            start = int(os.environ.get("AGENT2_PLANT_CAP_RAMP_DAY", "18"))
+            target = int(os.environ.get("AGENT2_PLANT_CAP_RAMP_TARGET", "63"))
+            growth = max(0, day - start + 1) * ramp
+            return min(target, plant_cap + growth)
+        release_day = int(os.environ.get("AGENT2_PLANT_CAP_RELEASE_DAY", "18"))
+        if plant_cap > 0 and day >= release_day:
+            plant_cap = int(os.environ.get("AGENT2_PLANT_CAP_RELEASE", "48"))
+        final_day = int(os.environ.get("AGENT2_PLANT_CAP_FINAL_DAY", "99"))
+        if plant_cap > 0 and day >= final_day:
+            plant_cap = int(os.environ.get("AGENT2_PLANT_CAP_FINAL", "0"))
+        return plant_cap
 
     def _set_expansion_settings(self, obs):
         surge_hands = int(os.environ.get("AGENT2_EXPANSION_HANDS", "0"))

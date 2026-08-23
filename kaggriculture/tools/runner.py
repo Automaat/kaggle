@@ -1,5 +1,7 @@
 """Shared helpers to run Kaggriculture episodes locally."""
 
+import os
+
 from pathlib import Path
 
 from kaggle_environments import make
@@ -9,6 +11,34 @@ from artifact import load_artifact
 ROOT = Path(__file__).resolve().parent.parent
 BUILTIN = {"pass", "random", "starter"}
 CHAMPION = "agents_1.0.x/v1_14_0_central_herd.py"
+
+
+class ConfiguredAgent:
+    def __init__(self, name, values):
+        self.values = values
+        self.inner = self._apply(lambda: load_agent(name))
+
+    def _apply(self, callback, *args):
+        missing = object()
+        previous = {key: os.environ.get(key, missing) for key in self.values}
+        os.environ.update(self.values)
+        try:
+            return callback(*args)
+        finally:
+            for key, value in previous.items():
+                if value is missing:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+    def __call__(self, obs, _configuration=None):
+        return self._apply(self.inner, obs)
+
+
+def configured_agent(spec):
+    name, *settings = spec.split(";")
+    values = dict(setting.split("=", 1) for setting in settings)
+    return ConfiguredAgent(name, values)
 
 
 def load_agent(name):
@@ -31,6 +61,8 @@ def load_agent(name):
         from variants import variant
 
         return variant(name.partition(":")[2])
+    if name.startswith("configured:"):
+        return configured_agent(name.partition(":")[2])
     path = Path(name)
     if not path.is_absolute():
         path = ROOT / name

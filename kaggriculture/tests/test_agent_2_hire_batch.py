@@ -106,3 +106,62 @@ def test_plant_cap_release_finishes_live_episode(monkeypatch):
     monkeypatch.setenv("AGENT2_PLANT_CAP_RELEASE", "55")
     _, _, statuses = run_match(str(CANDIDATE), BASELINE, seed=54)
     assert statuses == ["DONE", "DONE"]
+
+
+def test_plant_cap_ramp_finishes_live_episode(monkeypatch):
+    monkeypatch.setenv("AGENT2_PLANT_CAP_RAMP", "3")
+    _, _, statuses = run_match(str(CANDIDATE), BASELINE, seed=55)
+    assert statuses == ["DONE", "DONE"]
+
+
+def test_skip_cap_weeds_finishes_live_episode(monkeypatch):
+    monkeypatch.setenv("AGENT2_SKIP_CAP_WEEDS", "1")
+    _, _, statuses = run_match(str(CANDIDATE), BASELINE, seed=56)
+    assert statuses == ["DONE", "DONE"]
+
+
+def test_terminal_prune_finishes_live_episode(monkeypatch):
+    monkeypatch.setenv("AGENT2_TERMINAL_PRUNE", "1")
+    _, _, statuses = run_match(str(CANDIDATE), BASELINE, seed=57)
+    assert statuses == ["DONE", "DONE"]
+
+
+def test_service_flow_layout_finishes_live_episode(monkeypatch):
+    monkeypatch.setenv("AGENT2_SERVICE_FLOW_LAYOUT", "1")
+    _, _, statuses = run_match(str(CANDIDATE), BASELINE, seed=58)
+    assert statuses == ["DONE", "DONE"]
+
+
+def test_final_extra_crop_finishes_live_episode(monkeypatch):
+    monkeypatch.setenv("AGENT2_PLANT_CAP_FINAL_DAY", "24")
+    monkeypatch.setenv("AGENT2_PLANT_CAP_FINAL", "63")
+    monkeypatch.setenv("AGENT2_FINAL_EXTRA_CROP", "CARROT")
+    _, _, statuses = run_match(str(CANDIDATE), BASELINE, seed=59)
+    assert statuses == ["DONE", "DONE"]
+
+
+def test_terminal_fertilize_finishes_live_episode(monkeypatch):
+    monkeypatch.setenv("AGENT2_PLANT_CAP_FINAL_DAY", "24")
+    monkeypatch.setenv("AGENT2_PLANT_CAP_FINAL", "63")
+    monkeypatch.setenv("AGENT2_FINAL_EXTRA_CROP", "WHEAT")
+    monkeypatch.setenv("AGENT2_TERMINAL_FERTILIZE", "WHEAT")
+    _, _, statuses = run_match(str(CANDIDATE), BASELINE, seed=60)
+    assert statuses == ["DONE", "DONE"]
+
+
+def test_late_hire_first_finishes_live_episode(monkeypatch):
+    monkeypatch.setenv("AGENT2_LATE_HIRE_FIRST_DAY", "24")
+    _, _, statuses = run_match(str(CANDIDATE), BASELINE, seed=61)
+    assert statuses == ["DONE", "DONE"]
+
+
+def test_seed_buy_stop_finishes_live_episode(monkeypatch):
+    monkeypatch.setenv("AGENT2_SEED_BUY_STOP_HOUR", "20")
+    _, _, statuses = run_match(str(CANDIDATE), BASELINE, seed=62)
+    assert statuses == ["DONE", "DONE"]
+
+
+def test_feed_action_ledger_finishes_live_episode(monkeypatch):
+    monkeypatch.setenv("AGENT2_FEED_ACTION_LEDGER", "1")
+    _, _, statuses = run_match(str(CANDIDATE), BASELINE, seed=63)
+    assert statuses == ["DONE", "DONE"]

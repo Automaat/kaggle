@@ -1,5 +1,6 @@
 import copy
 import json
+import os
 import pathlib
 import shutil
 import subprocess
@@ -181,6 +182,13 @@ def test_existing_loader_forms_remain_available():
     assert callable(load_agent("specialist:melon"))
     assert callable(load_agent("current:melon"))
     assert callable(load_agent("variant:KAGG_LAND=1"))
+
+
+def test_configured_loader_isolates_environment(monkeypatch):
+    monkeypatch.delenv("AGENT2_PLANT_CAP", raising=False)
+    configured = load_agent(f"configured:{CANDIDATE};AGENT2_PLANT_CAP=38")
+    assert callable(configured)
+    assert "AGENT2_PLANT_CAP" not in os.environ
 
 
 def test_runner_executes_two_loaded_file_agents():

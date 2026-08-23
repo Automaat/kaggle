@@ -3304,3 +3304,52 @@ On 50 tiles, the same routing, feed and urgent pre-care package scored 100% poin
 ### Final decision
 
 Keep land 2, 12 hands, hire batch 10, guarded tile bundles, radius 1, sale-funded urgent feed, urgent pre-care, a 42-plant expansion cap and release to 48 plants on day 18 as the Agent 2 default. Do not enable the day-24 release to 63. Root `main.py` remains unchanged.
+
+## Round 40 marginal field follow-up
+
+Status: no further change accepted. The Round 39 default remains the 75-tile champion.
+
+All direct tests used a configured loader that gives each agent an isolated environment. This permits low-variance comparisons between one changed setting and the default in the same process. Root `main.py` remained unchanged.
+
+### Plant admission and endgame
+
+The default 42-plant cap and day-18 release to 48 is a local optimum. Direct paired tests against that default rejected lower and higher initial caps, later releases, gradual ramps and a larger release.
+
+| Arm | Seeds | Direct delta vs default |
+|:---|---:|---:|
+| Initial cap 38 | 40 | -$1,816 +/- $808 |
+| Initial cap 40 | 20 | -$834 +/- $859 |
+| Initial cap 44 | 20 | -$453 +/- $1,340 |
+| Release cap 45 | 20 | -$262 +/- $876 |
+| Release cap 51 | 20 | -$2,428 +/- $1,543 |
+| Release day 17 | 20 | -$899 +/- $1,455 |
+| Release day 19 | 20 | -$1,223 +/- $1,059 |
+| Release day 20 | 20 | -$437 +/- $905 |
+
+Linear cap growth of two, three or four plants per day lost $5.3k, $7.4k and $6.3k on the first three-seed mechanism screen. Late caps of 52 and 56 gave small same-block gains against the frozen 50 champion, but both lost on a fresh block and did not survive direct comparison.
+
+The full-field loss is not only a terminal cashout error. Suppressing terminal tasks, harvesting before terminal water, forcing the extra cohort to carrot or wheat, and fertilizing only the terminal cohort did not beat the 48-plant schedule. A short wheat cohort from day 19 also failed directly.
+
+| Short wheat cap | Seeds | Direct delta vs default |
+|---:|---:|---:|
+| 52 | 20 | -$1,797 +/- $1,028 |
+| 56 | 20 | -$3,278 +/- $1,174 |
+| 63 | 20 | -$5,635 +/- $1,623 |
+
+Reassigning the same crop counts by distance also failed. Putting short-cycle crops near the shed lowered own money by about $2.7k on four seeds. The reverse order lowered it by about $4.0k. Geometry alone does not repair admission of too much work.
+
+### Feed, care and market state
+
+Accounting for wheat consumed by actions before the market executes was correct but action-neutral at this scale: +$19 +/- $197 over 40 direct seeds. The existing sale-funded feed rule remains important. Disabling it lost $2,696 +/- $1,309 over 20 direct seeds.
+
+The current two-day feed target and 50% sale-proceeds allowance remain the best tested settings. A one-day target scored +$99 +/- $215. A three-day target scored -$392 +/- $653. Sale shares of 25%, 75% and 100% all scored below the default on the same block.
+
+Restricting all care to one species caused large losses. Restricting only pre-care to sheep gave an initial +$345 signal, then failed the 80-seed confirmation at -$33 +/- $443 and 49% points. Feeding or caring for production-night animals before safe crop work also failed.
+
+### Routing retest
+
+The staged plant cap did not expose a new local routing optimum. Distance weights 0.3 and 0.8, continuation weights 0 and 0.25, and the earlier service-flow remap all failed. Continuation weight zero screened at +$668 +/- $1,023, then confirmed at -$273 +/- $521 over 80 fresh direct seeds and 43% points.
+
+### Final decision
+
+Keep the Round 39 default unchanged. It beats the frozen 50-tile champion by $3,581 +/- $944 over 200 fresh paired seeds. Every tested attempt to fill the last 15 crop slots displaced higher-value animal or crop work. Full physical occupancy remains an invalid target for the present 30-day economy. The next material experiment requires a joint crop-and-route admission solver that prices the work displaced by each added plant, not another static cap or task-priority rule.
