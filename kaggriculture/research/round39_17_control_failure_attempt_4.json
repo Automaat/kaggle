@@ -1,0 +1,11 @@
+{
+  "arm": "control-1.14",
+  "candidate_seat": 0,
+  "error": "WholeFarmSolveError: coupled solve failed after 5 cuts: ledger:day 10 exceeds field capacity; ledger:day 11 exceeds field capacity; ledger:day 12 exceeds field capacity; ledger:day 13 exceeds field capacity; ledger:day 14 exceeds field capacity; ledger:day 15 exceeds field capacity; ledger:day 16 exceeds field capacity; ledger:day 17 exceeds field capacity; ledger:day 18 exceeds field capacity; ledger:day 19 exceeds field capacity; ledger:day 20 exceeds field capacity; ledger:day 21 exceeds field capacity; ledger:day 22 exceeds field capacity; ledger:day 23 exceeds field capacity; ledger:day 24 exceeds field capacity; ledger:day 25 exceeds field capacity; ledger:day 26 exceeds field capacity; ledger:day 27 exceeds field capacity; ledger:day 28 exceeds field capacity",
+  "failure_step": 216,
+  "game_completed": false,
+  "replay_written": false,
+  "seed": 3980000,
+  "status": "rejected-field-capacity-coupling",
+  "trace_written": false
+}
