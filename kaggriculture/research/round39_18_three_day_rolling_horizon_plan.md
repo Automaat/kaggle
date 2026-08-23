@@ -50,7 +50,13 @@ Na końcu trzeciego dnia ramię C doda wartość dalszego stanu do dnia 29:
 - pszenica: wartość sprzedaży albo uniknięty koszt zakupu paszy, zależnie od przyszłego zapotrzebowania
 - nawóz: dodatkowa wartość realnych przyszłych plonów, ograniczona liczbą upraw i akcji
 
-Ogon użyje znanego harmonogramu sklepów. Wartości będą konserwatywne i nie przekroczą wykonalnej wartości pełnego modelu dla tego samego stanu. Współczynniki zostaną skalibrowane na zapisanych stanach A, bez użycia wyników seedów testowych do strojenia.
+Ogon użyje tylko bieżącej sygnatury otwartych sklepów i oczekiwanych gałęzi `ShopForecast`. Nie użyje ukrytego przyszłego harmonogramu sklepów. Wartości będą konserwatywne i nie przekroczą wykonalnej wartości pełnego modelu dla tego samego stanu. Współczynniki zostaną skalibrowane na zapisanych stanach A, bez użycia wyników seedów testowych do strojenia.
+
+## Amendment: parametryczny horyzont
+
+`exact_horizon_days` będzie parametrem od 1 do 30. Brak wartości oznacza pełne ramię A. Ogon strategiczny wymaga krótszego dokładnego horyzontu. Cutoff wynosi minimum z dnia 29 oraz `current_day + exact_horizon_days - 1`. Krok końcowy wynosi minimum z 718 oraz końca dnia cutoff.
+
+Sweep 39.18 porówna najpierw 3 i 5 dokładnych dni z tym samym ogonem. Próba 7 użyje `exact_horizon_days=5` i strategicznego ogona. Konfiguracja, fingerprint, trace, progress i wynik gry zapiszą dokładną wartość parametru. Bramki i sparowane seedy pozostają bez zmian.
 
 ## Przeliczanie i zdarzenia
 
