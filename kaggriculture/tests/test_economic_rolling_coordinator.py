@@ -238,6 +238,14 @@ def test_execution_signal_rejects_duplicate_deltas_and_identifiers():
         _signal(completed=("effect", "effect"))
 
 
+def test_delta_identity_distinguishes_boolean_integer_and_float_keys():
+    boolean = _delta("topology", ("tile", True), "a", "b")
+    integer = _delta("topology", ("tile", 1), "a", "b")
+    decimal = _delta("topology", ("tile", 1.0), "a", "b")
+    assert len({boolean, integer, decimal}) == 3
+    assert _signal((boolean, integer, decimal))
+
+
 def test_shop_signature_preserves_duplicates_and_ignores_order():
     first = _observation(shops=("PET_CAFE", "YARN_STORE", "PET_CAFE"))
     second = _observation(shops=("YARN_STORE", "PET_CAFE", "PET_CAFE"))
@@ -458,6 +466,25 @@ def test_expected_effect_does_not_hide_simultaneous_weed():
             step=1,
             topology="topology-mixed",
             signal=_signal((expected, weed), (effect.identifier,)),
+        )
+    )
+    assert isinstance(repaired, coordinator.WholeFarmIntent)
+    assert repaired.epoch == first.epoch + 1
+    assert _phases(backend) == ["whole", "space", "routes"]
+
+
+def test_type_distinct_target_does_not_match_expected_effect():
+    effect = _effect(0, target=("tile", True))
+    backend = RecordingBackend()
+    backend.effects_by_epoch[0] = (effect,)
+    rolling = coordinator.RollingCoordinator(backend)
+    first = rolling.prepare(_observation())
+    unexpected = _delta("topology", ("tile", 1), "a", "b")
+    repaired = rolling.prepare(
+        _observation(
+            step=1,
+            topology="topology-1",
+            signal=_signal((unexpected,), (effect.identifier,)),
         )
     )
     assert isinstance(repaired, coordinator.WholeFarmIntent)

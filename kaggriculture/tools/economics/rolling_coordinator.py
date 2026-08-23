@@ -116,7 +116,7 @@ def _validate_epoch(value, name="epoch"):
         raise ValueError(f"{name} must be nonnegative")
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, eq=False)
 class ObservedDelta:
     domain: str
     target_key: str | tuple
@@ -135,6 +135,24 @@ class ObservedDelta:
         _validate_fingerprint(self.post_state_fingerprint, "post-state fingerprint")
         if self.pre_state_fingerprint == self.post_state_fingerprint:
             raise ValueError("delta states must differ")
+
+    @property
+    def identity(self):
+        return canonical_sha256(
+            "observed-delta",
+            (
+                self.domain,
+                self.target_key,
+                self.pre_state_fingerprint,
+                self.post_state_fingerprint,
+            ),
+        )
+
+    def __eq__(self, other):
+        return type(other) is ObservedDelta and self.identity == other.identity
+
+    def __hash__(self):
+        return int(self.identity[:16], 16)
 
 
 @dataclass(frozen=True, slots=True)
