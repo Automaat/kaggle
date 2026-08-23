@@ -79,7 +79,41 @@ def test_ongoing_options_stop_at_four_productions():
     assert _option(options, "STRAWBERRY", 0, 10).yield_units == 1
     final = _option(options, "STRAWBERRY", 0, 16)
     assert final.yield_units == 4
-    assert final.active_days[-1] == 29
+    assert final.active_days[-1] == 16
+    assert final.release_day == 17
+    assert final.actions[17] == 1
+
+
+def test_ongoing_schedule_without_final_harvest_keeps_tile():
+    options = oracle.generate_crop_options(_input())
+    strawberry = next(
+        value
+        for value in options
+        if value.crop == "STRAWBERRY"
+        and value.plant_day == 0
+        and value.harvests == ((10, 1),)
+        and not value.fertilizer_days
+    )
+    assert strawberry.release_day is None
+    assert strawberry.active_days[-1] == 29
+
+
+def test_ongoing_cleanup_releases_tile_for_same_day_replanting():
+    data = _input(cash=3000, tiles=1, fertilizer_supply=1)
+    counts = (0, 0, 0, 1, 0)
+    result = oracle.solve_oracle(data, 10, 0, counts)
+    strawberry = next(
+        value
+        for value in result.decisions
+        if value.crop == "STRAWBERRY" and value.plant_day == 0
+    )
+    assert strawberry.release_day == 17
+    assert any(
+        value.plant_day == strawberry.release_day
+        for value in result.decisions
+        if value.plant_day is not None
+    )
+    assert oracle.verify_result(data, result, counts) == ()
 
 
 def test_ongoing_schedule_harvests_twice_before_held_cap_discards_yield():

@@ -179,6 +179,7 @@ class CropOption:
     actions: tuple[int, ...]
     harvests: tuple[tuple[int, int], ...]
     fertilizer_days: tuple[int, ...]
+    release_day: int | None
     existing_index: int | None
 
 
@@ -192,6 +193,7 @@ class CropDecision:
     yield_per_unit: int
     harvests: tuple[tuple[int, int], ...]
     fertilizer_days: tuple[int, ...]
+    release_day: int | None
     existing_position: tuple[int, int] | None
 
 
@@ -300,6 +302,7 @@ def _new_one_time_options(data, crop):
                     _actions(data, action_values),
                     ((harvest_day, yield_units),),
                     (),
+                    harvest_day,
                     None,
                 )
             )
@@ -337,7 +340,6 @@ def _ongoing_schedule_options(
         return []
     applications = _fertilizer_application_days(production_days, covered_until)
     active_start = max(data.current_day, plant_day)
-    active_days = tuple(range(plant_day, LAST_DAY + 1)) if existing_index is None else ()
     result = {}
     for fertilizer_mask in range(1 << len(applications)):
         fertilizer_days = tuple(
@@ -370,6 +372,19 @@ def _ongoing_schedule_options(
                     held = 0
             if not harvests:
                 continue
+            final_production_day = max(all_productions, default=data.current_day)
+            release_day = (
+                final_production_day + 1
+                if harvests[-1][0] == final_production_day
+                and held == 0
+                and final_production_day < LAST_DAY
+                else None
+            )
+            active_days = (
+                tuple(range(plant_day, release_day or LAST_DAY + 1))
+                if existing_index is None
+                else ()
+            )
             action_values = {
                 day: 1
                 for day in range(
@@ -386,6 +401,8 @@ def _ongoing_schedule_options(
                 action_values[day] = (
                     action_values.get(day, 0) + 1 + data.terminal_return_actions
                 )
+            if release_day is not None:
+                action_values[release_day] = action_values.get(release_day, 0) + 1
             key = (tuple(harvests), fertilizer_days)
             identifier = (
                 f"{'existing-' + str(existing_index) if existing_index is not None else 'new'}-"
@@ -405,6 +422,7 @@ def _ongoing_schedule_options(
                 _actions(data, action_values),
                 tuple(harvests),
                 fertilizer_days,
+                release_day,
                 existing_index,
             )
     return list(result.values())
@@ -466,6 +484,7 @@ def _existing_one_time_options(data, existing_index, plant):
                 _actions(data, action_values),
                 ((harvest_day, yield_units),),
                 (),
+                harvest_day,
                 existing_index,
             )
         )
@@ -720,8 +739,8 @@ def _build_model(data, options, first_day_crop_counts=None):
                 occupancy[variable] = occupancy.get(variable, 0) + 1
             if (
                 option.existing_index is not None
-                and not CROP_SPECS[option.crop].ongoing
-                and option.harvest_day <= day
+                and option.release_day is not None
+                and option.release_day <= day
             ):
                 occupancy[variable] = occupancy.get(variable, 0) - 1
             action_count = option.actions[day_index]
@@ -964,6 +983,7 @@ def solve_oracle(
                 option.yield_units,
                 option.harvests,
                 option.fertilizer_days,
+                option.release_day,
                 position,
             )
         )
@@ -1069,6 +1089,7 @@ def verify_result(data, result, first_day_crop_counts=None):
             option.yield_units,
             option.harvests,
             option.fertilizer_days,
+            option.release_day,
             position,
         )
         option_keys[key] = option
@@ -1082,6 +1103,7 @@ def verify_result(data, result, first_day_crop_counts=None):
             decision.yield_per_unit,
             decision.harvests,
             decision.fertilizer_days,
+            decision.release_day,
             decision.existing_position,
         )
         option = option_keys.get(key)
@@ -1168,8 +1190,8 @@ def verify_result(data, result, first_day_crop_counts=None):
                 occupancy += count
             if (
                 option.existing_index is not None
-                and not CROP_SPECS[option.crop].ongoing
-                and option.harvest_day <= day
+                and option.release_day is not None
+                and option.release_day <= day
             ):
                 released_tiles += count
             actions += option.actions[day_index] * count
