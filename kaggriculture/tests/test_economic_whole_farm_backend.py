@@ -192,6 +192,34 @@ def test_macro_portfolio_enumeration_records_joint_objective():
     )
 
 
+def test_storage_cut_preserves_observed_animal_goods():
+    snapshot = _snapshot()
+    crop_goods = list(snapshot.crop.goods)
+    crop_goods[CROPS.index("WHEAT")] = 1
+    animal_goods = list(snapshot.animal.goods)
+    animal_goods[GOODS.index("EGG")] = 1
+    snapshot = replace(
+        snapshot,
+        crop=replace(
+            snapshot.crop,
+            goods=tuple(crop_goods),
+            tile_capacity=(3,),
+        ),
+        animal=replace(
+            snapshot.animal,
+            goods=tuple(animal_goods),
+            animal_tile_capacity=(3,),
+            fixed_shed_occupancy=(1,),
+        ),
+        shared=SharedCapacity((3,), (8,), (10,), (2,), (2,)),
+        animal_portfolios=((),),
+    )
+    backend = WholeFarmPlannerBackend(lambda observation: snapshot, 5, 0, 5)
+    intent = RollingCoordinator(backend).prepare(_observation())
+    assert intent.epoch == 0
+    assert backend.last_solve.verification.errors == ()
+
+
 def test_second_arm_plans_daily_crop_service_route():
     snapshot = _snapshot()
     plant = ExistingPlant((4, 4), "CARROT", 27, 3, False, 0, -1)

@@ -576,6 +576,7 @@ def _animal_input(
             )
         ),
         shed_capacity=animal_storage_capacity,
+        fixed_shed_occupancy=(0,) * snapshot.animal.horizon_days,
         market_order_slots=snapshot.shared.market_orders,
         base_inventory=_forecast_inventory(
             snapshot.animal.base_inventory,
@@ -1586,8 +1587,14 @@ class WholeFarmPlannerBackend:
         field_capacity, action_capacity = _daily_investment_capacity(snapshot, selected)
         max_animals = snapshot.animal.max_new_animals
         storage_cut_step = max(1, max(snapshot.crop.tile_capacity))
+        minimum_animal_storage = (
+            sum(snapshot.animal.goods) + sum(snapshot.animal.shed_animals)
+        )
         animal_storage_capacity = tuple(
-            max(0, capacity - min(capacity, reserve * 4))
+            max(
+                minimum_animal_storage,
+                capacity - min(capacity, reserve * 4),
+            )
             for capacity, reserve in zip(
                 snapshot.shared.storage,
                 snapshot.crop.tile_capacity,
