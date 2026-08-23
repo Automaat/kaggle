@@ -292,6 +292,41 @@ def test_fallback_does_not_use_exponential_ordering_for_large_route(monkeypatch)
     assert sum(len(route.task_identifiers) for route in plan.routes) == 20
 
 
+def test_fallback_allows_later_tasks_to_consume_carried_capacity():
+    tasks = (
+        _task(
+            "feed-first",
+            (0, 0),
+            ("FEED",),
+            priority=0,
+            requires=(("WHEAT", 1),),
+        ),
+        _task(
+            "feed-second",
+            (4, 0),
+            ("FEED",),
+            priority=0,
+            requires=(("WHEAT", 1),),
+        ),
+        *(
+            _task(f"water-{index:02d}", (index % 5, 1 + index // 5))
+            for index in range(11)
+        ),
+    )
+    problem = _problem(
+        tasks,
+        (
+            RouteUnit("first", (0, 0), (("WHEAT", 1),)),
+            RouteUnit("second", (4, 0), (("WHEAT", 1),)),
+        ),
+        shed=(("WHEAT", 100),),
+        capacity=100,
+    )
+    plan = _plan(problem)
+    assert plan.optimal is False
+    assert all(route.pickup == () for route in plan.routes)
+
+
 def test_shared_cell_routes_have_explicit_collision_policy():
     problem = _problem(
         (_task("shared-a", (2, 2)), _task("shared-b", (2, 2))),

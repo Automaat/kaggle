@@ -634,12 +634,19 @@ def _route_candidate(problem, unit, mask, exact_order=True):
 
 def _stock_fits(problem, pickup, final):
     shed = _inventory_vector(problem.shed)
-    if any(used > available for used, available in zip(pickup, shed, strict=True)):
+    if not _pickup_fits(problem, pickup):
         return False
     if sum(shed) + sum(final) > problem.shed_capacity:
         return False
     final_shed = _vector_add(_vector_subtract(shed, pickup), final)
     return sum(final_shed) <= problem.shed_capacity
+
+
+def _pickup_fits(problem, pickup):
+    shed = _inventory_vector(problem.shed)
+    return not any(
+        used > available for used, available in zip(pickup, shed, strict=True)
+    )
 
 
 def _candidate_score(candidates):
@@ -742,7 +749,7 @@ def _heuristic_assignment(problem, component_masks):
             for current in trial:
                 used = _vector_add(used, current.pickup_vector)
                 final = _vector_add(final, current.final_vector)
-            if not _stock_fits(problem, used, final):
+            if not _pickup_fits(problem, used):
                 continue
             choices.append(
                 (
@@ -758,6 +765,13 @@ def _heuristic_assignment(problem, component_masks):
         _delta, _load, _identifier, selected, route = min(choices)
         masks[selected] |= component
         candidates[selected] = route
+    used = (0,) * len(SHED_ITEMS)
+    final = (0,) * len(SHED_ITEMS)
+    for current in candidates:
+        used = _vector_add(used, current.pickup_vector)
+        final = _vector_add(final, current.final_vector)
+    if not _stock_fits(problem, used, final):
+        return None
     return tuple(candidates)
 
 
