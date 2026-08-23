@@ -454,6 +454,77 @@ def test_tail_does_not_value_exhausted_ongoing_crop():
     assert oracle._active_crop_terminal_value(data, option) == 0
 
 
+def test_pipeline_excludes_one_time_crop_expired_before_boundary():
+    terminal_values = oracle.CropTerminalValues(
+        (500, 0, 0, 0, 0),
+        (0,) * len(market.CROPS),
+        (0,) * len(market.CROPS),
+        0,
+    )
+    data = _input(
+        cash=0,
+        seeds=(1, 0, 0, 0, 0),
+        slots=0,
+        terminal_day=5,
+        terminal_values=terminal_values,
+    )
+    options = oracle.generate_crop_options(data)
+    assert not any(
+        option.crop == "WHEAT"
+        and option.plant_day == 0
+        and not option.harvests
+        for option in options
+    )
+    result = oracle.solve_oracle(data, 10, 0, (1, 0, 0, 0, 0))
+    assert result.success
+    assert result.decisions[0].harvests
+    assert result.terminal_value == 0
+    assert oracle.verify_result(data, result, (1, 0, 0, 0, 0)) == ()
+    forged = dataclasses.replace(
+        result,
+        decisions=(
+            oracle.CropDecision(
+                "WHEAT",
+                0,
+                5,
+                5,
+                1,
+                0,
+                (),
+                (),
+                None,
+                None,
+            ),
+        ),
+    )
+    assert "unknown crop decision" in oracle.verify_result(
+        data,
+        forged,
+        (1, 0, 0, 0, 0),
+    )
+
+
+def test_pipeline_excludes_expired_existing_one_time_crop():
+    terminal_values = oracle.CropTerminalValues(
+        (500, 0, 0, 0, 0),
+        (0,) * len(market.CROPS),
+        (0,) * len(market.CROPS),
+        0,
+    )
+    plant = oracle.ExistingPlant((0, 0), "WHEAT", 0, 3, False, 0, -1)
+    data = _input(
+        day=5,
+        cash=0,
+        existing=(plant,),
+        terminal_day=6,
+        terminal_values=terminal_values,
+    )
+    assert not any(
+        option.existing_index == 0 and not option.harvests
+        for option in oracle.generate_crop_options(data)
+    )
+
+
 def test_terminal_inventory_value_is_separate_from_boundary_cash():
     terminal_values = oracle.CropTerminalValues(
         (0,) * len(market.CROPS),

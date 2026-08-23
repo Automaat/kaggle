@@ -575,11 +575,35 @@ def _pipeline_options(data):
     for crop in CROPS:
         spec = CROP_SPECS[crop]
         for plant_day in range(data.first_plant_day, data.last_day + 1):
-            if plant_day + spec.first_yield_day <= LAST_DAY:
+            future_value = (
+                any(
+                    day > data.last_day
+                    for day in scheduled_production_days(crop, plant_day, LAST_DAY)
+                )
+                if spec.ongoing
+                else plant_day + spec.max_yield_day + 1 > data.last_day
+            )
+            if plant_day + spec.first_yield_day <= LAST_DAY and future_value:
                 result.append(
                     _pipeline_option(data, crop, plant_day, None, False)
                 )
     for index, plant in enumerate(data.existing_plants):
+        spec = CROP_SPECS[plant.crop]
+        future_value = (
+            plant.yield_units > 0
+            or any(
+                day > data.last_day
+                for day in scheduled_production_days(
+                    plant.crop,
+                    plant.planted_day,
+                    LAST_DAY,
+                )
+            )
+            if spec.ongoing
+            else plant.planted_day + spec.max_yield_day + 1 > data.last_day
+        )
+        if not future_value:
+            continue
         result.append(
             _pipeline_option(
                 data,
