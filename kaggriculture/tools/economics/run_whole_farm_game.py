@@ -11,6 +11,8 @@ from pathlib import Path
 from kaggle_environments import make
 
 from kaggriculture.tools.artifact import load_artifact
+from kaggriculture.tools.economics.animal_milp import ANIMALS
+from kaggriculture.tools.economics.market_ledger import CROPS
 from kaggriculture.tools.economics.rolling_coordinator import canonical_sha256
 from kaggriculture.tools.economics.whole_farm_hybrid_provider import (
     WholeFarmControlProvider,
@@ -60,6 +62,39 @@ def _write_json_atomic(value, path):
     temporary.replace(path)
 
 
+def _candidate_farm(observation, candidate_seat):
+    farm = observation["farms"][candidate_seat]
+    crops = {crop: 0 for crop in CROPS}
+    animals = {animal: 0 for animal in ANIMALS}
+    structures = {structure: 0 for structure in ("COOP", "PASTURE")}
+    for row in farm["tiles"]:
+        for tile in row:
+            if not isinstance(tile, dict):
+                continue
+            kind = tile.get("kind")
+            crop = tile.get("crop")
+            animal = tile.get("animal")
+            if kind == "PLANT" and crop in crops:
+                crops[crop] += 1
+            if kind in structures and animal in animals:
+                animals[animal] += 1
+            if kind in structures and animal is None:
+                structures[kind] += 1
+    private = observation["private"]
+    shed = private["shed"]
+    seeds = private["seeds"]
+    unlocked = tuple(farm["unlocked_quadrants"])
+    return {
+        "empty_structures": structures,
+        "placed_animals": animals,
+        "seeds": {crop: seeds.get(crop, 0) for crop in CROPS},
+        "shed_animals": {animal: shed.get(animal, 0) for animal in ANIMALS},
+        "standing_crops": crops,
+        "unlocked_quadrant_count": len(unlocked),
+        "unlocked_quadrants": unlocked,
+    }
+
+
 class _DailyProgress:
     def __init__(self, path, arm, seed, candidate_seat):
         self.path = None if path is None else Path(path)
@@ -87,6 +122,10 @@ class _DailyProgress:
             for seat in range(2)
         )
         record = {
+            "candidate_farm": _candidate_farm(
+                observation,
+                self.candidate_seat,
+            ),
             "completed_day": completed_day,
             "elapsed_seconds": round(time.monotonic() - self.started, 6),
             "fingerprint": None if trace is None else trace.fingerprint,

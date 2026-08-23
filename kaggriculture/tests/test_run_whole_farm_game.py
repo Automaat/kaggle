@@ -21,8 +21,23 @@ def test_daily_progress_writes_atomic_solve_checkpoint(tmp_path):
         SimpleNamespace(reward=100.0, status="ACTIVE"),
         SimpleNamespace(reward=90.0, status="ACTIVE"),
     )
+    tiles = [[None for _ in range(10)] for _ in range(10)]
+    tiles[0][0] = {"crop": "CARROT", "kind": "PLANT"}
+    tiles[0][1] = {"animal": "SHEEP", "kind": "PASTURE"}
+    tiles[0][2] = {"kind": "COOP"}
     observation = {
-        "farms": ({"money": 100.0}, {"money": 90.0}),
+        "farms": (
+            {
+                "money": 100.0,
+                "tiles": tiles,
+                "unlocked_quadrants": ["NW", "NE"],
+            },
+            {"money": 90.0},
+        ),
+        "private": {
+            "seeds": {"CARROT": 3},
+            "shed": {"SHEEP": 2},
+        },
     }
     progress = _DailyProgress(path, "control-1.14", 3_980_000, 0)
 
@@ -37,6 +52,27 @@ def test_daily_progress_writes_atomic_solve_checkpoint(tmp_path):
     assert document["latest"]["source_step"] == 24
     assert document["latest"]["last_epoch"] == 4
     assert document["latest"]["fingerprint"] == "a" * 64
+    assert document["latest"]["candidate_farm"] == {
+        "empty_structures": {"COOP": 1, "PASTURE": 0},
+        "placed_animals": {"COW": 0, "GOOSE": 0, "SHEEP": 1},
+        "seeds": {
+            "CARROT": 3,
+            "MELON": 0,
+            "STRAWBERRY": 0,
+            "TOMATO": 0,
+            "WHEAT": 0,
+        },
+        "shed_animals": {"COW": 0, "GOOSE": 0, "SHEEP": 2},
+        "standing_crops": {
+            "CARROT": 1,
+            "MELON": 0,
+            "STRAWBERRY": 0,
+            "TOMATO": 0,
+            "WHEAT": 0,
+        },
+        "unlocked_quadrant_count": 2,
+        "unlocked_quadrants": ["NW", "NE"],
+    }
     assert document["latest"]["last_solve"] == {
         "animal_decisions": 1,
         "crop_decisions": 2,
