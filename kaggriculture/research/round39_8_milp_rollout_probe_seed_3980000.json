@@ -1,0 +1,52 @@
+{
+  "candidate": "agents_2.0.x/round39_8_milp_rollout",
+  "candidate_mean_reward": 49103.0,
+  "candidate_sha256": "7e1a6c473206f506e4e05c97c02ccb002fd9f3daa66b794ea046acd1fd920011",
+  "champion": "agents_1.0.x/v1_14_0_central_herd.py",
+  "champion_mean_reward": 41924.0,
+  "champion_sha256": "86951703eac27253938500eac664650c1e927d1b86b26ed84be008f24739d699",
+  "games": [
+    {
+      "candidate_day_1_crops": {
+        "CARROT": 9,
+        "MELON": 4
+      },
+      "candidate_final_crops": {
+        "CARROT": 1,
+        "STRAWBERRY": 2
+      },
+      "candidate_reward": 49103.0,
+      "candidate_seat": 0,
+      "candidate_status": "DONE",
+      "champion_reward": 41924.0,
+      "champion_status": "DONE",
+      "replay": "replays/round39_8_milp_vs_v1_14_0_3980000_seat_0.json.gz",
+      "replay_sha256": "3e64fe1a08c4e695c6764c9702531baf45d0cffafd6e16263ad105461e33a2f2"
+    },
+    {
+      "candidate_day_1_crops": {
+        "CARROT": 9,
+        "MELON": 4
+      },
+      "candidate_final_crops": {
+        "CARROT": 1,
+        "STRAWBERRY": 2
+      },
+      "candidate_reward": 49103.0,
+      "candidate_seat": 1,
+      "candidate_status": "DONE",
+      "champion_reward": 41924.0,
+      "champion_status": "DONE",
+      "replay": "replays/round39_8_milp_vs_v1_14_0_3980000_seat_1.json.gz",
+      "replay_sha256": "ef81eee43ffa82fd8fa5e8ecd4a16c27c8b560ba3df2f5f31500910f12b343a9"
+    }
+  ],
+  "kaggle_environments_version": "1.32.7",
+  "mean_difference": 7179.0,
+  "schema": 1,
+  "scope": "milp-first-day-rollout-probe",
+  "seed": 3980000,
+  "statistical_score_claim": false,
+  "ties": 0,
+  "wins": 2
+}

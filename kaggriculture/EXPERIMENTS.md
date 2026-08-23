@@ -3256,3 +3256,58 @@ execute the first-day choice.
 
 Decision: accept the A2a oracle core. Start registered A2a calibration, then
 run A2b against frozen 1.14.0 only if the ranking gate passes.
+
+## Round 39.8: MILP first-day rollout probe
+
+Status: positive exploratory result. It is not the A2a ranking gate and does
+not promote the MILP to continuous control.
+
+Plan commit: `50b97bd`. Implementation commit: `9c8993c`. Replay compression
+fix: `93f2372`.
+
+The probe copies the accepted Agent 2.0 task-graph runtime and changes only its
+day-0 crop targets. It reserves the frozen 12 central herd tiles and executes
+the registered A2a initial portfolio on the remaining 13 tiles: nine carrot
+and four melon. From day 1 through day 29 the strategy seam returns no
+override, so frozen 1.14.0 controls later crop choices. The games still run the
+complete 30-day season.
+
+The runtime snapshot contains no SciPy import and no MILP solver. It uses the
+distilled result from Round 39.7. The baseline seed, herd, land, routing,
+market and task policies remain frozen.
+
+Registered command:
+
+```bash
+.venv/bin/python tools/run_milp_rollout_probe.py --seed 3980000 \
+  --output research/round39_8_milp_rollout_probe_seed_3980000.json
+```
+
+| Gate | MILP probe | Frozen 1.14.0 |
+|:---|---:|---:|
+| Mean terminal money | $49,103 | $41,924 |
+| Mean difference | +$7,179 | — |
+| Paired wins | 2 / 2 | 0 / 2 |
+| Completed games | 2 / 2 | 2 / 2 |
+| Day-1 standing crops | 9 carrot, 4 melon | frozen policy |
+
+Both seat orders produced the same terminal money. Candidate SHA-256 is
+`7e1a6c473206f506e4e05c97c02ccb002fd9f3daa66b794ea046acd1fd920011`.
+Frozen 1.14.0 SHA-256 is
+`86951703eac27253938500eac664650c1e927d1b86b26ed84be008f24739d699`.
+The simulator is `kaggle-environments==1.32.7`.
+
+Complete replay files are stored as deterministic gzip streams. The raw files
+were 45.3 MB in total; the equivalent compressed files are 630 KB. The result
+JSON records each replay hash.
+
+All 308 tests and Ruff for changed files pass. Both adversarial review passes
+returned `CLEAN`.
+
+The probe isolates the value of the initial portfolio, not the value of daily
+MILP control. One paired seed is insufficient for a score claim. The next
+steps are a registered multi-seed replication and A2a ranking calibration.
+Only then should a separate arm re-solve and execute a rolling daily plan.
+
+Decision: keep the day-0 MILP portfolio as a positive candidate. Do not release
+it or enable continuous control from this two-game result.
