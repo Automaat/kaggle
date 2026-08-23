@@ -499,7 +499,22 @@ def _marginal_prices(data):
     return result
 
 
-def _build_model(data, options):
+def _validate_first_day_counts(first_day_crop_counts):
+    if first_day_crop_counts is None:
+        return None
+    if type(first_day_crop_counts) is not tuple or len(first_day_crop_counts) != len(
+        CROPS
+    ):
+        raise TypeError("first-day crop counts must cover crops")
+    if any(type(value) is not int for value in first_day_crop_counts):
+        raise TypeError("first-day crop counts must be integers")
+    if any(value < 0 for value in first_day_crop_counts):
+        raise ValueError("first-day crop counts must be nonnegative")
+    return first_day_crop_counts
+
+
+def _build_model(data, options, first_day_crop_counts=None):
+    first_day_crop_counts = _validate_first_day_counts(first_day_crop_counts)
     builder = _Builder()
     max_tiles = max(data.tile_capacity, default=0)
     new_tile_limit = max_tiles + sum(
@@ -578,6 +593,14 @@ def _build_model(data, options):
         }
         if values:
             builder.constraint(values, upper=1)
+    if first_day_crop_counts is not None:
+        for crop, count in zip(CROPS, first_day_crop_counts):
+            values = {
+                option_vars[option.identifier]: 1
+                for option in new_options
+                if option.crop == crop and option.plant_day == data.first_plant_day
+            }
+            builder.constraint(values, lower=count, upper=count)
     builder.constraint(
         {wheat_buy[day]: 1 for day in range(data.current_day, LAST_DAY + 1)},
         upper=sum(data.wheat_demand),
@@ -705,15 +728,21 @@ def _integer(value):
     return int(round(float(value)))
 
 
-def solve_oracle(data, time_limit=120.0, mip_rel_gap=0.0):
+def solve_oracle(
+    data,
+    time_limit=120.0,
+    mip_rel_gap=0.0,
+    first_day_crop_counts=None,
+):
     if not isinstance(data, OracleInput):
         raise TypeError("data must be an OracleInput")
     if type(time_limit) not in (int, float) or time_limit <= 0:
         raise ValueError("time limit must be positive")
     if type(mip_rel_gap) not in (int, float) or not 0 <= mip_rel_gap < 1:
         raise ValueError("MIP gap must be in 0..1")
+    first_day_crop_counts = _validate_first_day_counts(first_day_crop_counts)
     options = generate_crop_options(data)
-    built = _build_model(data, options)
+    built = _build_model(data, options, first_day_crop_counts)
     (
         builder,
         option_vars,
@@ -846,11 +875,12 @@ def solve_oracle(data, time_limit=120.0, mip_rel_gap=0.0):
     )
 
 
-def verify_result(data, result):
+def verify_result(data, result, first_day_crop_counts=None):
     if not isinstance(data, OracleInput):
         raise TypeError("data must be an OracleInput")
     if not isinstance(result, OracleResult):
         raise TypeError("result must be an OracleResult")
+    first_day_crop_counts = _validate_first_day_counts(first_day_crop_counts)
     errors = []
     if result.input_sha256 != input_sha256(data):
         errors.append("input hash mismatch")
@@ -891,6 +921,19 @@ def verify_result(data, result):
             errors.append("invalid crop decision count")
             continue
         selected.append((option, decision.count))
+    if first_day_crop_counts is not None:
+        actual = tuple(
+            sum(
+                count
+                for option, count in selected
+                if option.crop == crop
+                and option.plant_day == data.first_plant_day
+                and option.existing_index is None
+            )
+            for crop in CROPS
+        )
+        if actual != first_day_crop_counts:
+            errors.append("first-day crop counts mismatch")
     existing_counts = {index: 0 for index in range(len(data.existing_plants))}
     seed_buys = {}
     wheat_buys = {}

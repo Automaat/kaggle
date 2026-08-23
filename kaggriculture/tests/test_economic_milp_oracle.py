@@ -127,6 +127,41 @@ def test_hand_computed_last_cycle_prefers_carrot():
     assert selected[0].count == 1
 
 
+def test_fixed_first_day_portfolio_is_exact():
+    counts = (0, 0, 0, 1, 0)
+    data = _input(tiles=1)
+    result = oracle.solve_oracle(data, 10, 0, counts)
+    assert result.success
+    selected = {
+        crop: sum(
+            value.count
+            for value in result.decisions
+            if value.crop == crop and value.plant_day == 0
+        )
+        for crop in market.CROPS
+    }
+    assert tuple(selected[crop] for crop in market.CROPS) == counts
+    assert oracle.verify_result(data, result, counts) == ()
+
+
+def test_fixed_first_day_portfolio_can_be_infeasible():
+    result = oracle.solve_oracle(_input(tiles=1), 10, 0, (0, 2, 0, 0, 0))
+    assert not result.success
+
+
+@pytest.mark.parametrize(
+    "counts,error",
+    [
+        ((1,), TypeError),
+        ((True, 0, 0, 0, 0), TypeError),
+        ((-1, 0, 0, 0, 0), ValueError),
+    ],
+)
+def test_fixed_first_day_portfolio_validation(counts, error):
+    with pytest.raises(error):
+        oracle.solve_oracle(_input(), 10, 0, counts)
+
+
 def test_cash_reserve_can_block_all_planting():
     result = oracle.solve_oracle(_input(day=27, cash=20, reserve=20), 10, 0)
     assert result.success
