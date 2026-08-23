@@ -161,6 +161,20 @@ def test_pickup_consumption_and_harvest_drop_are_verified():
     assert route.commands[-1].action == ("DROP",)
 
 
+def test_exact_order_includes_terminal_shed_return_cost():
+    problem = _problem(
+        (
+            _task("origin", (0, 0), ("HARVEST",), produces=(("CARROT", 1),)),
+            _task("north", (0, 6), ("HARVEST",), produces=(("CARROT", 1),)),
+            _task("middle", (1, 4), ("HARVEST",), produces=(("CARROT", 1),)),
+        ),
+        (RouteUnit("farmer", (0, 0)),),
+    )
+    plan = _plan(problem)
+    assert plan.total_movement == 12
+    assert plan.routes[0].task_identifiers == ("origin", "north", "middle")
+
+
 def test_existing_inventory_avoids_pickup_and_returns_remainder():
     problem = _problem(
         (
@@ -203,6 +217,27 @@ def test_missing_shared_stock_returns_no_partial_plan():
     assert result.phase == "solve"
 
 
+def test_task_resources_must_match_exact_action_semantics():
+    with pytest.raises(ValueError, match="requirements"):
+        _task("feed", (1, 1), ("FEED",))
+    with pytest.raises(ValueError, match="requirements"):
+        _task(
+            "place",
+            (1, 1),
+            ("PLACE", "COW"),
+            requires=(("SHEEP", 1),),
+        )
+    with pytest.raises(ValueError, match="production"):
+        _task("harvest", (1, 1), ("HARVEST",))
+    with pytest.raises(ValueError, match="production"):
+        _task(
+            "collect",
+            (1, 1),
+            ("COLLECT_FERTILIZER",),
+            produces=(("FERTILIZER", 2),),
+        )
+
+
 def test_shed_overflow_returns_no_partial_plan():
     problem = _problem(
         (_task("harvest", (4, 4), ("HARVEST",), produces=(("MILK", 1),)),),
@@ -235,6 +270,26 @@ def test_more_than_twelve_tasks_uses_verified_fallback():
     plan = _plan(problem)
     assert plan.optimal is False
     assert sum(len(route.task_identifiers) for route in plan.routes) == 13
+
+
+def test_fallback_does_not_use_exponential_ordering_for_large_route(monkeypatch):
+    tasks = tuple(
+        _task(f"task-{index:02d}", (index % 5, index // 5), deadline=24)
+        for index in range(20)
+    )
+    problem = _problem(
+        tasks,
+        (RouteUnit("first", (0, 0)), RouteUnit("second", (4, 3))),
+    )
+    planner_module = sys.modules[plan_routes.__module__]
+
+    def rejected(*_arguments, **_keywords):
+        raise AssertionError("exact ordering used by fallback")
+
+    monkeypatch.setattr(planner_module, "_best_task_orders", rejected)
+    plan = _plan(problem)
+    assert plan.optimal is False
+    assert sum(len(route.task_identifiers) for route in plan.routes) == 20
 
 
 def test_shared_cell_routes_have_explicit_collision_policy():
@@ -306,6 +361,25 @@ def test_verifier_rejects_tampered_totals():
     plan = _plan(problem)
     tampered = dataclasses.replace(plan, total_cost=plan.total_cost + 1)
     assert "cost total mismatch" in verify_plan(problem, tampered)
+
+
+def test_verifier_rejects_tampered_command_integrity():
+    problem = _problem((_task("water", (3, 4)),))
+    plan = _plan(problem)
+    command = plan.routes[0].commands[0]
+    tampered_command = dataclasses.replace(
+        command,
+        identifier="0" * 64,
+        effect_fingerprint="1" * 64,
+    )
+    route = dataclasses.replace(
+        plan.routes[0],
+        commands=(tampered_command, *plan.routes[0].commands[1:]),
+    )
+    tampered_plan = dataclasses.replace(plan, routes=(route,))
+    errors = verify_plan(problem, tampered_plan)
+    assert "farmer: synthetic effect mismatch" in errors
+    assert "farmer: command identifier mismatch" in errors
 
 
 def test_input_rejects_cycle_and_last_step_overrun():

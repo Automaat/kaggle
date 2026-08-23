@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from economics.market_ledger import ANIMALS, CROPS, SHED_ITEMS
+from economics.market_ledger import ANIMALS, CROPS, PRODUCTS, SHED_ITEMS
 from economics.rolling_coordinator import canonical_sha256
 
 
@@ -159,6 +159,24 @@ class RouteTask:
             raise ValueError("task dependencies are invalid")
         _validate_inventory(self.requires, "task requirements")
         _validate_inventory(self.produces, "task production")
+        expected_requirements = {
+            "FEED": (("WHEAT", 1),),
+            "FERTILIZE": (("FERTILIZER", 1),),
+            "PLACE": ((self.action[1], 1),) if self.action[0] == "PLACE" else (),
+        }.get(self.action[0], ())
+        if self.requires != expected_requirements:
+            raise ValueError("task requirements do not match its action")
+        if self.action[0] == "COLLECT_FERTILIZER":
+            if self.produces != (("FERTILIZER", 1),):
+                raise ValueError("task production does not match its action")
+        elif self.action[0] == "HARVEST":
+            harvest_items = frozenset(PRODUCTS) - {"FERTILIZER"}
+            if len(self.produces) != 1 or any(
+                item not in harvest_items for item, _quantity in self.produces
+            ):
+                raise ValueError("task production does not match its action")
+        elif self.produces:
+            raise ValueError("task production does not match its action")
         _validate_fingerprint(self.precondition_fingerprint, "task precondition")
         _validate_fingerprint(self.effect_fingerprint, "task effect")
 
@@ -412,10 +430,10 @@ def _append_path(commands, position, destination, target_identifier):
     return current
 
 
-def _best_task_order(tasks, selected, start, initial_elapsed):
+def _best_task_orders(tasks, selected, start, initial_elapsed):
     local = tuple(index for index in range(len(tasks)) if selected & (1 << index))
     if not local:
-        return (), initial_elapsed
+        return (((), initial_elapsed),)
     local_bit = {task_index: 1 << position for position, task_index in enumerate(local)}
     index_by_id = {task.identifier: index for index, task in enumerate(tasks)}
     dependencies = {
@@ -451,11 +469,51 @@ def _best_task_order(tasks, selected, start, initial_elapsed):
     complete = [value for (visited, _last), value in states.items() if visited == full]
     if not complete:
         return None
-    elapsed, _priority, order = min(complete)
-    return order, elapsed
+    return tuple(
+        (order, elapsed)
+        for elapsed, _priority, order in sorted(complete)
+    )
 
 
-def _route_candidate(problem, unit, mask):
+def _heuristic_task_order(tasks, selected, start, initial_elapsed):
+    index_by_id = {task.identifier: index for index, task in enumerate(tasks)}
+    remaining = {
+        index for index in range(len(tasks)) if selected & (1 << index)
+    }
+    visited = set()
+    order = []
+    position = start
+    elapsed = initial_elapsed
+    while remaining:
+        choices = []
+        for task_index in remaining:
+            task = tasks[task_index]
+            if any(index_by_id[dependency] not in visited for dependency in task.dependencies):
+                continue
+            completion = elapsed + _distance(position, task.position) + 1
+            if completion > task.deadline_turn:
+                continue
+            choices.append(
+                (
+                    task.deadline_turn,
+                    task.priority,
+                    _distance(position, task.position),
+                    task.identifier,
+                    task_index,
+                    completion,
+                )
+            )
+        if not choices:
+            return None
+        _deadline, _priority, _travel, _identifier, task_index, elapsed = min(choices)
+        remaining.remove(task_index)
+        visited.add(task_index)
+        order.append(task_index)
+        position = tasks[task_index].position
+    return ((tuple(order), elapsed),)
+
+
+def _route_candidate(problem, unit, mask, exact_order=True):
     tasks = problem.tasks
     required, produced = _task_vectors(tasks, mask)
     carried = _inventory_vector(unit.inventory)
@@ -485,18 +543,40 @@ def _route_candidate(problem, unit, mask):
     variants = []
     for start in starts:
         pickup_elapsed = _distance(unit.position, start) + len(pickup_items)
-        ordered = _best_task_order(tasks, mask, start, pickup_elapsed)
-        if ordered is None:
+        if exact_order:
+            ordered_routes = _best_task_orders(tasks, mask, start, pickup_elapsed)
+        else:
+            ordered_routes = _heuristic_task_order(
+                tasks,
+                mask,
+                start,
+                pickup_elapsed,
+            )
+        if ordered_routes is None:
             continue
-        order, elapsed = ordered
-        last = start if not order else tasks[order[-1]].position
-        end = min(accesses, key=lambda position: (_distance(last, position), accesses.index(position)))
-        total = elapsed
-        if final_items:
-            total += _distance(last, end) + 1
-        if total > problem.max_commands_per_unit:
-            continue
-        variants.append((total, tuple(tasks[index].identifier for index in order), start, end, order))
+        for order, elapsed in ordered_routes:
+            last = start if not order else tasks[order[-1]].position
+            end = min(
+                accesses,
+                key=lambda position: (
+                    _distance(last, position),
+                    accesses.index(position),
+                ),
+            )
+            total = elapsed
+            if final_items:
+                total += _distance(last, end) + 1
+            if total > problem.max_commands_per_unit:
+                continue
+            variants.append(
+                (
+                    total,
+                    tuple(tasks[index].identifier for index in order),
+                    start,
+                    end,
+                    order,
+                )
+            )
     if not variants:
         return None
     _total, _ids, pickup_position, drop_position, order = min(variants)
@@ -619,7 +699,7 @@ def _exact_assignment(problem, component_masks):
 def _heuristic_assignment(problem, component_masks):
     masks = [0] * len(problem.units)
     candidates = [
-        _route_candidate(problem, unit, 0)
+        _route_candidate(problem, unit, 0, False)
         for unit in problem.units
     ]
     if any(candidate is None for candidate in candidates):
@@ -647,7 +727,12 @@ def _heuristic_assignment(problem, component_masks):
     for component in ordered_components:
         choices = []
         for unit_index, unit in enumerate(problem.units):
-            route = _route_candidate(problem, unit, masks[unit_index] | component)
+            route = _route_candidate(
+                problem,
+                unit,
+                masks[unit_index] | component,
+                False,
+            )
             if route is None:
                 continue
             trial = list(candidates)
@@ -780,9 +865,18 @@ def verify_plan(problem, plan):
                 errors.append(f"{unit.identifier}: command pre-position mismatch")
                 continue
             operation = command.action[0]
+            expected_effect = None
             if operation in MOVES:
                 dx, dy = MOVES[operation]
                 position = (position[0] + dx, position[1] + dy)
+                expected_effect = canonical_sha256(
+                    "offline-route-move-effect",
+                    (
+                        command.expected_pre_position,
+                        position,
+                        command.task_identifier,
+                    ),
+                )
                 total_movement += 1
                 route_movement[unit_index] += 1
             else:
@@ -793,6 +887,10 @@ def verify_plan(problem, plan):
                         errors.append(f"{unit.identifier}: pickup away from shed")
                     item, quantity = command.action[1:]
                     item_index = SHED_ITEMS.index(item)
+                    expected_effect = canonical_sha256(
+                        "offline-route-pickup-effect",
+                        (unit.identifier, item, quantity, position),
+                    )
                     if shed[item_index] < quantity:
                         errors.append(f"{unit.identifier}: pickup exceeds shed stock")
                     else:
@@ -802,6 +900,15 @@ def verify_plan(problem, plan):
                 elif operation == "DROP":
                     if position not in _shed_access(problem.board_size):
                         errors.append(f"{unit.identifier}: drop away from shed")
+                    dropped = tuple(
+                        (SHED_ITEMS[item_index], quantity)
+                        for item_index, quantity in enumerate(inventory)
+                        if quantity
+                    )
+                    expected_effect = canonical_sha256(
+                        "offline-route-drop-effect",
+                        (unit.identifier, dropped, position),
+                    )
                     for item_index, quantity in enumerate(inventory):
                         shed[item_index] += quantity
                         inventory[item_index] = 0
@@ -809,6 +916,7 @@ def verify_plan(problem, plan):
                         errors.append(f"{unit.identifier}: shed overflow")
                 elif command.task_identifier in task_by_id:
                     task = task_by_id[command.task_identifier]
+                    expected_effect = task.effect_fingerprint
                     if command.action != task.action or position != task.position:
                         errors.append(f"{task.identifier}: task command mismatch")
                     for dependency in task.dependencies:
@@ -831,6 +939,17 @@ def verify_plan(problem, plan):
                     route_seen[unit_index].append(task.identifier)
                 else:
                     errors.append(f"{unit.identifier}: unknown synthetic action")
+            if expected_effect is not None and command.effect_fingerprint != expected_effect:
+                errors.append(f"{unit.identifier}: synthetic effect mismatch")
+            expected_identifier = _command(
+                command.expected_pre_position,
+                command.action,
+                command.expected_post_position,
+                command.task_identifier,
+                command.effect_fingerprint,
+            ).identifier
+            if command.identifier != expected_identifier:
+                errors.append(f"{unit.identifier}: command identifier mismatch")
             if command.expected_post_position != position:
                 errors.append(f"{unit.identifier}: command post-position mismatch")
             positions[unit_index] = position
