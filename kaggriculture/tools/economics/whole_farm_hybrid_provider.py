@@ -147,13 +147,7 @@ class _Agent2Seam:
             for intent in handoff.market_orders
             if intent.source_step == world.step
         )
-        frozen_hires = tuple(
-            order for order in frozen_orders if order and order[0] == "HIRE"
-        )
-        combined = planned + tuple(
-            order for order in frozen_hires if order not in planned
-        )
-        return combined[:10]
+        return planned[:10]
 
 
 class WholeFarmControlProvider:

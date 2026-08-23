@@ -17,10 +17,10 @@ def test_seam_does_not_execute_unplanned_frozen_orders():
     assert orders == ()
 
 
-def test_seam_preserves_frozen_hires_for_execution_capacity():
+def test_seam_does_not_execute_unplanned_frozen_hires():
     seam = _Agent2Seam(_Source(), tuple)
     orders = seam.plan(
         SimpleNamespace(step=7),
         (("HIRE",), ("BUY_ANIMAL", "COW", 3)),
     )
-    assert orders == (("HIRE",),)
+    assert orders == ()
