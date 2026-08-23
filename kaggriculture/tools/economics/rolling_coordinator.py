@@ -75,14 +75,37 @@ def _validate_text(value, name):
         raise ValueError(f"{name} must be nonempty text")
 
 
-def _validate_target_key(value):
-    if type(value) is str:
-        if not value:
-            raise ValueError("target key must be nonempty")
-        return
-    if type(value) is not tuple or not value:
+def _freeze_target_key(value):
+    if value is None or type(value) in (bool, int, str):
+        return value
+    if type(value) is float:
+        if not math.isfinite(value):
+            raise ValueError("target key numbers must be finite")
+        return value
+    if isinstance(value, Mapping):
+        if any(type(key) is not str for key in value):
+            raise TypeError("target mapping keys must be text")
+        return (
+            "mapping",
+            tuple(
+                (key, _freeze_target_key(value[key]))
+                for key in sorted(value)
+            ),
+        )
+    if type(value) in (list, tuple):
+        return tuple(_freeze_target_key(item) for item in value)
+    raise TypeError("target key is not JSON-compatible")
+
+
+def _canonical_target_key(value):
+    if isinstance(value, Mapping) and not value:
         raise ValueError("target key must be canonical and nonempty")
-    _freeze_canonical(value)
+    frozen = _freeze_target_key(value)
+    if type(frozen) is str and frozen:
+        return frozen
+    if type(frozen) is not tuple or not frozen:
+        raise ValueError("target key must be canonical and nonempty")
+    return frozen
 
 
 def _validate_identifiers(values, name):
@@ -111,7 +134,11 @@ class ObservedDelta:
     def __post_init__(self):
         if self.domain not in DOMAINS:
             raise ValueError("unknown delta domain")
-        _validate_target_key(self.target_key)
+        object.__setattr__(
+            self,
+            "target_key",
+            _canonical_target_key(self.target_key),
+        )
         _validate_fingerprint(self.pre_state_fingerprint, "pre-state fingerprint")
         _validate_fingerprint(self.post_state_fingerprint, "post-state fingerprint")
         if self.pre_state_fingerprint == self.post_state_fingerprint:
@@ -128,6 +155,11 @@ class ExpectedEffectRef:
     identifier: str | None = None
 
     def __post_init__(self):
+        object.__setattr__(
+            self,
+            "target_key",
+            _canonical_target_key(self.target_key),
+        )
         ObservedDelta(
             self.domain,
             self.target_key,
@@ -465,6 +497,8 @@ class RollingCoordinator:
         self._last_intent = None
         self._next_epoch = 0
         self._acknowledged_effect_ids = frozenset()
+        self._backend_reset_required = False
+        self._pending_reset_reason = False
 
     def _failure(self, phase, error):
         text = f"{type(error).__name__}: {error}"
@@ -477,21 +511,28 @@ class RollingCoordinator:
         self._next_epoch = 0
         self._acknowledged_effect_ids = frozenset()
 
-    def reset(self):
-        self._clear()
+    def _reset_backend(self):
         try:
             self._backend.reset()
         except Exception as error:
+            self._backend_reset_required = True
+            self._pending_reset_reason = True
             return self._failure("reset", error)
+        self._backend_reset_required = False
+        self._pending_reset_reason = True
         return None
+
+    def reset(self):
+        self._clear()
+        self._backend_reset_required = True
+        self._pending_reset_reason = True
+        return self._reset_backend()
 
     def _reset_before_prepare(self):
         self._clear()
-        try:
-            self._backend.reset()
-        except Exception as error:
-            return self._failure("reset", error)
-        return None
+        self._backend_reset_required = True
+        self._pending_reset_reason = True
+        return self._reset_backend()
 
     @staticmethod
     def _domain_fingerprints(observation):
@@ -602,6 +643,7 @@ class RollingCoordinator:
         self._last_intent = intent
         self._next_epoch += 1
         self._acknowledged_effect_ids = frozenset()
+        self._pending_reset_reason = False
         return intent
 
     def _prepare_whole_farm(self, observation, reasons):
@@ -710,13 +752,18 @@ class RollingCoordinator:
     def prepare(self, observation):
         if type(observation) is not RollingObservation:
             raise TypeError("observation must be RollingObservation")
+        reset_happened = self._pending_reset_reason
+        if self._backend_reset_required:
+            failure = self._reset_backend()
+            if failure is not None:
+                return failure
+            reset_happened = True
         if (
             self._last_observation is not None
             and observation.source_step == self._last_observation.source_step
             and observation.identity == self._last_observation.identity
         ):
             return self._last_intent
-        reset_happened = False
         if (
             self._last_observation is not None
             and observation.source_step <= self._last_observation.source_step

@@ -1,6 +1,7 @@
 import argparse
 import hashlib
 import json
+import sys
 from dataclasses import asdict
 from pathlib import Path
 
@@ -19,7 +20,8 @@ try:
         canonical_sha256,
     )
 except ImportError:
-    from rolling_coordinator import (
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from tools.economics.rolling_coordinator import (
         EconomicPlanRef,
         ExecutionSignal,
         ExpectedEffectRef,

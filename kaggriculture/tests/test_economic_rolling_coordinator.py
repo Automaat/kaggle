@@ -1,6 +1,8 @@
 import importlib
+import json
 import math
 import pathlib
+import subprocess
 import sys
 
 import pytest
@@ -198,6 +200,17 @@ def test_effect_identifier_covers_epoch_and_exact_transition():
     )
 
 
+def test_effect_target_key_is_deeply_frozen():
+    key = ["tile", [4, 4]]
+    effect = _effect(0, target=key)
+    identifier = effect.identifier
+    key[1].append(5)
+    assert effect.target_key == ("tile", (4, 4))
+    assert effect.identifier == identifier
+    assert effect.identifier == _effect(0, target=("tile", (4, 4))).identifier
+    assert _signal((effect.observed_delta(),), (effect.identifier,))
+
+
 @pytest.mark.parametrize(
     ("factory", "exception"),
     (
@@ -208,6 +221,7 @@ def test_effect_identifier_covers_epoch_and_exact_transition():
         (lambda: _observation(step=719), ValueError),
         (lambda: _observation(shops=("UNKNOWN",)), ValueError),
         (lambda: _observation(shops=("PET_CAFE",) * 9), ValueError),
+        (lambda: _delta("economy", {}, "a", "b"), ValueError),
     ),
 )
 def test_canonical_inputs_reject_invalid_values(factory, exception):
@@ -592,6 +606,33 @@ def test_reset_failure_leaves_coordinator_empty():
     assert rolling._last_intent is None
 
 
+def test_failed_automatic_reset_is_retried_before_planning():
+    backend, rolling, _observation_value, _intent = _prepared(step=3)
+    changed = _observation(step=3, progress="changed")
+    backend.fail_phase = "reset"
+    failed = rolling.prepare(changed)
+    assert isinstance(failed, coordinator.PlanFailure)
+    assert backend.reset_calls == 1
+    assert rolling._last_observation is None
+    backend.fail_phase = None
+    retried = rolling.prepare(changed)
+    assert isinstance(retried, coordinator.WholeFarmIntent)
+    assert retried.epoch == 0
+    assert retried.reasons == (coordinator.REASON_RESET,)
+    assert backend.reset_calls == 2
+    assert _phases(backend) == ["whole", "whole"]
+
+
+def test_explicit_reset_marks_next_plan_as_reset():
+    backend, rolling, _observation_value, _intent = _prepared()
+    assert rolling.reset() is None
+    restarted = rolling.prepare(_observation())
+    assert isinstance(restarted, coordinator.WholeFarmIntent)
+    assert restarted.epoch == 0
+    assert restarted.reasons == (coordinator.REASON_RESET,)
+    assert backend.reset_calls == 1
+
+
 def test_registered_runner_is_deterministic_and_atomic():
     runner = importlib.import_module("economics.run_rolling_coordinator")
     first = runner.run()
@@ -613,6 +654,20 @@ def test_registered_runner_is_deterministic_and_atomic():
         ("whole", 5, 96),
         ("routes", 6, 97),
     )
+
+
+def test_registered_runner_executes_as_a_script():
+    path = ROOT / "tools" / "economics" / "run_rolling_coordinator.py"
+    completed = subprocess.run(
+        [sys.executable, str(path)],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "accepted-contract-only"
+    assert payload["sequence"]["failure_atomic"] is True
 
 
 def test_live_agent_does_not_import_standalone_coordinator():
