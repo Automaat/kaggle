@@ -3,17 +3,30 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Protocol, runtime_checkable
 
-from economics.animal_ledger import ANIMAL_SPECS
-from economics.crop_ledger import CROP_SPECS
-from economics.market_ledger import ANIMALS, CROPS, SHED_ITEMS
-from economics.rolling_coordinator import canonical_sha256
-from routing.offline_route_planner import (
-    RouteExecutor,
-    RouteFailure,
-    RouteProblem,
-    RouteTask,
-    RouteUnit,
-)
+try:
+    from ..economics.animal_ledger import ANIMAL_SPECS
+    from ..economics.crop_ledger import CROP_SPECS
+    from ..economics.market_ledger import ANIMALS, CROPS, SHED_ITEMS
+    from ..economics.rolling_coordinator import canonical_sha256
+    from .offline_route_planner import (
+        RouteExecutor,
+        RouteFailure,
+        RouteProblem,
+        RouteTask,
+        RouteUnit,
+    )
+except ImportError:
+    from economics.animal_ledger import ANIMAL_SPECS
+    from economics.crop_ledger import CROP_SPECS
+    from economics.market_ledger import ANIMALS, CROPS, SHED_ITEMS
+    from economics.rolling_coordinator import canonical_sha256
+    from routing.offline_route_planner import (
+        RouteExecutor,
+        RouteFailure,
+        RouteProblem,
+        RouteTask,
+        RouteUnit,
+    )
 
 
 @runtime_checkable
