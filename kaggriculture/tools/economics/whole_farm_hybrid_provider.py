@@ -1,3 +1,5 @@
+import json
+from collections.abc import Mapping
 from pathlib import Path
 
 try:
@@ -16,6 +18,22 @@ from .whole_farm_backend import WholeFarmPlannerBackend, WholeFarmSolveError
 
 ROOT = Path(__file__).resolve().parents[2]
 AGENT2_TEMPLATE = ROOT / "agents_2.0.x/round39_8_milp_rollout"
+
+
+def _world_identity(world):
+    if hasattr(world, "identity"):
+        return world.identity
+    if isinstance(world, Mapping):
+        values = dict(world.items())
+        values.pop("remainingOverageTime", None)
+        return json.dumps(
+            values,
+            allow_nan=False,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+    raise TypeError("world must contain an observation")
 
 
 class WholeFarmHandoffSource:
@@ -38,6 +56,7 @@ class WholeFarmHandoffSource:
         self._traces = []
         self._last_world_identity = None
         self._last_handoff = None
+        self._last_error = None
 
     @property
     def traces(self):
@@ -51,6 +70,10 @@ class WholeFarmHandoffSource:
     def backend(self):
         return self._backend
 
+    @property
+    def last_error(self):
+        return self._last_error
+
     def reset(self):
         self._bridge.reset()
         failure = self._coordinator.reset()
@@ -59,14 +82,20 @@ class WholeFarmHandoffSource:
         self._traces.clear()
         self._last_world_identity = None
         self._last_handoff = None
+        self._last_error = None
 
     def __call__(self, world):
-        observation = self._bridge.observe(world)
-        if observation.identity == self._last_world_identity:
+        world_identity = _world_identity(world)
+        if world_identity == self._last_world_identity:
+            if self._last_error is not None:
+                raise self._last_error
             return self._last_handoff
+        self._last_world_identity = world_identity
+        observation = self._bridge.observe(world)
         intent = self._coordinator.prepare(observation)
         if isinstance(intent, PlanFailure):
-            raise WholeFarmSolveError(intent.exception_text)
+            self._last_error = WholeFarmSolveError(intent.exception_text)
+            raise self._last_error
         if type(intent) is not WholeFarmIntent:
             raise TypeError("coordinator returned wrong intent type")
         handoff = self._backend.last_handoff
@@ -80,7 +109,7 @@ class WholeFarmHandoffSource:
         if observation.source_step % 24 == 0:
             if trace.observed.source_step != observation.source_step:
                 raise WholeFarmSolveError("daily observation lacks full solve")
-        self._last_world_identity = observation.identity
+        self._last_error = None
         self._last_handoff = handoff
         return handoff
 
@@ -167,6 +196,8 @@ class WholeFarmControlProvider:
     def act(self, observation):
         action = self._agent(observation)
         step = int(observation.get("step", observation["day"] * 24 + observation["hour"]))
+        if self._source.last_error is not None:
+            raise self._source.last_error
         if step % 24 == 0:
             traces = self._source.traces
             if not traces or traces[-1].observed.source_step != step:
