@@ -290,3 +290,33 @@ def test_release_champion_finishes_live_episode():
     assert statuses == ["DONE", "DONE"]
     assert rewards[0] > 3000
     assert rewards[1] > 3000
+
+
+def test_archive_entrypoint_loads_without_path_help(tmp_path):
+    """Given an archive, When the harness loads main.py by path, Then it imports.
+
+    Kaggle executes the entrypoint without putting its directory on `sys.path`,
+    while `tools/artifact.py` inserts it. That gap passed every local gate and
+    failed validation on the ladder.
+    """
+    import subprocess
+
+    archive = tmp_path / "agent.tar.gz"
+    subprocess.run(
+        [sys.executable, str(ROOT / "tools" / "package_agent.py"),
+         str(ROOT / "agents_1.0.x" / "v1_15_0_staged_field"), str(archive)],
+        check=True, capture_output=True,
+    )
+    root = tmp_path / "unpacked"
+    root.mkdir()
+    subprocess.run(["tar", "xzf", str(archive), "-C", str(root)], check=True)
+    probe = (
+        "import importlib.util, sys;"
+        f"spec = importlib.util.spec_from_file_location('probe', {str(root / 'main.py')!r});"
+        "module = importlib.util.module_from_spec(spec);"
+        "sys.modules['probe'] = module;"
+        "spec.loader.exec_module(module);"
+        "assert callable(module.agent)"
+    )
+    result = subprocess.run([sys.executable, "-c", probe], cwd="/", capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
