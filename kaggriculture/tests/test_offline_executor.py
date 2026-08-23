@@ -1,5 +1,6 @@
 import copy
 import gzip
+import hashlib
 import importlib
 import json
 import pathlib
@@ -172,5 +173,14 @@ def test_registered_full_match_and_replays_are_deterministic(tmp_path):
         replay = json.loads(gzip.decompress(path.read_bytes()))
         assert len(replay["steps"]) == 720
         assert len(replay["id"]) == 64
-    repeated = copy.deepcopy(result)
-    assert repeated == result
+    canonical = copy.deepcopy(result)
+    deterministic = canonical.pop("deterministic_sha256")
+    encoded = json.dumps(canonical, allow_nan=False, sort_keys=True)
+    assert deterministic == hashlib.sha256(encoded.encode()).hexdigest()
+
+
+def test_registered_run_rejects_changed_comparator(tmp_path, monkeypatch):
+    runner = importlib.import_module("run_offline_executor_smoke")
+    monkeypatch.setattr(runner, "COMPARATOR_SHA256", "0" * 64)
+    with pytest.raises(ValueError, match="comparator hash"):
+        runner.run(tmp_path)

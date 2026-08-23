@@ -11,7 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from offline_executor import CallableActionProvider, make_provider_agent
-from runner import load_agent, run_match
+from runner import ROOT, load_agent, run_match
 
 
 COMPARATOR = "agents_1.0.x/v1_14_0_central_herd.py"
@@ -108,6 +108,9 @@ def _pair(seed, replay_dir):
 
 def run(replay_dir, seed=DEFAULT_SEED):
     replay_dir = Path(replay_dir)
+    comparator_hash = _file_hash(ROOT / COMPARATOR)
+    if comparator_hash != COMPARATOR_SHA256:
+        raise ValueError("frozen comparator hash changed")
     games = _pair(seed, replay_dir)
     with tempfile.TemporaryDirectory(prefix="round39-16b-repeat-") as directory:
         repeated = _pair(seed, Path(directory))
@@ -126,7 +129,7 @@ def run(replay_dir, seed=DEFAULT_SEED):
         "comparator": {
             "path": COMPARATOR,
             "commit": COMPARATOR_COMMIT,
-            "sha256": COMPARATOR_SHA256,
+            "sha256": comparator_hash,
         },
         "kaggle_environments_version": importlib.metadata.version(
             "kaggle-environments"
