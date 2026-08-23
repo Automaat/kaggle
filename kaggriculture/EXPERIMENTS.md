@@ -2981,3 +2981,52 @@ fixed planner mode and the packed artifact.
 Decision: accept the seam. The next stages build the exact offline ledger and
 the slow research MILP. They compare realized score with frozen 1.14.0 before
 any Kaggle runtime optimization.
+
+## Round 39.3: exact market ledger A1a
+
+Status: accepted offline model. It makes no score claim and changes no live
+agent action.
+
+Plan commit: `6a7d992`. Implementation commit: `c812602`.
+
+The independent standard-library model covers the market and town phases. It
+stores exact product inventory, player money, shed and seed balances, hiring
+and land counters, market parameters and absolute source step. It implements
+raw queue parsing, atomic orders, per-unit two-player lockstep, buy and sell
+quotes, the `$1` floor, capacity and cash failure, all price shapes and town
+demand. The result boundary is after town demand and before decay or end-of-day.
+
+The model imports neither Kaggle, Agent 2.0 nor 1.14.0. A separate validator
+injects the same state into the market and town phases of
+`kaggle-environments==1.32.7`.
+
+Validation command:
+
+```bash
+.venv/bin/python tools/economics/validate_market_ledger.py \
+  --random-cases 10000 --seed 3950000 \
+  --output research/round39_3_market_ledger_validation.json
+```
+
+| Gate | Result |
+|:---|---:|
+| Boundary cases | 753 |
+| Registered random cases | 10,000 |
+| Total compared phases | 10,753 |
+| Field mismatches | 0 |
+| Simulator failures | 0 |
+| Elapsed time | 82.466 s |
+| Input SHA-256 | `2351a433fd7551263cbe1660f32805f5b5bd4d9e7c1dc596328de3f08d7ca3d4` |
+| Model SHA-256 | `879b055b62775b880cdbb08144bd59ef73a3184b5f540ecc045f84e79df17bff` |
+| Simulator SHA-256 | `bc8a54879ef02c7ea64b8b333d6a976f0ea65c4949149d01f463f23bccee653e` |
+
+All 223 tests pass. Ruff passes for every changed file. Full-repository Ruff
+still reports the pre-existing multi-import and semicolon in `tools/play.py`;
+this experiment does not change that unrelated file.
+
+Adversarial review found no economic-result bug. It found one optional trace
+gap for an unsupported product. The final code records that rejected event and
+has a regression test.
+
+Decision: accept A1a. Start A1b from this commit. A1b adds the complete shed,
+unit inventory and purchase-availability transitions before crop modeling.

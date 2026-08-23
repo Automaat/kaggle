@@ -1,0 +1,29 @@
+{
+  "boundary_cases": 753,
+  "compared_fields": [
+    "source_step",
+    "market.inventory",
+    "market.prices",
+    "players.money",
+    "players.shed",
+    "players.seeds",
+    "players.hires_today",
+    "players.hand_count",
+    "players.unlocked_quadrant_count"
+  ],
+  "elapsed_seconds": 82.46576729200024,
+  "environment_version": "1.32.7",
+  "failures": 0,
+  "first_failure": null,
+  "first_mismatch": null,
+  "fixtures": 10753,
+  "input_sha256": "2351a433fd7551263cbe1660f32805f5b5bd4d9e7c1dc596328de3f08d7ca3d4",
+  "mismatches": 0,
+  "model_sha256": "879b055b62775b880cdbb08144bd59ef73a3184b5f540ecc045f84e79df17bff",
+  "random_cases": 10000,
+  "reachable_cases": 10000,
+  "schema": 1,
+  "seed": 3950000,
+  "simulator_sha256": "bc8a54879ef02c7ea64b8b333d6a976f0ea65c4949149d01f463f23bccee653e",
+  "synthetic_cases": 753
+}
