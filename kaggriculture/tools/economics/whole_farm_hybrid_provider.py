@@ -153,7 +153,7 @@ class _Agent2Seam:
         combined = planned + tuple(
             order for order in frozen_hires if order not in planned
         )
-        return combined[:10] or frozen_orders
+        return combined[:10]
 
 
 class WholeFarmControlProvider:
