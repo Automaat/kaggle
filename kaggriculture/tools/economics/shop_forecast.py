@@ -325,9 +325,47 @@ def verify_forecast(data, result):
         errors.append("action horizon mismatch")
     if result.strategy_end_step != expected_strategy_end:
         errors.append("strategy horizon mismatch")
-    probability = sum(scenario.probability for scenario in result.scenarios)
-    if not math.isclose(probability, 1.0, abs_tol=1e-12):
+    expected_next_shops = (
+        tuple(sorted(SHOP_DEMAND)) if unlock_steps else (None,)
+    )
+    if type(result.scenarios) is not tuple:
+        errors.append("scenarios must be a tuple")
+        scenarios = ()
+    else:
+        scenarios = result.scenarios
+    probabilities_valid = all(
+        type(scenario.probability) in (int, float)
+        and not isinstance(scenario.probability, bool)
+        and math.isfinite(scenario.probability)
+        and scenario.probability > 0
+        for scenario in scenarios
+    )
+    if not probabilities_valid:
+        errors.append("scenario probabilities are invalid")
+    elif not math.isclose(
+        sum(scenario.probability for scenario in scenarios),
+        1.0,
+        abs_tol=1e-12,
+    ):
         errors.append("scenario probability does not sum to one")
+    if tuple(scenario.next_shop for scenario in scenarios) != expected_next_shops:
+        errors.append("scenario branches mismatch")
+    expected_probability = 1.0 / len(expected_next_shops)
+    if probabilities_valid and any(
+        not math.isclose(
+            scenario.probability,
+            expected_probability,
+            abs_tol=1e-12,
+        )
+        for scenario in scenarios
+    ):
+        errors.append("scenario probabilities are not uniform")
+    expected_names = tuple(
+        "deterministic" if shop is None else f"next-{shop.lower()}"
+        for shop in expected_next_shops
+    )
+    if tuple(scenario.name for scenario in scenarios) != expected_names:
+        errors.append("scenario names mismatch")
     expected_rows_valid = _valid_drain_rows(
         result.expected_drain_by_step,
         expected_steps,
@@ -342,13 +380,26 @@ def verify_forecast(data, result):
         errors.append("open shop signature mismatch")
     if result.investment_end_step != data.terminal_step:
         errors.append("investment horizon mismatch")
-    for scenario in result.scenarios:
+    for scenario in scenarios:
         rows_valid = _valid_drain_rows(scenario.drain_by_step, expected_steps)
         if not rows_valid:
             errors.append(f"{scenario.name} step demand is invalid")
         if len(scenario.drain_by_day) != expected_days:
             errors.append(f"{scenario.name} day horizon has wrong length")
         if rows_valid:
+            if (
+                type(scenario.next_shop) is str
+                and scenario.next_shop in SHOP_DEMAND
+            ) or (
+                scenario.next_shop is None and not unlock_steps
+            ):
+                expected_rows = _drain_by_step(
+                    data,
+                    unlock_steps,
+                    scenario.next_shop,
+                )
+                if scenario.drain_by_step != expected_rows:
+                    errors.append(f"{scenario.name} step demand mismatch")
             if scenario.drain_by_day != _drain_by_day(data, scenario.drain_by_step):
                 errors.append(f"{scenario.name} daily demand mismatch")
             if scenario.total_drain != _total(scenario.drain_by_step):
@@ -362,14 +413,14 @@ def verify_forecast(data, result):
             errors.append("expected daily demand mismatch")
         if all(
             _valid_drain_rows(scenario.drain_by_step, expected_steps)
-            for scenario in result.scenarios
+            for scenario in scenarios
         ):
             weighted = tuple(
                 tuple(
                     sum(
                         scenario.probability
                         * scenario.drain_by_step[row_index][item_index]
-                        for scenario in result.scenarios
+                        for scenario in scenarios
                     )
                     for item_index in range(len(PRODUCTS))
                 )

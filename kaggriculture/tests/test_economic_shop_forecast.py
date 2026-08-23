@@ -207,3 +207,27 @@ def test_verifier_rejects_forged_weighted_demand():
     assert forecast.verify_forecast(data, forged) == (
         "probability-weighted demand mismatch",
     )
+
+
+def test_verifier_rejects_missing_next_shop_branches():
+    data = _data()
+    valid = forecast.forecast_shops(data)
+    bakery = next(
+        scenario for scenario in valid.scenarios if scenario.next_shop == "BAKERY"
+    )
+    branches = (
+        replace(bakery, probability=0.5),
+        replace(bakery, probability=0.5),
+    )
+    forged = replace(
+        valid,
+        scenarios=branches,
+        expected_drain_by_step=bakery.drain_by_step,
+        expected_drain_by_day=bakery.drain_by_day,
+        expected_total_drain=bakery.total_drain,
+    )
+    assert forecast.verify_forecast(data, forged) == (
+        "scenario branches mismatch",
+        "scenario probabilities are not uniform",
+        "scenario names mismatch",
+    )
