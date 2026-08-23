@@ -3,7 +3,9 @@ import gzip
 import hashlib
 import importlib.metadata
 import json
+import time
 from dataclasses import asdict
+from datetime import UTC, datetime
 from pathlib import Path
 
 from kaggle_environments import make
@@ -50,6 +52,71 @@ def _write_gzip(value, path):
     return hashlib.sha256(compressed).hexdigest(), len(compressed)
 
 
+def _write_json_atomic(value, path):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.tmp")
+    temporary.write_bytes(_encoded(value) + b"\n")
+    temporary.replace(path)
+
+
+class _DailyProgress:
+    def __init__(self, path, arm, seed, candidate_seat):
+        self.path = None if path is None else Path(path)
+        self.arm = arm
+        self.seed = seed
+        self.candidate_seat = candidate_seat
+        self.started = time.monotonic()
+        self.records = []
+        self.completed_days = set()
+
+    def record(self, completed_day, source_step, observation, states, source):
+        if self.path is None or completed_day in self.completed_days:
+            return
+        traces = source.traces
+        trace = traces[-1] if traces else None
+        solve = source.backend.last_solve
+        farms = observation["farms"]
+        players = tuple(
+            {
+                "cash": farms[seat]["money"],
+                "reward": states[seat].reward,
+                "seat": seat,
+                "status": states[seat].status,
+            }
+            for seat in range(2)
+        )
+        record = {
+            "completed_day": completed_day,
+            "elapsed_seconds": round(time.monotonic() - self.started, 6),
+            "fingerprint": None if trace is None else trace.fingerprint,
+            "last_epoch": None if trace is None else trace.epoch,
+            "last_solve": None
+            if solve is None
+            else {
+                "animal_decisions": len(solve.animal_result.animals),
+                "crop_decisions": len(solve.crop_result.decisions),
+                "iterations": solve.ledger.iterations,
+                "terminal_cash": solve.ledger.terminal_cash,
+            },
+            "planning_day": min(29, source_step // 24),
+            "players": players,
+            "source_step": source_step,
+            "wall_time_utc": datetime.now(UTC).isoformat(),
+        }
+        self.records.append(record)
+        self.completed_days.add(completed_day)
+        document = {
+            "arm": self.arm,
+            "candidate_seat": self.candidate_seat,
+            "latest": record,
+            "records": tuple(self.records),
+            "schema": "whole-farm-progress-v1",
+            "seed": self.seed,
+        }
+        _write_json_atomic(document, self.path)
+
+
 def _final_money(replay, seat):
     observation = replay["steps"][-1][seat]["observation"]
     return observation["farms"][seat]["money"]
@@ -72,17 +139,14 @@ def run(
     trace_path,
     time_limit=30.0,
     mip_rel_gap=0.0,
+    progress_path=None,
 ):
     if _sha256(COMPARATOR) != COMPARATOR_SHA256:
         raise ValueError("frozen comparator hash changed")
     provider, source_getter = _provider(arm, seed, time_limit, mip_rel_gap)
-    candidate = make_provider_agent(lambda: provider)
+    candidate_agent = make_provider_agent(lambda: provider)
     comparator = load_artifact(COMPARATOR)
-    agents = (
-        (candidate, comparator)
-        if candidate_seat == 0
-        else (comparator, candidate)
-    )
+    progress = _DailyProgress(progress_path, arm, seed, candidate_seat)
     environment = make(
         "kaggriculture",
         configuration={
@@ -92,6 +156,25 @@ def run(
             "seed": seed,
         },
         debug=True,
+    )
+
+    def candidate(observation, configuration=None):
+        action = candidate_agent(observation, configuration)
+        source_step = observation["step"]
+        if source_step > 0 and source_step % 24 == 0:
+            progress.record(
+                source_step // 24 - 1,
+                source_step,
+                observation,
+                environment.steps[-1],
+                source_getter(),
+            )
+        return action
+
+    agents = (
+        (candidate, comparator)
+        if candidate_seat == 0
+        else (comparator, candidate)
     )
     environment.run(list(agents))
     replay = environment.toJSON()
@@ -106,6 +189,13 @@ def run(
     if statuses != ("DONE", "DONE"):
         raise ValueError(f"game did not finish: {statuses}")
     source = source_getter()
+    progress.record(
+        29,
+        719,
+        replay["steps"][-1][candidate_seat]["observation"],
+        environment.steps[-1],
+        source,
+    )
     source.verify_daily_epochs()
     traces = tuple(source.traces)
     daily_steps = tuple(
@@ -165,6 +255,12 @@ def run(
         "schema": "whole-farm-offline-game-v1",
         "seed": seed,
     }
+    if progress.path is not None:
+        result["progress"] = {
+            "path": str(progress.path),
+            "records": len(progress.records),
+            "sha256": _sha256(progress.path),
+        }
     result["result_sha256"] = canonical_sha256("whole-farm-game-result", result)
     return result
 
@@ -179,6 +275,7 @@ def main():
     parser.add_argument("--candidate-seat", type=int, choices=(0, 1), default=0)
     parser.add_argument("--mip-rel-gap", type=float, default=0.0)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--progress", type=Path)
     parser.add_argument("--replay", type=Path, required=True)
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument("--time-limit", type=float, default=30.0)
@@ -192,6 +289,8 @@ def main():
         arguments.trace,
         arguments.time_limit,
         arguments.mip_rel_gap,
+        arguments.progress
+        or arguments.output.with_name(f"{arguments.output.stem}_progress.json"),
     )
     text = json.dumps(result, allow_nan=False, indent=2, sort_keys=True) + "\n"
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
