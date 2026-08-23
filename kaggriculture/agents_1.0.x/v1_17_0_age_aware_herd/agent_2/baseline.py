@@ -544,7 +544,11 @@ class BaselinePolicy:
             ]
             if not viable:
                 break
-            animal = max(viable, key=margins.get)
+            cow_floor = int(os.environ.get("AGENT2_AGE_AWARE_COW_FLOOR", "0"))
+            if "COW" in viable and counts["COW"] < cow_floor:
+                animal = "COW"
+            else:
+                animal = max(viable, key=margins.get)
             if len(self._dynamic_herd) >= minimum and margins[animal] <= threshold:
                 break
             self._dynamic_herd.append(animal)
@@ -593,17 +597,23 @@ class BaselinePolicy:
             f"AGENT2_{animal}_REALIZATION", {"GOOSE": "0.35", "COW": "0.8", "SHEEP": "0.65"}[animal]
         ))
         units = max(1, round(units * realization))
-        if os.environ.get("AGENT2_AGE_AWARE_HERD", "0") == "1":
+        if os.environ.get("AGENT2_AGE_AWARE_HERD", "1") == "1":
             existing_realization = float(os.environ.get(
                 f"AGENT2_EXISTING_{animal}_REALIZATION", str(realization)
             ))
             existing_units = self._existing_product_units(
                 module, obs, animal, counts, units, existing_realization,
             )
+            saturation = os.environ.get("AGENT2_AGE_AWARE_SATURATION", "stockless")
+            if saturation in {"stockless", "overlap"}:
+                existing_units = self._saturation_product_units(
+                    module, obs, animal, counts, units, existing_realization, saturation,
+                )
         else:
             existing_units = counts[animal] * units
         product_inventory = projected.get(product, module.MARKET_I0) + existing_units
-        if os.environ.get("AGENT2_PRIVATE_PRODUCT_STOCK", "0") == "1":
+        if (os.environ.get("AGENT2_PRIVATE_PRODUCT_STOCK", "0") == "1"
+                and os.environ.get("AGENT2_AGE_AWARE_SATURATION", "stockless") == "full"):
             stores = [obs["private"]["shed"], *obs["private"]["inventories"]]
             product_inventory += sum(int(store.get(product, 0)) for store in stores)
         product_revenue = module._sale_revenue(product, product_inventory, units)
@@ -649,6 +659,40 @@ class BaselinePolicy:
                 future_units = len(productions) + service_days
                 placed_units += int(tile.get("yield_units", 0)) + pending
                 placed_units += max(0, round(future_units * realization))
+        stores = [obs["private"]["shed"], *obs["private"]["inventories"]]
+        held_count = sum(int(store.get(animal, 0)) for store in stores)
+        modeled_count = max(0, counts[animal] - placed_count - held_count)
+        return placed_units + (held_count + modeled_count) * candidate_units
+
+    @staticmethod
+    def _saturation_product_units(
+            module, obs, animal, counts, candidate_units, realization, mode):
+        farm = obs["farms"][obs["player"]]
+        day = int(obs["day"])
+        data = module.ANIMALS[animal]
+        placement_days = int(os.environ.get("AGENT2_ANIMAL_PLACEMENT_DAYS", "2"))
+        cutoff = day + placement_days + data["first_yield_day"]
+        placed_units = 0
+        placed_count = 0
+        for row in farm["tiles"]:
+            for tile in row:
+                if not isinstance(tile, dict) or tile.get("animal") != animal:
+                    continue
+                placed_count += 1
+                productions = [
+                    production for production in module._animal_production_days(tile)
+                    if day + 1 <= production <= module.LAST_DAY
+                ]
+                pending = int(tile.get("pending_care_bonus", 0)) if productions else 0
+                if mode == "overlap":
+                    productions = [production for production in productions if production >= cutoff]
+                    pending = 0
+                    service_start = max(day, cutoff)
+                else:
+                    service_start = day
+                service_days = max(0, productions[-1] - service_start) if productions else 0
+                future_units = len(productions) + service_days
+                placed_units += pending + max(0, round(future_units * realization))
         stores = [obs["private"]["shed"], *obs["private"]["inventories"]]
         held_count = sum(int(store.get(animal, 0)) for store in stores)
         modeled_count = max(0, counts[animal] - placed_count - held_count)

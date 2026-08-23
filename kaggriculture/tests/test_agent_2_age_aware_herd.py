@@ -112,3 +112,24 @@ def test_private_product_stock_reduces_margin(monkeypatch):
     included = policy._animal_margin(policy.module, observation, "COW", Counter())
 
     assert included < ignored
+
+
+def test_existing_realization_calibrates_placed_supply(monkeypatch):
+    policy = _policy()
+    observation = _observation()
+    observation["day"] = 10
+    observation["farms"][observation["player"]]["tiles"][0][0] = {
+        "kind": "PASTURE",
+        "animal": "COW",
+        "placed_day": 0,
+        "yield_units": 0,
+        "pending_care_bonus": 0,
+    }
+    counts = Counter(COW=1)
+    monkeypatch.setenv("AGENT2_AGE_AWARE_HERD", "1")
+
+    default = policy._animal_margin(policy.module, observation, "COW", counts)
+    monkeypatch.setenv("AGENT2_EXISTING_COW_REALIZATION", "0")
+    calibrated = policy._animal_margin(policy.module, observation, "COW", counts)
+
+    assert calibrated > default

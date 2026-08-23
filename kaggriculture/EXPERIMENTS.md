@@ -3462,4 +3462,17 @@ The corrected model counts each placed animal's remaining phase-aligned producti
 | Private product stock | $0 +/- $0 | inert |
 | Both corrections | -$1,647 +/- $1,574 | reject |
 
-The more accurate supply estimate changes the mix in the wrong economic direction under the current execution policy. Version 1.16.0 remains unchanged. Future wheat still uses one current quote; test any buy-curve forecast independently rather than adding it to this rejected arm.
+The first supply correction changed the mix in the wrong economic direction. It also exposed a second error: the margin model added harvested stock and all future production to one terminal inventory value. That made product available for sale today depress the price of product from a new animal several days later.
+
+### Release 1.17.0
+
+The corrected policy keeps the age and phase count but applies price saturation only to pending and future product. It excludes harvested product that can be sold before the new animal starts production. A stricter overlap-only model lost $2,302 +/- $1,653 on 40 paired seeds and was rejected. Species realization and existing-supply calibration also reversed on confirmation and were rejected.
+
+The selected stockless policy was neutral against 1.16.0.
+
+| Board | Paired seeds | Delta | Points | Failures |
+|:---|---:|---:|---:|---:|
+| 75 tiles | 40 | -$36 +/- $1,198 | 46% | 0 |
+| 50 tiles | 40 | -$721 +/- $971 | 42% | 0 |
+
+The source is `agents_1.0.x/v1_17_0_age_aware_herd`. Exact archive validation compared 143,800 actions over 200 episodes and found zero mismatches and zero failures. Decision p99 was 33.11 ms against the one-second limit. The full suite passed 325 tests. The archive SHA-256 is `fb7cc7b122fe36994f27974a0c92785307061afe02c0ad0d98b0ec4f0703595e`. It is a local release only and has not been sent to Kaggle. Future wheat still uses one current quote; test the buy curve independently.

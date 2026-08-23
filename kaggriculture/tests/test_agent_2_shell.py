@@ -20,8 +20,8 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 CANDIDATE = ROOT / "agents_2.0.x/round37_0_shell"
 BASELINE = ROOT / "agents_1.0.x/v1_14_0_central_herd.py"
 REPLAY = ROOT / "replays/main_vs_champion_42.json"
-RELEASE = ROOT / "agents_1.0.x/v1_16_0_dynamic_herd"
-RELEASE_ARCHIVE = ROOT / "agents_1.0.x/v1_16_0_dynamic_herd.tar.gz"
+RELEASE = ROOT / "agents_1.0.x/v1_17_0_age_aware_herd"
+RELEASE_ARCHIVE = ROOT / "agents_1.0.x/v1_17_0_age_aware_herd.tar.gz"
 
 
 def _observations(seat, limit=720):
@@ -263,18 +263,18 @@ def test_release_archive_is_the_champion(tmp_path):
     manifest = build_archive(
         RELEASE,
         generated,
-        source_commit="b80184f6020d125b837ae0682956c814f1b1e596",
-        stage="42",
-        candidate="1.16.0",
+        source_commit="3844674204e62ac9e64fdb140fec3210fd513f5d",
+        stage="42.8",
+        candidate="1.17.0",
     )
-    assert CHAMPION == "agents_1.0.x/v1_16_0_dynamic_herd"
+    assert CHAMPION == "agents_1.0.x/v1_17_0_age_aware_herd"
     assert generated.read_bytes() == RELEASE_ARCHIVE.read_bytes()
-    assert manifest["candidate"] == "1.16.0"
-    assert manifest["stage"] == "42"
+    assert manifest["candidate"] == "1.17.0"
+    assert manifest["stage"] == "42.8"
 
 
 def test_release_source_matches_selected_candidate():
-    selected = ROOT / "agents_2.0.x/round42_1_dynamic_herd"
+    selected = ROOT / "agents_2.0.x/round42_8_age_aware_policy"
     selected_files = {
         path.relative_to(selected): path.read_bytes()
         for path in selected.rglob("*.py")

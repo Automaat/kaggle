@@ -19,7 +19,7 @@ uv run python tools/bench.py main.py --pool default --held-out
 uv run python tools/bandit.py --grid KAGG_LAND=1,2 --floor 40
 uv run python tools/trace.py main.py starter 42
 uv run python tools/labour.py main.py champion
-uv run python tools/package_agent.py agents_1.0.x/v1_16_0_dynamic_herd /tmp/agent.tar.gz --stage 42 --candidate 1.16.0
+uv run python tools/package_agent.py agents_1.0.x/v1_17_0_age_aware_herd /tmp/agent.tar.gz --stage 42.8 --candidate 1.17.0
 uv run python tools/equivalence.py /tmp/agent.tar.gz --seeds 100
 uv run pytest -q tests/
 ```
@@ -57,15 +57,15 @@ Agents follow semantic versioning. `0.N.0` is the historical line: one minor per
 
 A **major** bump means the strategy itself changed, not that it was tuned. 1.0.0 is the first such change: the farm buys a quadrant, staffs it with 12 hands and runs a larger herd, which no amount of tuning had ever made pay. It comes from measuring the labour cost of a tile and from 26 real ladder replays, not from another self-play sweep.
 
-1.16.0 uses the package artifact format developed on the Agent 2 branch but remains in the 1.x release line. The immutable source directory and deterministic tar archive carry the same version.
+1.17.0 uses the package artifact format developed on the Agent 2 branch but remains in the 1.x release line. The immutable source directory and deterministic tar archive carry the same version.
 
-## Current agent (1.16.0)
+## Current agent (1.17.0)
 
-The champion is `agents_1.0.x/v1_16_0_dynamic_herd`. It keeps the proven 75-tile, 12-hand and 42-to-48 plant schedule from 1.15.0. It recalculates the herd mix from visible shop demand, projected sale prices, purchase cost, wheat cost and service work. Twelve animals remain the execution limit; the selected mix changes between cows and sheep. Geese are bought only when their full net margin is positive.
+The local champion is `agents_1.0.x/v1_17_0_age_aware_herd`. It keeps the proven 75-tile, 12-hand and 42-to-48 plant schedule from 1.16.0. It prices each animal from visible shop demand, sale prices, purchase cost, wheat cost and service work. It now counts the remaining production of each owned animal from its age and production phase. Product that can be sold before a new animal starts production does not depress the new animal's sale price. Twelve animals remain the execution limit. The selected mix changes between cows and sheep. Geese still require a positive full net margin.
 
-Against frozen 1.15.0, the release scored 64% points and **+$2,268 +/- $752** over 200 fresh paired seeds. It won 249 of 400 games, tied 10 and had no failures. At 50 tiles the same change scored 70% points and +$2,200 +/- $1,368 over 40 paired seeds. The regression pool scored 97% points, won 407 of 420 games and was positive against all 21 opponents.
+Version 1.16.0 remains the measured score gain over 1.15.0: 64% points and **+$2,268 +/- $752** over 200 fresh paired seeds. The age-aware 1.17.0 change was neutral against 1.16.0. On 75 tiles it scored -$36 +/- $1,198 over 40 fresh paired seeds. On 50 tiles it scored -$721 +/- $971 over 40 fresh paired seeds. Both tests had zero failures. Version 1.17.0 is a local release and has not been sent to Kaggle.
 
-The source directory and packed archive are behavior-identical. The archive is deterministic and has SHA-256 `623859249435332fc4099f66f5e1c7ebdf82627a6be25450d068c34324078833`.
+The source directory and packed archive are behavior-identical. Exact validation compared 143,800 actions over 200 episodes and found zero mismatches and zero failures. The full test suite has 325 passing tests. The archive is deterministic and has SHA-256 `fb7cc7b122fe36994f27974a0c92785307061afe02c0ad0d98b0ec4f0703595e`.
 
 ## Previous 1.x strategy
 
@@ -128,5 +128,5 @@ The plan for the next version is [agents_1.0.x/PLAN.md](agents_1.0.x/PLAN.md), a
 ## Submit
 
 ```bash
-uv run kaggle competitions submit kaggriculture -f agents_1.0.x/v1_16_0_dynamic_herd.tar.gz -m "1.16.0 dynamic demand herd"
+uv run kaggle competitions submit kaggriculture -f agents_1.0.x/v1_17_0_age_aware_herd.tar.gz -m "1.17.0 age-aware demand herd"
 ```
