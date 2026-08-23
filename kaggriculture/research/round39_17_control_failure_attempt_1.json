@@ -1,0 +1,12 @@
+{
+  "arm": "control-1.14",
+  "candidate_seat": 0,
+  "error": "WholeFarmSolveError: daily solve was not retained",
+  "failure_step": 24,
+  "game_completed": false,
+  "original_plan_failure_available": false,
+  "replay_written": false,
+  "seed": 3980000,
+  "status": "rejected-incomplete-daily-trace",
+  "trace_written": false
+}

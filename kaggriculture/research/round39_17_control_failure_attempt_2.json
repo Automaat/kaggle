@@ -1,0 +1,11 @@
+{
+  "arm": "control-1.14",
+  "candidate_seat": 0,
+  "error": "ValueError: current shed inventory exceeds capacity",
+  "failure_step": 24,
+  "game_completed": false,
+  "replay_written": false,
+  "seed": 3980000,
+  "status": "rejected-storage-coupling",
+  "trace_written": false
+}
