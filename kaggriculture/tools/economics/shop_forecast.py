@@ -38,6 +38,8 @@ class ShopForecastInput:
             raise ValueError("terminal step must be in source_step..718")
         if min(values[2:]) < 1:
             raise ValueError("forecast intervals and limits must be positive")
+        if self.max_shops != 8:
+            raise ValueError("shop cap must equal the simulator limit")
         if type(self.open_shops) is not tuple:
             raise TypeError("open shops must be a tuple")
         if len(self.open_shops) > self.max_shops:
@@ -280,6 +282,30 @@ def verify_forecast(data, result):
         return ("result has wrong type",)
     expected_steps = data.terminal_step - data.source_step + 1
     expected_days = data.terminal_day - data.current_day + 1
+    unlock_steps = _unlock_steps(data)
+    expected_daily = (data.current_day + 1) * data.turns_per_day
+    if expected_daily > data.terminal_step:
+        expected_daily = None
+    expected_shop = unlock_steps[0] if unlock_steps else None
+    expected_action_end = min(
+        data.terminal_step,
+        (data.current_day + 1) * data.turns_per_day - 1,
+    )
+    expected_strategy_end = (
+        data.terminal_step if expected_shop is None else expected_shop - 1
+    )
+    if result.source_step != data.source_step:
+        errors.append("source step mismatch")
+    if result.terminal_step != data.terminal_step:
+        errors.append("terminal step mismatch")
+    if result.next_daily_replan_step != expected_daily:
+        errors.append("daily replan boundary mismatch")
+    if result.next_shop_replan_step != expected_shop:
+        errors.append("shop replan boundary mismatch")
+    if result.action_end_step != expected_action_end:
+        errors.append("action horizon mismatch")
+    if result.strategy_end_step != expected_strategy_end:
+        errors.append("strategy horizon mismatch")
     probability = sum(scenario.probability for scenario in result.scenarios)
     if not math.isclose(probability, 1.0, abs_tol=1e-12):
         errors.append("scenario probability does not sum to one")

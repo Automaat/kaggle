@@ -2,6 +2,7 @@ import copy
 import importlib
 import pathlib
 import sys
+from dataclasses import replace
 
 import pytest
 from kaggle_environments import make
@@ -133,6 +134,7 @@ def test_expected_next_shop_demand_conserves_probability():
         ({"shops": ["PET_CAFE"]}, TypeError),
         ({"shops": ("UNKNOWN",)}, ValueError),
         ({"shops": ("PET_CAFE",) * 9}, ValueError),
+        ({"max_shops": 9}, ValueError),
         ({"shop_sell_interval_steps": 0}, ValueError),
     ),
 )
@@ -152,3 +154,24 @@ def test_inventory_projection_validates_rows():
             initial,
             ((-1.0,) * len(market.PRODUCTS),),
         )
+
+
+def test_verifier_rejects_forged_timing_boundaries():
+    data = _data()
+    valid = forecast.forecast_shops(data)
+    forged = replace(
+        valid,
+        source_step=718,
+        terminal_step=718,
+        next_daily_replan_step=None,
+        next_shop_replan_step=None,
+        action_end_step=718,
+        strategy_end_step=718,
+    )
+    assert forecast.verify_forecast(data, forged) == (
+        "source step mismatch",
+        "daily replan boundary mismatch",
+        "shop replan boundary mismatch",
+        "action horizon mismatch",
+        "strategy horizon mismatch",
+    )
