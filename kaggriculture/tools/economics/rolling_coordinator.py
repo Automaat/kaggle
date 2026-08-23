@@ -83,15 +83,7 @@ def _freeze_target_key(value):
             raise ValueError("target key numbers must be finite")
         return value
     if isinstance(value, Mapping):
-        if any(type(key) is not str for key in value):
-            raise TypeError("target mapping keys must be text")
-        return (
-            "mapping",
-            tuple(
-                (key, _freeze_target_key(value[key]))
-                for key in sorted(value)
-            ),
-        )
+        raise TypeError("target key mappings are not supported")
     if type(value) in (list, tuple):
         return tuple(_freeze_target_key(item) for item in value)
     raise TypeError("target key is not JSON-compatible")

@@ -222,6 +222,7 @@ def test_effect_target_key_is_deeply_frozen():
         (lambda: _observation(shops=("UNKNOWN",)), ValueError),
         (lambda: _observation(shops=("PET_CAFE",) * 9), ValueError),
         (lambda: _delta("economy", {}, "a", "b"), ValueError),
+        (lambda: _delta("topology", {"tile": [4, 4]}, "a", "b"), TypeError),
     ),
 )
 def test_canonical_inputs_reject_invalid_values(factory, exception):
