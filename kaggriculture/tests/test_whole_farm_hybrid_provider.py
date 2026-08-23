@@ -1,6 +1,12 @@
 from types import SimpleNamespace
 
-from kaggriculture.tools.economics.whole_farm_hybrid_provider import _Agent2Seam
+import pytest
+
+from kaggriculture.tools.economics.whole_farm_backend import PlanningHorizonConfig
+from kaggriculture.tools.economics.whole_farm_hybrid_provider import (
+    WholeFarmHandoffSource,
+    _Agent2Seam,
+)
 
 
 class _Source:
@@ -24,3 +30,14 @@ def test_seam_does_not_execute_unplanned_frozen_hires():
         (("HIRE",), ("BUY_ANIMAL", "COW", 3)),
     )
     assert orders == ()
+
+
+def test_handoff_source_passes_planning_horizon_to_backend():
+    horizon = PlanningHorizonConfig(5, True)
+    source = WholeFarmHandoffSource(horizon=horizon)
+    assert source.backend.planning_horizon is horizon
+
+
+def test_handoff_source_rejects_invalid_planning_horizon():
+    with pytest.raises(TypeError, match="PlanningHorizonConfig"):
+        WholeFarmHandoffSource(horizon=5)

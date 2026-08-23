@@ -13,7 +13,11 @@ from .rolling_coordinator import (
     RollingCoordinator,
     WholeFarmIntent,
 )
-from .whole_farm_backend import WholeFarmPlannerBackend, WholeFarmSolveError
+from .whole_farm_backend import (
+    PlanningHorizonConfig,
+    WholeFarmPlannerBackend,
+    WholeFarmSolveError,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -43,7 +47,12 @@ class WholeFarmHandoffSource:
         time_limit=30.0,
         mip_rel_gap=0.0,
         max_iterations=5,
+        horizon=None,
     ):
+        if horizon is None:
+            horizon = PlanningHorizonConfig()
+        if type(horizon) is not PlanningHorizonConfig:
+            raise TypeError("horizon must be a PlanningHorizonConfig")
         self._bridge = LiveSnapshotAdapter(registered_seed)
         self._backend = WholeFarmPlannerBackend(
             self._bridge.snapshot,
@@ -51,6 +60,7 @@ class WholeFarmHandoffSource:
             mip_rel_gap,
             max_iterations,
             "frozen-1.14",
+            horizon=horizon,
         )
         self._coordinator = RollingCoordinator(self._backend)
         self._traces = []
@@ -157,12 +167,18 @@ class WholeFarmControlProvider:
         time_limit=30.0,
         mip_rel_gap=0.0,
         max_iterations=5,
+        horizon=None,
     ):
+        if horizon is None:
+            horizon = PlanningHorizonConfig()
+        if type(horizon) is not PlanningHorizonConfig:
+            raise TypeError("horizon must be a PlanningHorizonConfig")
         self._settings = (
             registered_seed,
             time_limit,
             mip_rel_gap,
             max_iterations,
+            horizon,
         )
         self._source = None
         self._loaded = None

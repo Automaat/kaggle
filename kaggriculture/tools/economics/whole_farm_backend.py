@@ -1,16 +1,20 @@
 import math
+import time
 from dataclasses import asdict, dataclass, replace
 from typing import Callable
 
 from .animal_milp import (
     ANIMALS,
     GOODS,
+    STRUCTURES,
     AnimalOracleInput,
     AnimalOracleResult,
+    AnimalTerminalValues,
     solve_animal_oracle,
     verify_result as verify_animal_result,
 )
 from .animal_ledger import ANIMAL_SPECS
+from .crop_ledger import CROP_SPECS
 from .land_hire_optimizer import (
     MODES,
     OptimizerInput,
@@ -18,8 +22,15 @@ from .land_hire_optimizer import (
     solve_optimizer,
     verify_result as verify_investment_result,
 )
-from .market_ledger import CROPS, PRODUCTS, SHED_ITEMS
+from .market_ledger import (
+    CROPS,
+    DEFAULT_MARKET_PARAMS,
+    PRODUCTS,
+    SHED_ITEMS,
+    market_price,
+)
 from .milp_oracle import (
+    CropTerminalValues,
     OracleInput,
     OracleResult,
     generate_crop_options,
@@ -66,6 +77,54 @@ SOURCE_COMMITS = (
     ("shop-coordinator", "1b0c9f5"),
     ("routes", "f43083f"),
 )
+
+
+@dataclass(frozen=True, slots=True)
+class PlanningHorizonConfig:
+    exact_horizon_days: int | None = None
+    strategic_tail: bool = False
+    commit_days: int = 1
+    season_last_day: int = 29
+
+    def __post_init__(self):
+        if self.exact_horizon_days is not None:
+            if type(self.exact_horizon_days) is not int:
+                raise TypeError("exact horizon days must be an integer")
+            if not 1 <= self.exact_horizon_days <= 30:
+                raise ValueError("exact horizon days must be in 1..30")
+        if type(self.strategic_tail) is not bool:
+            raise TypeError("strategic tail must be a boolean")
+        if type(self.commit_days) is not int or self.commit_days != 1:
+            raise ValueError("commit days must equal one")
+        if type(self.season_last_day) is not int or self.season_last_day != 29:
+            raise ValueError("season last day must equal 29")
+        if self.strategic_tail and self.exact_horizon_days is None:
+            raise ValueError("strategic tail requires an exact horizon")
+        if self.strategic_tail and self.exact_horizon_days == 30:
+            raise ValueError("strategic tail requires a shorter horizon")
+
+    def cutoff_day(self, current_day):
+        if type(current_day) is not int or not 0 <= current_day <= 29:
+            raise ValueError("current day must be in 0..29")
+        if self.exact_horizon_days is None:
+            return self.season_last_day
+        return min(
+            self.season_last_day,
+            current_day + self.exact_horizon_days - 1,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class StrategicTailValue:
+    cutoff_day: int
+    terminal_step: int
+    crop_active: tuple[float, ...]
+    animal_active: tuple[float, ...]
+    inventory: tuple[float, ...]
+    wheat: float
+    fertilizer: float
+    investment_per_work: float
+    fingerprint: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,8 +217,8 @@ class WholeFarmSnapshot:
             raise ValueError("model terminal steps differ")
         if self.investment.source_step != self.crop.source_step:
             raise ValueError("investment source step differs")
-        if self.investment.terminal_step != self.crop.terminal_step:
-            raise ValueError("investment terminal step differs")
+        if self.investment.terminal_step < self.crop.terminal_step:
+            raise ValueError("investment horizon ends before farm horizon")
         if len(self.shared.actions) != self.crop.horizon_days:
             raise ValueError("shared capacity must cover model days")
         cash_values = (self.crop.cash, self.animal.cash, self.investment.cash)
@@ -217,6 +276,7 @@ class SharedResourceLedger:
     source_cash: float
     investment_cost: float
     terminal_cash: float
+    forecast_terminal_cash: float
     iterations: int
     cut_signatures: tuple[str, ...]
     days: tuple[DailyResourceLedger, ...]
@@ -351,6 +411,9 @@ class DecisionTrace:
     constraints: tuple[str, ...]
     cuts: tuple[str, ...]
     fingerprints: tuple[tuple[str, str], ...]
+    planning_horizon: PlanningHorizonConfig
+    strategic_tail: StrategicTailValue | None
+    runtime_seconds: float
     fingerprint: str
 
 
@@ -491,6 +554,186 @@ def _forecast_inventory(base_rows, items, forecast):
         )
         cumulative = [value + delta for value, delta in zip(cumulative, drain)]
     return tuple(rows)
+
+
+def _strategic_tail_values(snapshot, forecast, config, cutoff_day):
+    terminal_step = min(718, (cutoff_day + 1) * 24 - 1)
+    tail_days = config.season_last_day - cutoff_day
+    if not config.strategic_tail:
+        return None, None, None, None
+    if tail_days == 0:
+        trace = StrategicTailValue(
+            cutoff_day,
+            terminal_step,
+            (0.0,) * len(CROPS),
+            (0.0,) * len(ANIMALS),
+            (0.0,) * len(PRODUCTS),
+            0.0,
+            0.0,
+            0.0,
+            canonical_sha256(
+                "whole-farm-strategic-tail",
+                (cutoff_day, terminal_step, forecast.open_shop_signature),
+            ),
+        )
+        return trace, None, None, None
+    crop_rows = _forecast_inventory(snapshot.crop.base_inventory, CROPS, forecast)
+    animal_rows = _forecast_inventory(snapshot.animal.base_inventory, GOODS, forecast)
+    day_index = min(cutoff_day - snapshot.current_day, len(crop_rows) - 1)
+    crop_inventory = dict(zip(CROPS, crop_rows[day_index]))
+    animal_inventory = dict(zip(GOODS, animal_rows[day_index]))
+    inventory_values = tuple(
+        market_price(
+            item,
+            crop_inventory[item]
+            if item in crop_inventory
+            else animal_inventory[item],
+            DEFAULT_MARKET_PARAMS,
+        )
+        * 0.6
+        for item in PRODUCTS
+    )
+    wheat_index = PRODUCTS.index("WHEAT")
+    fertilizer_index = PRODUCTS.index("FERTILIZER")
+    wheat_value = max(
+        inventory_values[wheat_index],
+        min(snapshot.crop.wheat_buy_price) * 0.8,
+    )
+    fertilizer_value = inventory_values[fertilizer_index]
+    inventory_values = tuple(
+        wheat_value
+        if item == "WHEAT"
+        else fertilizer_value
+        if item == "FERTILIZER"
+        else value
+        for item, value in zip(PRODUCTS, inventory_values)
+    )
+    crop_active = tuple(
+        market_price(
+            crop,
+            crop_inventory[crop],
+            DEFAULT_MARKET_PARAMS,
+        )
+        * CROP_SPECS[crop].max_yield
+        * 0.75
+        for crop in CROPS
+    )
+    animal_active = []
+    for animal in ANIMALS:
+        spec = ANIMAL_SPECS[animal]
+        exact_days = config.exact_horizon_days or 0
+        yield_delay = max(0, spec.first_yield_day - exact_days)
+        production_days = max(0, tail_days - yield_delay)
+        productions = 0 if production_days == 0 else 1 + production_days // spec.interval
+        product_value = inventory_values[PRODUCTS.index(spec.product)]
+        future_product = productions * product_value
+        future_fertilizer = tail_days * fertilizer_value * 0.15
+        future_cost = tail_days * (wheat_value + 5.0)
+        animal_active.append(max(0.0, future_product + future_fertilizer - future_cost))
+    investment_per_work = 0.0
+    fingerprint = canonical_sha256(
+        "whole-farm-strategic-tail",
+        (
+            cutoff_day,
+            terminal_step,
+            forecast.open_shop_signature,
+            tuple(round(value, 8) for value in forecast.expected_total_drain),
+            crop_active,
+            tuple(animal_active),
+            inventory_values,
+            investment_per_work,
+        ),
+    )
+    trace = StrategicTailValue(
+        cutoff_day,
+        terminal_step,
+        crop_active,
+        tuple(animal_active),
+        inventory_values,
+        wheat_value,
+        fertilizer_value,
+        investment_per_work,
+        fingerprint,
+    )
+    crop_terminal = CropTerminalValues(
+        crop_active,
+        tuple(CROP_SPECS[crop].seed * 0.45 for crop in CROPS),
+        tuple(inventory_values[PRODUCTS.index(crop)] for crop in CROPS),
+        fertilizer_value,
+    )
+    animal_terminal = AnimalTerminalValues(
+        tuple(animal_active),
+        tuple(
+            0.0
+            if item in ("WHEAT", "FERTILIZER")
+            else inventory_values[PRODUCTS.index(item)]
+            for item in GOODS
+        ),
+        tuple(max(0.0, value - 15.0) for value in animal_active),
+        tuple(
+            max(
+                0.0,
+                max(
+                    value - ANIMAL_SPECS[animal].cost - 10.0
+                    for animal, value in zip(ANIMALS, animal_active)
+                    if ANIMAL_SPECS[animal].structure == structure
+                ),
+            )
+            for structure in STRUCTURES
+        ),
+    )
+    return trace, crop_terminal, animal_terminal, None
+
+
+def _planning_snapshot(snapshot, forecast, config):
+    cutoff_day = config.cutoff_day(snapshot.current_day)
+    terminal_step = min(718, (cutoff_day + 1) * 24 - 1)
+    if terminal_step == snapshot.crop.terminal_step and not config.strategic_tail:
+        return snapshot, None
+    trace, crop_terminal, animal_terminal, _ = (
+        _strategic_tail_values(snapshot, forecast, config, cutoff_day)
+    )
+    day_count = cutoff_day - snapshot.current_day + 1
+    crop = replace(
+        snapshot.crop,
+        terminal_step=terminal_step,
+        tile_capacity=snapshot.crop.tile_capacity[:day_count],
+        action_capacity=snapshot.crop.action_capacity[:day_count],
+        crop_storage_capacity=snapshot.crop.crop_storage_capacity[:day_count],
+        wheat_demand=snapshot.crop.wheat_demand[:day_count],
+        fixed_cash_flow=snapshot.crop.fixed_cash_flow[:day_count],
+        fertilizer_supply=snapshot.crop.fertilizer_supply[:day_count],
+        fertilizer_buy_price=snapshot.crop.fertilizer_buy_price[:day_count],
+        market_order_slots=snapshot.crop.market_order_slots[:day_count],
+        base_inventory=snapshot.crop.base_inventory[:day_count],
+        wheat_buy_price=snapshot.crop.wheat_buy_price[:day_count],
+        terminal_values=crop_terminal,
+    )
+    animal = replace(
+        snapshot.animal,
+        terminal_step=terminal_step,
+        animal_tile_capacity=snapshot.animal.animal_tile_capacity[:day_count],
+        action_capacity=snapshot.animal.action_capacity[:day_count],
+        shed_capacity=snapshot.animal.shed_capacity[:day_count],
+        fixed_shed_occupancy=snapshot.animal.fixed_shed_occupancy[:day_count],
+        market_order_slots=snapshot.animal.market_order_slots[:day_count],
+        fixed_cash_flow=snapshot.animal.fixed_cash_flow[:day_count],
+        base_inventory=snapshot.animal.base_inventory[:day_count],
+        terminal_values=animal_terminal,
+    )
+    shared = SharedCapacity(
+        snapshot.shared.field_tiles[:day_count],
+        snapshot.shared.actions[:day_count],
+        snapshot.shared.storage[:day_count],
+        snapshot.shared.market_orders[:day_count],
+        snapshot.shared.route_action_reserve[:day_count],
+    )
+    return replace(
+        snapshot,
+        crop=crop,
+        animal=animal,
+        shared=shared,
+    ), trace
 
 
 def _select_investment(snapshot, time_limit, mip_rel_gap):
@@ -895,10 +1138,16 @@ def build_shared_ledger(
                 animal["orders"][index],
             )
         )
+    forecast_terminal_cash = crop_result.terminal_cash
+    if crop_data.terminal_values is not None:
+        forecast_terminal_cash += crop_result.terminal_value or 0.0
+        forecast_terminal_cash += animal_result.terminal_value or 0.0
+        forecast_terminal_cash += selected_investment.terminal_work_value or 0.0
     return SharedResourceLedger(
         snapshot.crop.cash,
         selected_investment.investment_cost or 0.0,
         crop_result.terminal_cash,
+        forecast_terminal_cash,
         iterations,
         tuple(cut_signatures),
         tuple(days),
@@ -914,6 +1163,8 @@ def verify_shared_ledger(ledger):
         errors.append("negative cash")
     if ledger.terminal_cash != ledger.days[-1].cash_end:
         errors.append("terminal cash mismatch")
+    if ledger.forecast_terminal_cash < ledger.terminal_cash:
+        errors.append("forecast terminal cash below boundary cash")
     if expected_initial < 0:
         errors.append("investment exceeds source cash")
     for day in ledger.days:
@@ -1007,13 +1258,17 @@ def _market_order_intents(snapshot, solved):
         )
     return tuple(
         sorted(
-            intents,
+            (
+                intent
+                for intent in intents
+                if intent.source_step // 24 == snapshot.current_day
+            ),
             key=lambda value: (value.source_step, value.identifier, value.order),
         )
     )
 
 
-def _space_targets(solved):
+def _space_targets(snapshot, solved):
     return tuple(
         SpaceTarget(
             assignment.intent,
@@ -1024,6 +1279,7 @@ def _space_targets(solved):
             assignment.placement_day,
         )
         for assignment in solved.space_result.assignments
+        if assignment.placement_day == snapshot.current_day
     )
 
 
@@ -1042,7 +1298,7 @@ def _projected_unlock_day(snapshot, solved, cell):
     return min(candidates) if candidates else None
 
 
-def _animal_execution_intents(solved):
+def _animal_execution_intents(snapshot, solved):
     purchases = {}
     for purchase in solved.animal_result.purchases:
         if purchase.item in ANIMALS:
@@ -1051,7 +1307,7 @@ def _animal_execution_intents(solved):
             )
     result = []
     for decision in solved.animal_result.animals:
-        if decision.existing:
+        if decision.existing or decision.placement_day != snapshot.current_day:
             continue
         days = purchases.get(decision.animal, [])
         eligible = [day for day in days if day <= decision.placement_day]
@@ -1069,13 +1325,15 @@ def _animal_execution_intents(solved):
     return tuple(result)
 
 
-def _crop_targets(snapshot, solved, space_targets):
+def _crop_targets(snapshot, solved, space_targets, commit_day=None):
     blocked_from = {
         (target.y, target.x): target.placement_day for target in space_targets
     }
     by_day = {}
     for decision in solved.crop_result.decisions:
         if decision.plant_day is None:
+            continue
+        if commit_day is not None and decision.plant_day != commit_day:
             continue
         by_day.setdefault(decision.plant_day, []).extend(
             [(decision.crop, decision.release_day)] * decision.count
@@ -1173,15 +1431,20 @@ def _build_handoff(
     route_arm="frozen-1.14",
     route_plan=None,
 ):
-    space_targets = _space_targets(solved)
+    space_targets = _space_targets(snapshot, solved)
     return ExecutionHandoff(
         label,
         epoch,
         snapshot.source_step,
         economy.fingerprint,
         space.fingerprint,
-        _crop_targets(snapshot, solved, space_targets),
-        _animal_execution_intents(solved),
+        _crop_targets(
+            snapshot,
+            solved,
+            space_targets,
+            snapshot.current_day,
+        ),
+        _animal_execution_intents(snapshot, solved),
         space_targets,
         _market_order_intents(snapshot, solved),
         route_arm,
@@ -1422,6 +1685,9 @@ def _build_decision_trace(
     routes,
     route_arm,
     route_plan,
+    planning_horizon,
+    strategic_tail,
+    runtime_seconds,
 ):
     investment_errors = dict(solved.verification.investment)
     selected_animals = tuple(
@@ -1460,7 +1726,8 @@ def _build_decision_trace(
             "crop",
             "selected-portfolio",
             not solved.verification.crop,
-            solved.crop_result.terminal_cash,
+            solved.crop_result.forecast_terminal_cash
+            or solved.crop_result.terminal_cash,
             "; ".join(solved.verification.crop) or None,
         ),
         CandidateTrace(
@@ -1556,6 +1823,10 @@ def _build_decision_trace(
         "constraints": constraints,
         "cuts": solved.ledger.cut_signatures,
         "fingerprints": fingerprints,
+        "planning_horizon": asdict(planning_horizon),
+        "strategic_tail": None
+        if strategic_tail is None
+        else asdict(strategic_tail),
     }
     return DecisionTrace(
         epoch,
@@ -1572,6 +1843,9 @@ def _build_decision_trace(
         constraints,
         solved.ledger.cut_signatures,
         fingerprints,
+        planning_horizon,
+        strategic_tail,
+        runtime_seconds,
         canonical_sha256("whole-farm-decision-trace", payload),
     )
 
@@ -1584,6 +1858,7 @@ class WholeFarmPlannerBackend:
         mip_rel_gap=0.0,
         max_iterations=5,
         route_arm="frozen-1.14",
+        horizon=None,
     ):
         if not callable(snapshot_provider):
             raise TypeError("snapshot provider must be callable")
@@ -1599,17 +1874,24 @@ class WholeFarmPlannerBackend:
             raise ValueError("MIP gap must be in 0..1")
         if route_arm not in ("frozen-1.14", "planner-2.0"):
             raise ValueError("unknown route arm")
+        if horizon is None:
+            horizon = PlanningHorizonConfig()
+        if type(horizon) is not PlanningHorizonConfig:
+            raise TypeError("horizon must be PlanningHorizonConfig")
         self._snapshot_provider = snapshot_provider
         self._time_limit = float(time_limit)
         self._mip_rel_gap = float(mip_rel_gap)
         self._max_iterations = max_iterations
         self._route_arm = route_arm
+        self._horizon = horizon
         self._last_solve = None
         self._last_handoff = None
         self._last_trace = None
         self._last_shop_signature = None
         self._last_route_plan = None
         self._last_route_plan_problem = None
+        self._last_strategic_tail = None
+        self._last_runtime_seconds = 0.0
 
     @property
     def last_solve(self):
@@ -1631,6 +1913,10 @@ class WholeFarmPlannerBackend:
     def last_route_plan_problem(self):
         return self._last_route_plan_problem
 
+    @property
+    def planning_horizon(self):
+        return self._horizon
+
     def reset(self):
         self._last_solve = None
         self._last_handoff = None
@@ -1638,6 +1924,8 @@ class WholeFarmPlannerBackend:
         self._last_shop_signature = None
         self._last_route_plan = None
         self._last_route_plan_problem = None
+        self._last_strategic_tail = None
+        self._last_runtime_seconds = 0.0
 
     def _solve(self, snapshot, forecast):
         investment_results, selected, investment_verification = _select_investment(
@@ -1815,14 +2103,19 @@ class WholeFarmPlannerBackend:
                                         (
                                             identifier,
                                             True,
-                                            ledger.terminal_cash,
+                                            ledger.forecast_terminal_cash,
                                             None,
                                         ),
                                     ),
                                 )
                             identifier = "+".join(portfolio) or "none"
                             animal_candidate_summary.append(
-                                (identifier, True, ledger.terminal_cash, None)
+                                (
+                                    identifier,
+                                    True,
+                                    ledger.forecast_terminal_cash,
+                                    None,
+                                )
                             )
                             feasible_solutions.append(solution)
                             continue
@@ -1861,7 +2154,7 @@ class WholeFarmPlannerBackend:
         if feasible_solutions:
             best = max(
                 feasible_solutions,
-                key=lambda value: value.ledger.terminal_cash,
+                key=lambda value: value.ledger.forecast_terminal_cash,
             )
             ledger = replace(
                 best.ledger,
@@ -1885,11 +2178,16 @@ class WholeFarmPlannerBackend:
             raise TypeError("forecast has wrong type")
         if type(window) is not PlanningWindow:
             raise TypeError("planning window has wrong type")
-        snapshot = self._snapshot_provider(observation)
-        if type(snapshot) is not WholeFarmSnapshot:
+        observed_snapshot = self._snapshot_provider(observation)
+        if type(observed_snapshot) is not WholeFarmSnapshot:
             raise TypeError("snapshot provider returned wrong type")
-        if snapshot.source_step != observation.source_step:
+        if observed_snapshot.source_step != observation.source_step:
             raise ValueError("snapshot and observation source steps differ")
+        snapshot, strategic_tail = _planning_snapshot(
+            observed_snapshot,
+            forecast,
+            self._horizon,
+        )
         reasons = []
         if self._last_solve is None:
             reasons.append("initial-plan")
@@ -1903,7 +2201,9 @@ class WholeFarmPlannerBackend:
         ):
             reasons.append("shop-signature-change")
         reasons = tuple(sorted(reasons))
+        started = time.perf_counter()
         solved = self._solve(snapshot, forecast)
+        runtime_seconds = time.perf_counter() - started
         crop_fingerprint = _result_fingerprint(
             "whole-farm-crop",
             solved.crop_result,
@@ -1966,6 +2266,10 @@ class WholeFarmPlannerBackend:
                     animal_fingerprint,
                     investment_fingerprint,
                     resource_fingerprint,
+                    asdict(self._horizon),
+                    None
+                    if strategic_tail is None
+                    else strategic_tail.fingerprint,
                 ),
             ),
             crop_fingerprint,
@@ -2060,6 +2364,9 @@ class WholeFarmPlannerBackend:
             routes,
             self._route_arm,
             route_plan,
+            self._horizon,
+            strategic_tail,
+            runtime_seconds,
         )
         self._last_solve = solved
         self._last_handoff = handoff
@@ -2067,6 +2374,8 @@ class WholeFarmPlannerBackend:
         self._last_shop_signature = forecast.open_shop_signature
         self._last_route_plan = route_plan
         self._last_route_plan_problem = route_problem
+        self._last_strategic_tail = strategic_tail
+        self._last_runtime_seconds = runtime_seconds
         return economy, space, routes
 
     def repair_space(self, epoch, observation, economy, previous_space):
@@ -2163,6 +2472,9 @@ class WholeFarmPlannerBackend:
             routes,
             self._route_arm,
             route_plan,
+            self._horizon,
+            self._last_strategic_tail,
+            self._last_runtime_seconds,
         )
         self._last_handoff = handoff
         self._last_trace = trace
