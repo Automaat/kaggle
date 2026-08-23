@@ -1,10 +1,17 @@
 import gzip
 import json
+import sys
 from types import SimpleNamespace
 
+import pytest
+
+from kaggriculture.tools.economics import run_whole_farm_game as runner
 from kaggriculture.tools.economics.run_whole_farm_game import (
     _DailyProgress,
+    _argument_parser,
     _checkpoint_artifacts,
+    _planning_horizon,
+    _write_failure_result,
 )
 
 
@@ -43,13 +50,26 @@ def test_daily_progress_writes_atomic_solve_checkpoint(tmp_path):
             "shed": {"SHEEP": 2},
         },
     }
-    progress = _DailyProgress(path, "control-1.14", 3_980_000, 0)
+    horizon = _planning_horizon(5, True)
+    progress = _DailyProgress(
+        path,
+        "control-1.14",
+        3_980_000,
+        0,
+        horizon,
+    )
 
     progress.record(0, 24, observation, states, source)
     progress.record(0, 48, observation, states, source)
 
     document = json.loads(path.read_text())
     assert document["schema"] == "whole-farm-progress-v1"
+    assert document["planning_horizon"] == {
+        "commit_days": 1,
+        "exact_horizon_days": 5,
+        "season_last_day": 29,
+        "strategic_tail": True,
+    }
     assert len(document["records"]) == 1
     assert document["latest"]["completed_day"] == 0
     assert document["latest"]["planning_day"] == 1
@@ -96,13 +116,18 @@ def test_checkpoint_writes_official_html_and_replay_atomically(tmp_path):
     class Environment:
         def __init__(self):
             self.render_arguments = None
+            self.info = {}
 
         def toJSON(self):
-            return {"steps": [[{"observation": {}}]]}
+            return {
+                "info": self.info,
+                "steps": [[{"observation": {}}]],
+            }
 
         def render(self, **arguments):
             self.render_arguments = arguments
-            return "<html>official replay</html>"
+            payload = json.dumps(self.toJSON(), sort_keys=True)
+            return f"<html>{payload}</html>"
 
     environment = Environment()
     replay_path = tmp_path / "replay.json.gz"
@@ -114,12 +139,23 @@ def test_checkpoint_writes_official_html_and_replay_atomically(tmp_path):
         "control-1.14",
         3_980_000,
         0,
+        _planning_horizon(5, True),
     )
 
     with gzip.open(replay_path, "rt") as stream:
         written_replay = json.load(stream)
     assert written_replay == replay
-    assert html_path.read_text() == "<html>official replay</html>"
+    planning_horizon = {
+        "commit_days": 1,
+        "exact_horizon_days": 5,
+        "season_last_day": 29,
+        "strategic_tail": True,
+    }
+    assert replay["planning_horizon"] == planning_horizon
+    assert replay["info"]["planning_horizon"] == planning_horizon
+    html = html_path.read_text()
+    assert '"exact_horizon_days": 5' in html
+    assert '"strategic_tail": true' in html
     assert environment.render_arguments == {
         "controls": True,
         "height": 800,
@@ -127,6 +163,138 @@ def test_checkpoint_writes_official_html_and_replay_atomically(tmp_path):
         "width": 1200,
     }
     assert metadata["replay"]["steps"] == 1
-    assert metadata["html"]["bytes"] == 28
+    assert metadata["html"]["bytes"] == len(html.encode())
     assert not (tmp_path / ".replay.json.gz.tmp").exists()
     assert not (tmp_path / ".replay.html.tmp").exists()
+
+
+@pytest.mark.parametrize("value", ("0", "31"))
+def test_cli_rejects_exact_horizon_outside_season(value):
+    parser = _argument_parser()
+    arguments = (
+        "--output",
+        "result.json",
+        "--replay",
+        "replay.json.gz",
+        "--trace",
+        "trace.json.gz",
+        "--exact-horizon-days",
+        value,
+    )
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(arguments)
+
+
+def test_cli_accepts_five_day_strategic_horizon():
+    arguments = _argument_parser().parse_args(
+        (
+            "--output",
+            "result.json",
+            "--replay",
+            "replay.json.gz",
+            "--trace",
+            "trace.json.gz",
+            "--exact-horizon-days",
+            "5",
+            "--strategic-tail",
+        )
+    )
+
+    assert arguments.exact_horizon_days == 5
+    assert arguments.strategic_tail is True
+
+
+def test_strategic_tail_requires_exact_horizon():
+    with pytest.raises(ValueError, match="requires an exact horizon"):
+        _planning_horizon(strategic_tail=True)
+
+
+def test_failure_result_preserves_config_and_partial_artifacts(tmp_path):
+    output_path = tmp_path / "attempt.json"
+    replay_path = tmp_path / "replay.json.gz"
+    html_path = tmp_path / "replay.html"
+    progress_path = tmp_path / "progress.json"
+    with gzip.open(replay_path, "wt") as stream:
+        json.dump({"steps": [[], [], []]}, stream)
+    html_path.write_text("<html>partial</html>")
+    progress_path.write_text(
+        json.dumps(
+            {
+                "latest": {"completed_day": 1, "source_step": 48},
+                "records": ({"source_step": 24}, {"source_step": 48}),
+            }
+        )
+    )
+    arguments = SimpleNamespace(
+        arm="control-1.14",
+        candidate_seat=0,
+        exact_horizon_days=5,
+        html=html_path,
+        output=output_path,
+        progress=progress_path,
+        replay=replay_path,
+        seed=3_980_000,
+        strategic_tail=True,
+        trace=tmp_path / "trace.json.gz",
+    )
+
+    result = _write_failure_result(arguments, RuntimeError("solve failed"))
+
+    written = json.loads(output_path.read_text())
+    assert written == result
+    assert result["status"] == "failed"
+    assert result["planning_horizon"] == {
+        "commit_days": 1,
+        "exact_horizon_days": 5,
+        "season_last_day": 29,
+        "strategic_tail": True,
+    }
+    assert result["error"] == {
+        "text": "solve failed",
+        "type": "RuntimeError",
+    }
+    assert result["partial_replay"]["steps"] == 3
+    assert result["html"]["path"] == str(html_path)
+    assert result["progress"]["records"] == 2
+    assert result["source_step"] == 48
+    assert result["last_checkpoint"] == {
+        "completed_day": 1,
+        "source_step": 48,
+    }
+    assert len(result["result_sha256"]) == 64
+    assert not (tmp_path / ".attempt.json.tmp").exists()
+
+
+def test_main_writes_failure_result_and_reraises(tmp_path, monkeypatch):
+    output_path = tmp_path / "attempt.json"
+
+    def fail(*args):
+        raise RuntimeError("planner stopped")
+
+    monkeypatch.setattr(runner, "run", fail)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_whole_farm_game.py",
+            "--output",
+            str(output_path),
+            "--replay",
+            str(tmp_path / "replay.json.gz"),
+            "--trace",
+            str(tmp_path / "trace.json.gz"),
+            "--exact-horizon-days",
+            "5",
+            "--strategic-tail",
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="planner stopped"):
+        runner.main()
+
+    result = json.loads(output_path.read_text())
+    assert result["status"] == "failed"
+    assert result["planning_horizon"]["exact_horizon_days"] == 5
+    assert result["planning_horizon"]["strategic_tail"] is True
+    assert not (tmp_path / ".attempt.json.tmp").exists()
