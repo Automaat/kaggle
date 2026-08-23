@@ -3311,3 +3311,58 @@ Only then should a separate arm re-solve and execute a rolling daily plan.
 
 Decision: keep the day-0 MILP portfolio as a positive candidate. Do not release
 it or enable continuous control from this two-game result.
+
+## Round 39.14: shop-aware rolling forecast
+
+Status: accepted standalone forecast. It changes no live action and makes no
+simulator-score claim.
+
+Plan commit: `8c18216`. Implementation commit: `69f6eec`. Review fix commits:
+`7317611`, `493965e`, `56a1d2f`.
+
+The environment observation exposes only `town.unlocked_shops`. Its schema
+states that the resolved episode seed stays outside agent observations. A
+two-seed simulator test proves that identical empty-town observations at step 0
+lead to different first shops at step 72. A live agent therefore cannot know a
+future shop type without information leakage.
+
+The forecast uses exact current shops and town timing. It creates eight uniform
+branches for the next hidden shop type. Later openings use expected fractional
+demand. If eight shops are already open, the forecast becomes deterministic.
+Duplicates and the double demand from one-product shops remain exact.
+
+The rolling policy keeps three horizons:
+
+1. execute actions only through the current day;
+2. keep shop-sensitive strategy only through the step before the next opening;
+3. value crops, animals, land and workers through source step 718.
+
+This prevents a three-day forecast from rejecting long-lived investments. The
+coordinator will solve each day and also react immediately when the multiset of
+open shops changes.
+
+Registered command:
+
+```bash
+.venv/bin/python -m kaggriculture.tools.economics.run_shop_forecast \
+  --output kaggriculture/research/round39_14_shop_aware_rolling.json
+```
+
+| Case | Branches | Next shop step | Verification errors |
+|:---|---:|---:|---:|
+| Game start | 8 | 72 | 0 |
+| Step 71 | 8 | 72 | 0 |
+| Step 72 after Pet Cafe | 8 | 144 | 0 |
+| Eight-shop cap | 1 | none | 0 |
+
+At game start the expected full-season drain is 525 wheat, 327 carrot, 228
+tomato, 426 strawberry, 30 melon, 228 egg, 327 milk and 228 wool. Fertilizer
+town demand is zero. These are inventory corrections, not revenue or a score.
+
+Adversarial review found an invalid configurable ninth shop and incomplete
+verification of timing, aggregates and scenario branches. The fixed model
+requires eight unique uniform branches, validates exact per-branch demand and
+ended with a clean review. All 20 focused tests and the full suite pass.
+
+Decision: accept the information-safe forecast for later coordinator
+integration. Do not read future shops from a replay or simulator seed.
