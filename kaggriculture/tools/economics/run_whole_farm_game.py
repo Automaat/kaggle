@@ -80,6 +80,19 @@ def _planning_horizon_document(horizon=None):
     return asdict(horizon)
 
 
+def _attempt_id(arm, seed, candidate_seat, horizon):
+    return canonical_sha256(
+        "whole-farm-game-attempt-id",
+        (
+            arm,
+            seed,
+            candidate_seat,
+            _planning_horizon_document(horizon),
+            time.time_ns(),
+        ),
+    )
+
+
 def _file_metadata(path):
     path = Path(path)
     if not path.exists():
@@ -108,16 +121,28 @@ def _failure_result(arguments, error):
         "seed": arguments.seed,
         "status": "failed",
     }
+    attempt_id = getattr(arguments, "attempt_id", None)
+    result["attempt_id"] = attempt_id
     replay_metadata = _file_metadata(arguments.replay)
     if replay_metadata is not None:
         try:
             with gzip.open(arguments.replay, "rt") as stream:
                 replay = json.load(stream)
-            replay_metadata["steps"] = len(replay["steps"])
+            if attempt_id is not None and replay.get("attempt_id") != attempt_id:
+                replay_metadata = None
+            else:
+                replay_metadata["steps"] = len(replay["steps"])
         except (KeyError, OSError, TypeError, ValueError):
-            pass
-        result["partial_replay"] = replay_metadata
+            replay_metadata = None if attempt_id is not None else replay_metadata
+        if replay_metadata is not None:
+            result["partial_replay"] = replay_metadata
     html_metadata = _file_metadata(arguments.html) if arguments.html else None
+    if html_metadata is not None and attempt_id is not None:
+        try:
+            if attempt_id not in arguments.html.read_text():
+                html_metadata = None
+        except (OSError, UnicodeError):
+            html_metadata = None
     if html_metadata is not None:
         result["html"] = html_metadata
     progress_path = arguments.progress or arguments.output.with_name(
@@ -125,17 +150,32 @@ def _failure_result(arguments, error):
     )
     progress_metadata = _file_metadata(progress_path)
     if progress_metadata is not None:
-        result["progress"] = progress_metadata
         try:
             progress_document = json.loads(progress_path.read_text())
-            progress_metadata["records"] = len(progress_document["records"])
-            latest = progress_document.get("latest")
-            if latest is not None:
-                result["last_checkpoint"] = latest
-                result["source_step"] = latest["source_step"]
+            if (
+                attempt_id is not None
+                and progress_document.get("attempt_id") != attempt_id
+            ):
+                progress_metadata = None
+            else:
+                progress_metadata["records"] = len(progress_document["records"])
+                latest = progress_document.get("latest")
+                if latest is not None:
+                    result["last_checkpoint"] = latest
+                    result["source_step"] = latest["source_step"]
         except (KeyError, OSError, TypeError, ValueError):
-            pass
+            progress_metadata = None if attempt_id is not None else progress_metadata
+        if progress_metadata is not None:
+            result["progress"] = progress_metadata
     trace_metadata = _file_metadata(arguments.trace)
+    if trace_metadata is not None and attempt_id is not None:
+        try:
+            with gzip.open(arguments.trace, "rt") as stream:
+                trace_document = json.load(stream)
+            if trace_document.get("attempt_id") != attempt_id:
+                trace_metadata = None
+        except (OSError, TypeError, ValueError):
+            trace_metadata = None
     if trace_metadata is not None:
         result["decision_trace"] = trace_metadata
     result["result_sha256"] = canonical_sha256(
@@ -159,13 +199,18 @@ def _checkpoint_artifacts(
     seed,
     candidate_seat,
     horizon=None,
+    attempt_id=None,
 ):
     planning_horizon = _planning_horizon_document(horizon)
     if type(environment.info) is not dict:
         raise TypeError("environment info must be a dictionary")
     environment.info["planning_horizon"] = planning_horizon
+    if attempt_id is not None:
+        environment.info["attempt_id"] = attempt_id
     replay = environment.toJSON()
     replay["planning_horizon"] = planning_horizon
+    if attempt_id is not None:
+        replay["attempt_id"] = attempt_id
     replay["id"] = canonical_sha256(
         "whole-farm-game",
         (arm, seed, candidate_seat, planning_horizon),
@@ -232,12 +277,21 @@ def _candidate_farm(observation, candidate_seat):
 
 
 class _DailyProgress:
-    def __init__(self, path, arm, seed, candidate_seat, horizon=None):
+    def __init__(
+        self,
+        path,
+        arm,
+        seed,
+        candidate_seat,
+        horizon=None,
+        attempt_id=None,
+    ):
         self.path = None if path is None else Path(path)
         self.arm = arm
         self.seed = seed
         self.candidate_seat = candidate_seat
         self.planning_horizon = _planning_horizon_document(horizon)
+        self.attempt_id = attempt_id
         self.started = time.monotonic()
         self.records = []
         self.completed_days = set()
@@ -284,6 +338,7 @@ class _DailyProgress:
         self.completed_days.add(completed_day)
         document = {
             "arm": self.arm,
+            "attempt_id": self.attempt_id,
             "candidate_seat": self.candidate_seat,
             "latest": record,
             "planning_horizon": self.planning_horizon,
@@ -332,8 +387,11 @@ def run(
     html_path=None,
     exact_horizon_days=None,
     strategic_tail=False,
+    attempt_id=None,
 ):
     horizon = _planning_horizon(exact_horizon_days, strategic_tail)
+    if attempt_id is None:
+        attempt_id = _attempt_id(arm, seed, candidate_seat, horizon)
     if _sha256(COMPARATOR) != COMPARATOR_SHA256:
         raise ValueError("frozen comparator hash changed")
     provider, source_getter = _provider(
@@ -351,6 +409,7 @@ def run(
         seed,
         candidate_seat,
         horizon,
+        attempt_id,
     )
     environment = make(
         "kaggriculture",
@@ -382,6 +441,7 @@ def run(
                 seed,
                 candidate_seat,
                 horizon,
+                attempt_id,
             )
         return action
 
@@ -398,6 +458,7 @@ def run(
                 seed,
                 candidate_seat,
                 horizon,
+                attempt_id,
             )
         except Exception:
             pass
@@ -410,6 +471,7 @@ def run(
         seed,
         candidate_seat,
         horizon,
+        attempt_id,
     )
     if len(replay["steps"]) != 720:
         raise ValueError("full game must contain 720 steps")
@@ -436,6 +498,7 @@ def run(
         raise ValueError("daily decision traces are incomplete")
     trace_document = {
         "arm": arm,
+        "attempt_id": attempt_id,
         "candidate_seat": candidate_seat,
         "decision_traces": tuple(asdict(trace) for trace in traces),
         "planning_horizon": _planning_horizon_document(horizon),
@@ -445,6 +508,7 @@ def run(
     opponent_seat = 1 - candidate_seat
     result = {
         "arm": arm,
+        "attempt_id": attempt_id,
         "candidate": {
             "final_money": _final_money(replay, candidate_seat),
             "reward": rewards[candidate_seat],
@@ -521,12 +585,18 @@ def main():
     parser = _argument_parser()
     arguments = parser.parse_args()
     try:
-        _planning_horizon(
+        horizon = _planning_horizon(
             arguments.exact_horizon_days,
             arguments.strategic_tail,
         )
     except (TypeError, ValueError) as error:
         parser.error(str(error))
+    arguments.attempt_id = _attempt_id(
+        arguments.arm,
+        arguments.seed,
+        arguments.candidate_seat,
+        horizon,
+    )
     try:
         result = run(
             arguments.arm,
@@ -541,6 +611,7 @@ def main():
             arguments.html,
             arguments.exact_horizon_days,
             arguments.strategic_tail,
+            arguments.attempt_id,
         )
     except Exception as error:
         _write_failure_result(arguments, error)

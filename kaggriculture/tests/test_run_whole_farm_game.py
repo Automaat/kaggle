@@ -298,3 +298,55 @@ def test_main_writes_failure_result_and_reraises(tmp_path, monkeypatch):
     assert result["planning_horizon"]["exact_horizon_days"] == 5
     assert result["planning_horizon"]["strategic_tail"] is True
     assert not (tmp_path / ".attempt.json.tmp").exists()
+
+
+def test_main_ignores_stale_artifacts_after_early_failure(tmp_path, monkeypatch):
+    output_path = tmp_path / "attempt.json"
+    replay_path = tmp_path / "replay.json.gz"
+    html_path = tmp_path / "replay.html"
+    progress_path = tmp_path / "progress.json"
+    trace_path = tmp_path / "trace.json.gz"
+    with gzip.open(replay_path, "wt") as stream:
+        json.dump({"attempt_id": "old", "steps": [[]]}, stream)
+    html_path.write_text("<html>old</html>")
+    progress_path.write_text(
+        json.dumps({"attempt_id": "old", "records": (), "latest": None})
+    )
+    with gzip.open(trace_path, "wt") as stream:
+        json.dump({"attempt_id": "old", "decision_traces": ()}, stream)
+
+    def fail(*args):
+        raise RuntimeError("failed before artifacts")
+
+    monkeypatch.setattr(runner, "run", fail)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_whole_farm_game.py",
+            "--output",
+            str(output_path),
+            "--replay",
+            str(replay_path),
+            "--trace",
+            str(trace_path),
+            "--progress",
+            str(progress_path),
+            "--html",
+            str(html_path),
+            "--exact-horizon-days",
+            "5",
+            "--strategic-tail",
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="failed before artifacts"):
+        runner.main()
+
+    result = json.loads(output_path.read_text())
+    assert result["attempt_id"] != "old"
+    assert "partial_replay" not in result
+    assert "html" not in result
+    assert "progress" not in result
+    assert "decision_trace" not in result
+    assert "last_checkpoint" not in result
