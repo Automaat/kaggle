@@ -522,28 +522,33 @@ def _select_investment(snapshot, time_limit, mip_rel_gap):
 def _daily_investment_capacity(snapshot, selected):
     projections_by_day = {}
     for projection in selected.projections:
-        projections_by_day[projection.source_step // 24] = projection
+        projections_by_day.setdefault(projection.source_step // 24, []).append(
+            projection
+        )
     fields = []
     actions = []
-    previous = None
     for index, day in enumerate(
         range(snapshot.current_day, snapshot.current_day + len(snapshot.shared.actions))
     ):
-        projection = projections_by_day.get(day, previous)
-        if projection is not None:
-            previous = projection
+        projections = projections_by_day.get(day, ())
         quadrants = snapshot.investment.unlocked_quadrants
-        hands = snapshot.investment.hands_today
-        if projection is not None:
-            quadrants = projection.unlocked_quadrants
-            hands = projection.hands
+        if projections:
+            quadrants = max(value.unlocked_quadrants for value in projections)
         fields.append(
             snapshot.shared.field_tiles[index]
             + 25 * (quadrants - snapshot.investment.unlocked_quadrants)
         )
+        baseline_hands = (
+            snapshot.investment.hands_today
+            if day == snapshot.current_day
+            else 0
+        )
+        hired_actions = sum(
+            max(0, value.hands - baseline_hands) for value in projections
+        )
         actions.append(
             snapshot.shared.actions[index]
-            + max(0, hands - snapshot.investment.hands_today)
+            + hired_actions
         )
     return tuple(fields), tuple(actions)
 
