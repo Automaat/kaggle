@@ -68,6 +68,9 @@ class OracleInput:
     crop_storage_capacity: tuple[int, ...]
     wheat_demand: tuple[int, ...]
     fixed_cash_flow: tuple[float, ...]
+    fertilizer_stock: int
+    fertilizer_supply: tuple[int, ...]
+    fertilizer_buy_price: tuple[float, ...]
     market_order_slots: tuple[int, ...]
     base_inventory: tuple[tuple[int, ...], ...]
     wheat_buy_price: tuple[float, ...]
@@ -83,6 +86,7 @@ class OracleInput:
             self.first_plant_day,
             self.terminal_return_actions,
             self.sale_unit_limit,
+            self.fertilizer_stock,
         )
         if any(type(value) is not int for value in integer_scalars):
             raise TypeError("oracle integer settings must be integers")
@@ -92,7 +96,11 @@ class OracleInput:
             raise ValueError("terminal step must be in source_step..718")
         if self.first_plant_day < self.current_day or self.first_plant_day > LAST_DAY:
             raise ValueError("first plant day must be in the remaining horizon")
-        if self.terminal_return_actions < 0 or self.sale_unit_limit < 1:
+        if (
+            self.terminal_return_actions < 0
+            or self.sale_unit_limit < 1
+            or self.fertilizer_stock < 0
+        ):
             raise ValueError("terminal limits must be positive")
         if type(self.cash) not in (int, float) or isinstance(self.cash, bool):
             raise TypeError("cash must be numeric")
@@ -125,13 +133,21 @@ class OracleInput:
             ("action capacity", self.action_capacity),
             ("crop storage capacity", self.crop_storage_capacity),
             ("wheat demand", self.wheat_demand),
+            ("fertilizer supply", self.fertilizer_supply),
             ("market order slots", self.market_order_slots),
         ):
             _validate_int_vector(values, horizon, name)
         _validate_float_vector(self.fixed_cash_flow, horizon, "fixed cash flow")
         _validate_float_vector(self.wheat_buy_price, horizon, "wheat buy price")
+        _validate_float_vector(
+            self.fertilizer_buy_price,
+            horizon,
+            "fertilizer buy price",
+        )
         if any(value <= 0 for value in self.wheat_buy_price):
             raise ValueError("wheat buy prices must be positive")
+        if any(value <= 0 for value in self.fertilizer_buy_price):
+            raise ValueError("fertilizer buy prices must be positive")
         if type(self.base_inventory) is not tuple or len(self.base_inventory) != horizon:
             raise TypeError("base inventory must cover the horizon")
         for values in self.base_inventory:
@@ -161,6 +177,8 @@ class CropOption:
     yield_units: int
     active_days: tuple[int, ...]
     actions: tuple[int, ...]
+    harvests: tuple[tuple[int, int], ...]
+    fertilizer_days: tuple[int, ...]
     existing_index: int | None
 
 
@@ -172,6 +190,8 @@ class CropDecision:
     sale_day: int
     count: int
     yield_per_unit: int
+    harvests: tuple[tuple[int, int], ...]
+    fertilizer_days: tuple[int, ...]
     existing_position: tuple[int, int] | None
 
 
@@ -196,6 +216,7 @@ class DayBalance:
     cash: float
     seeds: tuple[int, ...]
     goods: tuple[int, ...]
+    fertilizer: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -214,6 +235,7 @@ class OracleResult:
     sales: tuple[SaleDecision, ...]
     balances: tuple[DayBalance, ...]
     terminal_unsold_goods: tuple[int, ...] | None
+    terminal_unsold_fertilizer: int | None
     scenario: str
     input_sha256: str
 
@@ -276,35 +298,132 @@ def _new_one_time_options(data, crop):
                     yield_units,
                     tuple(range(plant_day, harvest_day)),
                     _actions(data, action_values),
+                    ((harvest_day, yield_units),),
+                    (),
                     None,
                 )
             )
     return result
 
 
+def _fertilizer_application_days(production_days, covered_until):
+    refresh_days = tuple(day - 1 for day in production_days if day - 1 > covered_until)
+    result = []
+    covered = covered_until
+    for day in refresh_days:
+        if day <= covered:
+            continue
+        result.append(day)
+        covered = day + 2
+    return tuple(result)
+
+
+def _ongoing_schedule_options(
+    data,
+    crop,
+    plant_day,
+    initial_yield,
+    watered_today,
+    covered_until,
+    existing_index,
+):
+    all_productions = scheduled_production_days(crop, plant_day, LAST_DAY)
+    production_days = tuple(day for day in all_productions if day > data.current_day)
+    candidates = tuple(
+        ([data.current_day] if initial_yield > 0 else [])
+        + [day for day in production_days if _terminal_feasible(data, day)]
+    )
+    if not candidates:
+        return []
+    applications = _fertilizer_application_days(production_days, covered_until)
+    active_start = max(data.current_day, plant_day)
+    active_days = tuple(range(plant_day, LAST_DAY + 1)) if existing_index is None else ()
+    result = {}
+    for fertilizer_mask in range(1 << len(applications)):
+        fertilizer_days = tuple(
+            day
+            for index, day in enumerate(applications)
+            if fertilizer_mask & (1 << index)
+        )
+        production_yields = {
+            day: 2
+            if day - 1 <= covered_until
+            or any(start <= day - 1 <= start + 2 for start in fertilizer_days)
+            else 1
+            for day in production_days
+        }
+        for harvest_mask in range(1, 1 << len(candidates)):
+            selected_days = {
+                day
+                for index, day in enumerate(candidates)
+                if harvest_mask & (1 << index)
+            }
+            held = initial_yield
+            harvests = []
+            for day in sorted({data.current_day, *production_days}):
+                held = min(
+                    CROP_SPECS[crop].max_yield,
+                    held + production_yields.get(day, 0),
+                )
+                if day in selected_days and held:
+                    harvests.append((day, held))
+                    held = 0
+            if not harvests:
+                continue
+            action_values = {
+                day: 1
+                for day in range(
+                    active_start,
+                    (max(production_days) if production_days else data.current_day) + 1,
+                )
+                if not (day == data.current_day and watered_today)
+            }
+            if existing_index is None:
+                action_values[plant_day] = action_values.get(plant_day, 0) + 1
+            for day in fertilizer_days:
+                action_values[day] = action_values.get(day, 0) + 1
+            for day, _quantity in harvests:
+                action_values[day] = (
+                    action_values.get(day, 0) + 1 + data.terminal_return_actions
+                )
+            key = (tuple(harvests), fertilizer_days)
+            identifier = (
+                f"{'existing-' + str(existing_index) if existing_index is not None else 'new'}-"
+                f"{crop}-{plant_day}-h"
+                + "-".join(f"{day}x{quantity}" for day, quantity in harvests)
+                + "-f"
+                + "-".join(str(day) for day in fertilizer_days)
+            )
+            result[key] = CropOption(
+                identifier,
+                crop,
+                None if existing_index is not None else plant_day,
+                harvests[-1][0],
+                harvests[-1][0],
+                sum(quantity for _day, quantity in harvests),
+                active_days,
+                _actions(data, action_values),
+                tuple(harvests),
+                fertilizer_days,
+                existing_index,
+            )
+    return list(result.values())
+
+
 def _new_ongoing_options(data, crop):
     result = []
     for plant_day in range(data.first_plant_day, LAST_DAY + 1):
-        production_days = scheduled_production_days(crop, plant_day, LAST_DAY)
-        for index, harvest_day in enumerate(production_days):
-            if not _terminal_feasible(data, harvest_day):
-                continue
-            action_values = {day: 1 for day in range(plant_day, harvest_day)}
-            action_values[plant_day] = action_values.get(plant_day, 0) + 1
-            action_values[harvest_day] = 1 + data.terminal_return_actions
-            result.append(
-                CropOption(
-                    f"new-{crop}-{plant_day}-{harvest_day}",
-                    crop,
-                    plant_day,
-                    harvest_day,
-                    harvest_day,
-                    index + 1,
-                    tuple(range(plant_day, LAST_DAY + 1)),
-                    _actions(data, action_values),
-                    None,
-                )
+        result.extend(
+            _ongoing_schedule_options(
+                data,
+                crop,
+                plant_day,
+                0,
+                False,
+                -1,
+                None,
             )
+        )
     return result
 
 
@@ -345,6 +464,8 @@ def _existing_one_time_options(data, existing_index, plant):
                 yield_units,
                 (),
                 _actions(data, action_values),
+                ((harvest_day, yield_units),),
+                (),
                 existing_index,
             )
         )
@@ -352,46 +473,15 @@ def _existing_one_time_options(data, existing_index, plant):
 
 
 def _existing_ongoing_options(data, existing_index, plant):
-    production_days = scheduled_production_days(
+    return _ongoing_schedule_options(
+        data,
         plant.crop,
         plant.planted_day,
-        LAST_DAY,
+        plant.yield_units,
+        plant.watered_today,
+        plant.fertilized_until_day,
+        existing_index,
     )
-    harvest_days = []
-    if plant.yield_units > 0:
-        harvest_days.append(data.current_day)
-    harvest_days.extend(day for day in production_days if day > data.current_day)
-    result = []
-    for harvest_day in sorted(set(harvest_days)):
-        if not _terminal_feasible(data, harvest_day):
-            continue
-        action_values = {}
-        for day in range(data.current_day, harvest_day):
-            if day == data.current_day and plant.watered_today:
-                continue
-            action_values[day] = action_values.get(day, 0) + 1
-        action_values[harvest_day] = 1 + data.terminal_return_actions
-        yield_units = plant.yield_units
-        for production_day in production_days:
-            if data.current_day < production_day <= harvest_day:
-                bonus = 2 if plant.fertilized_until_day >= production_day - 1 else 1
-                yield_units = min(CROP_SPECS[plant.crop].max_yield, yield_units + bonus)
-        if yield_units <= 0:
-            continue
-        result.append(
-            CropOption(
-                f"existing-{existing_index}-{plant.crop}-{harvest_day}",
-                plant.crop,
-                None,
-                harvest_day,
-                harvest_day,
-                yield_units,
-                (),
-                _actions(data, action_values),
-                existing_index,
-            )
-        )
-    return result
 
 
 def generate_crop_options(data):
@@ -525,7 +615,9 @@ def _build_model(data, options, first_day_crop_counts=None):
         (sum(data.tile_capacity) + new_tile_limit) * 6
         + sum(data.goods)
         + sum(data.seeds)
-        + sum(data.wheat_demand),
+        + sum(data.wheat_demand)
+        + data.fertilizer_stock
+        + sum(data.fertilizer_supply),
     )
     new_options = [option for option in options if option.existing_index is None]
     existing_options = [option for option in options if option.existing_index is not None]
@@ -546,6 +638,9 @@ def _build_model(data, options, first_day_crop_counts=None):
     seed_balance = {}
     wheat_buy = {}
     wheat_on = {}
+    fertilizer_buy = {}
+    fertilizer_on = {}
+    fertilizer_balance = {}
     sale_units = {}
     sale_on = {}
     marginal_prices = _marginal_prices(data)
@@ -585,6 +680,16 @@ def _build_model(data, options, first_day_crop_counts=None):
             upper=quantity_limit,
         )
         wheat_on[day] = builder.variable(("wheat_on", day), upper=1)
+        fertilizer_buy[day] = builder.variable(
+            ("fertilizer_buy", day),
+            objective=data.fertilizer_buy_price[day_index],
+            upper=quantity_limit,
+        )
+        fertilizer_on[day] = builder.variable(("fertilizer_on", day), upper=1)
+        fertilizer_balance[day] = builder.variable(
+            ("fertilizer_balance", day),
+            upper=quantity_limit,
+        )
     for existing_index in range(len(data.existing_plants)):
         values = {
             option_vars[option.identifier]: 1
@@ -624,11 +729,13 @@ def _build_model(data, options, first_day_crop_counts=None):
                 action_values[variable] = action_count
         builder.constraint(occupancy, upper=data.tile_capacity[day_index])
         builder.constraint(action_values, upper=data.action_capacity[day_index])
+        storage_values = {goods_balance[crop, day]: 1 for crop in CROPS}
+        storage_values[fertilizer_balance[day]] = 1
         builder.constraint(
-            {goods_balance[crop, day]: 1 for crop in CROPS},
+            storage_values,
             upper=data.crop_storage_capacity[day_index],
         )
-        order_values = {wheat_on[day]: 1}
+        order_values = {wheat_on[day]: 1, fertilizer_on[day]: 1}
         for crop in CROPS:
             order_values[seed_on[crop, day]] = 1
             order_values[sale_on[crop, day]] = 1
@@ -659,7 +766,40 @@ def _build_model(data, options, first_day_crop_counts=None):
             {wheat_buy[day]: 1, wheat_on[day]: -1},
             lower=0,
         )
+        builder.constraint(
+            {
+                fertilizer_buy[day]: 1,
+                fertilizer_on[day]: -quantity_limit,
+            },
+            upper=0,
+        )
+        builder.constraint(
+            {fertilizer_buy[day]: 1, fertilizer_on[day]: -1},
+            lower=0,
+        )
         builder.constraint(order_values, upper=data.market_order_slots[day_index])
+        fertilizer_values = {
+            fertilizer_balance[day]: 1,
+            fertilizer_buy[day]: -1,
+        }
+        if day_index:
+            fertilizer_values[fertilizer_balance[day - 1]] = -1
+            fertilizer_rhs = data.fertilizer_supply[day_index]
+        else:
+            fertilizer_rhs = (
+                data.fertilizer_stock + data.fertilizer_supply[day_index]
+            )
+        for option in options:
+            if day in option.fertilizer_days:
+                variable = option_vars[option.identifier]
+                fertilizer_values[variable] = (
+                    fertilizer_values.get(variable, 0) + 1
+                )
+        builder.constraint(
+            fertilizer_values,
+            lower=fertilizer_rhs,
+            upper=fertilizer_rhs,
+        )
     for crop_index, crop in enumerate(CROPS):
         for day_index in range(data.horizon_days):
             day = data.current_day + day_index
@@ -690,10 +830,17 @@ def _build_model(data, options, first_day_crop_counts=None):
             if crop == "WHEAT":
                 goods_values[wheat_buy[day]] = -1
             for option in options:
-                if option.crop == crop and option.sale_day == day:
+                if option.crop != crop:
+                    continue
+                produced = sum(
+                    quantity
+                    for harvest_day, quantity in option.harvests
+                    if harvest_day == day
+                )
+                if produced:
                     variable = option_vars[option.identifier]
                     goods_values[variable] = (
-                        goods_values.get(variable, 0) - option.yield_units
+                        goods_values.get(variable, 0) - produced
                     )
             for unit in range(data.sale_unit_limit):
                 goods_values[sale_units[crop, day, unit]] = 1
@@ -708,6 +855,7 @@ def _build_model(data, options, first_day_crop_counts=None):
             for unit, price in enumerate(marginal_prices[crop, day]):
                 cumulative_cash[sale_units[crop, day, unit]] = -price
         cumulative_cash[wheat_buy[day]] = data.wheat_buy_price[day_index]
+        cumulative_cash[fertilizer_buy[day]] = data.fertilizer_buy_price[day_index]
         builder.constraint(
             cumulative_cash,
             upper=data.cash + fixed_cash - data.cash_reserve,
@@ -717,9 +865,11 @@ def _build_model(data, options, first_day_crop_counts=None):
         option_vars,
         seed_buy,
         wheat_buy,
+        fertilizer_buy,
         sale_units,
         seed_balance,
         goods_balance,
+        fertilizer_balance,
         marginal_prices,
     )
 
@@ -748,9 +898,11 @@ def solve_oracle(
         option_vars,
         seed_buy,
         wheat_buy,
+        fertilizer_buy,
         sale_units,
         seed_balance,
         goods_balance,
+        fertilizer_balance,
         marginal_prices,
     ) = built
     objective, integrality, bounds, constraints = builder.arrays()
@@ -789,6 +941,7 @@ def solve_oracle(
             (),
             (),
             None,
+            None,
             data.scenario,
             input_sha256(data),
         )
@@ -809,6 +962,8 @@ def solve_oracle(
                 option.sale_day,
                 count,
                 option.yield_units,
+                option.harvests,
+                option.fertilizer_days,
                 position,
             )
         )
@@ -818,6 +973,7 @@ def solve_oracle(
     cumulative_cost = 0.0
     cumulative_revenue = 0.0
     cumulative_fixed = 0.0
+    fertilizer = data.fertilizer_stock
     for day_index in range(data.horizon_days):
         day = data.current_day + day_index
         for crop in CROPS:
@@ -829,6 +985,14 @@ def solve_oracle(
         if wheat_quantity:
             purchases.append(PurchaseDecision("WHEAT", day, wheat_quantity))
             cumulative_cost += wheat_quantity * data.wheat_buy_price[day_index]
+        fertilizer_quantity = _integer(values[fertilizer_buy[day]])
+        if fertilizer_quantity:
+            purchases.append(
+                PurchaseDecision("FERTILIZER", day, fertilizer_quantity)
+            )
+            cumulative_cost += (
+                fertilizer_quantity * data.fertilizer_buy_price[day_index]
+            )
         for crop in CROPS:
             selected = [
                 unit
@@ -840,6 +1004,7 @@ def solve_oracle(
                 cumulative_revenue += revenue
                 sales.append(SaleDecision(crop, day, len(selected), revenue))
         cumulative_fixed += data.fixed_cash_flow[day_index]
+        fertilizer = _integer(values[fertilizer_balance[day]])
         cash = data.cash + cumulative_fixed - cumulative_cost + cumulative_revenue
         balances.append(
             DayBalance(
@@ -851,6 +1016,7 @@ def solve_oracle(
                 tuple(
                     _integer(values[goods_balance[crop, day]]) for crop in CROPS
                 ),
+                fertilizer,
             )
         )
     terminal_cash = balances[-1].cash
@@ -870,6 +1036,7 @@ def solve_oracle(
         tuple(sales),
         tuple(balances),
         balances[-1].goods,
+        balances[-1].fertilizer,
         data.scenario,
         input_sha256(data),
     )
@@ -900,6 +1067,8 @@ def verify_result(data, result, first_day_crop_counts=None):
             option.harvest_day,
             option.sale_day,
             option.yield_units,
+            option.harvests,
+            option.fertilizer_days,
             position,
         )
         option_keys[key] = option
@@ -911,6 +1080,8 @@ def verify_result(data, result, first_day_crop_counts=None):
             decision.harvest_day,
             decision.sale_day,
             decision.yield_per_unit,
+            decision.harvests,
+            decision.fertilizer_days,
             decision.existing_position,
         )
         option = option_keys.get(key)
@@ -937,6 +1108,7 @@ def verify_result(data, result, first_day_crop_counts=None):
     existing_counts = {index: 0 for index in range(len(data.existing_plants))}
     seed_buys = {}
     wheat_buys = {}
+    fertilizer_buys = {}
     for purchase in result.purchases:
         if purchase.day < data.current_day or purchase.day > LAST_DAY:
             errors.append("purchase day outside horizon")
@@ -947,6 +1119,10 @@ def verify_result(data, result, first_day_crop_counts=None):
         if purchase.item == "WHEAT":
             wheat_buys[purchase.day] = (
                 wheat_buys.get(purchase.day, 0) + purchase.quantity
+            )
+        elif purchase.item == "FERTILIZER":
+            fertilizer_buys[purchase.day] = (
+                fertilizer_buys.get(purchase.day, 0) + purchase.quantity
             )
         elif purchase.item.endswith("_SEED"):
             crop = purchase.item.removesuffix("_SEED")
@@ -979,6 +1155,7 @@ def verify_result(data, result, first_day_crop_counts=None):
             errors.append("sale revenue mismatch")
     seed_balance = list(data.seeds)
     goods_balance = list(data.goods)
+    fertilizer_balance = data.fertilizer_stock
     cash = data.cash
     calculated_balances = []
     for day_index in range(data.horizon_days):
@@ -1000,8 +1177,14 @@ def verify_result(data, result, first_day_crop_counts=None):
                 existing_counts[option.existing_index] += count if day_index == 0 else 0
             if option.plant_day == day:
                 seed_balance[CROPS.index(option.crop)] -= count
-            if option.sale_day == day:
-                goods_balance[CROPS.index(option.crop)] += option.yield_units * count
+            produced = sum(
+                quantity
+                for harvest_day, quantity in option.harvests
+                if harvest_day == day
+            )
+            goods_balance[CROPS.index(option.crop)] += produced * count
+            if day in option.fertilizer_days:
+                fertilizer_balance -= count
         if occupancy - released_tiles > data.tile_capacity[day_index]:
             errors.append("tile capacity exceeded")
         if actions > data.action_capacity[day_index]:
@@ -1018,6 +1201,12 @@ def verify_result(data, result, first_day_crop_counts=None):
             orders += 1
             goods_balance[CROPS.index("WHEAT")] += wheat
             cash -= wheat * data.wheat_buy_price[day_index]
+        bought_fertilizer = fertilizer_buys.get(day, 0)
+        if bought_fertilizer:
+            orders += 1
+            fertilizer_balance += bought_fertilizer
+            cash -= bought_fertilizer * data.fertilizer_buy_price[day_index]
+        fertilizer_balance += data.fertilizer_supply[day_index]
         goods_balance[CROPS.index("WHEAT")] -= data.wheat_demand[day_index]
         for crop_index, crop in enumerate(CROPS):
             quantity = sales.get((crop, day), 0)
@@ -1032,12 +1221,23 @@ def verify_result(data, result, first_day_crop_counts=None):
             errors.append("negative seed balance")
         if any(value < 0 for value in goods_balance):
             errors.append("negative goods balance")
-        if sum(goods_balance) > data.crop_storage_capacity[day_index]:
+        if fertilizer_balance < 0:
+            errors.append("negative fertilizer balance")
+        if (
+            sum(goods_balance) + fertilizer_balance
+            > data.crop_storage_capacity[day_index]
+        ):
             errors.append("crop storage capacity exceeded")
         if cash + 1e-7 < data.cash_reserve:
             errors.append("cash reserve violated")
         calculated_balances.append(
-            DayBalance(day, cash, tuple(seed_balance), tuple(goods_balance))
+            DayBalance(
+                day,
+                cash,
+                tuple(seed_balance),
+                tuple(goods_balance),
+                fertilizer_balance,
+            )
         )
     if any(value > 1 for value in existing_counts.values()):
         errors.append("existing plant selected more than once")
@@ -1045,6 +1245,8 @@ def verify_result(data, result, first_day_crop_counts=None):
         errors.append("reported balances mismatch")
     if result.terminal_unsold_goods != tuple(goods_balance):
         errors.append("terminal goods mismatch")
+    if result.terminal_unsold_fertilizer != fertilizer_balance:
+        errors.append("terminal fertilizer mismatch")
     if result.terminal_cash is None or not math.isclose(
         result.terminal_cash,
         cash,

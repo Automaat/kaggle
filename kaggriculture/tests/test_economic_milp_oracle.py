@@ -23,6 +23,9 @@ def _input(
     actions=100,
     storage=100,
     feed=0,
+    fertilizer=0,
+    fertilizer_supply=0,
+    fertilizer_price=100.0,
     slots=5,
     return_actions=0,
     sale_limit=20,
@@ -41,6 +44,9 @@ def _input(
         crop_storage_capacity=(storage,) * horizon,
         wheat_demand=(feed,) * horizon,
         fixed_cash_flow=(0.0,) * horizon,
+        fertilizer_stock=fertilizer,
+        fertilizer_supply=(fertilizer_supply,) * horizon,
+        fertilizer_buy_price=(fertilizer_price,) * horizon,
         market_order_slots=(slots,) * horizon,
         base_inventory=tuple((10_000,) * len(market.CROPS) for _ in range(horizon)),
         wheat_buy_price=(25.0,) * horizon,
@@ -74,6 +80,63 @@ def test_ongoing_options_stop_at_four_productions():
     final = _option(options, "STRAWBERRY", 0, 16)
     assert final.yield_units == 4
     assert final.active_days[-1] == 29
+
+
+def test_ongoing_schedule_harvests_twice_before_held_cap_discards_yield():
+    options = oracle.generate_crop_options(_input())
+    strawberry = next(
+        value
+        for value in options
+        if value.crop == "STRAWBERRY"
+        and value.plant_day == 0
+        and value.harvests == ((12, 4), (16, 4))
+    )
+    assert strawberry.yield_units == 8
+    assert strawberry.fertilizer_days == (9, 13)
+
+
+def test_unfertilized_ongoing_schedule_caps_at_four_total_units():
+    options = oracle.generate_crop_options(_input())
+    unfertilized = [
+        value
+        for value in options
+        if value.crop == "TOMATO"
+        and value.plant_day == 0
+        and not value.fertilizer_days
+    ]
+    assert max(value.yield_units for value in unfertilized) == 4
+
+
+def test_fertilizer_supply_funds_full_strawberry_schedule():
+    data = _input(
+        cash=100,
+        tiles=1,
+        fertilizer_supply=1,
+        fertilizer_price=1000,
+    )
+    counts = (0, 0, 0, 1, 0)
+    result = oracle.solve_oracle(data, 10, 0, counts)
+    strawberry = next(
+        value
+        for value in result.decisions
+        if value.crop == "STRAWBERRY" and value.plant_day == 0
+    )
+    assert result.success
+    assert strawberry.yield_per_unit == 8
+    assert strawberry.fertilizer_days == (9, 13)
+    assert not any(value.item == "FERTILIZER" for value in result.purchases)
+    assert oracle.verify_result(data, result, counts) == ()
+
+
+def test_external_cash_flow_can_fund_feed_before_crop_revenue():
+    data = dataclasses.replace(
+        _input(day=29, cash=0, tiles=0, feed=1, slots=1),
+        fixed_cash_flow=(25.0,),
+    )
+    result = oracle.solve_oracle(data, 10, 0)
+    assert result.success
+    assert result.terminal_cash == 0
+    assert oracle.verify_result(data, result) == ()
 
 
 def test_late_melon_and_strawberry_have_no_option():
