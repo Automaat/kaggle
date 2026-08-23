@@ -1070,7 +1070,9 @@ def _animal_execution_intents(solved):
 
 
 def _crop_targets(snapshot, solved, space_targets):
-    blocked = {(target.y, target.x) for target in space_targets}
+    blocked_from = {
+        (target.y, target.x): target.placement_day for target in space_targets
+    }
     by_day = {}
     for decision in solved.crop_result.decisions:
         if decision.plant_day is None:
@@ -1080,7 +1082,7 @@ def _crop_targets(snapshot, solved, space_targets):
         )
     available_from = {}
     for cell in snapshot.cells:
-        if cell.kind != "EMPTY" or cell.position in blocked:
+        if cell.kind != "EMPTY":
             continue
         unlock_day = _projected_unlock_day(snapshot, solved, cell)
         if unlock_day is not None:
@@ -1088,7 +1090,7 @@ def _crop_targets(snapshot, solved, space_targets):
     plant_positions = {
         cell.position
         for cell in snapshot.cells
-        if cell.kind == "PLANT" and cell.position not in blocked
+        if cell.kind == "PLANT"
     }
     for decision in solved.crop_result.decisions:
         if (
@@ -1098,29 +1100,40 @@ def _crop_targets(snapshot, solved, space_targets):
             available_from[decision.existing_position] = decision.release_day
     targets = []
     for day, crops in sorted(by_day.items()):
-        available = sorted(
-            (
-                position
-                for position, available_day in available_from.items()
-                if available_day <= day
-            ),
-            key=lambda position: (
-                available_from[position],
-                abs(position[0] - 4) + abs(position[1] - 4),
-                position,
-            ),
-        )
-        if len(available) < len(crops):
-            raise WholeFarmSolveError("execution handoff lacks crop target cells")
         ordered_crops = sorted(
             crops,
             key=lambda value: (
+                value[1] is not None,
+                0 if value[1] is None else -value[1],
                 value[0],
-                value[1] is None,
-                0 if value[1] is None else value[1],
             ),
         )
-        for position, (crop, release_day) in zip(available, ordered_crops):
+        for crop, release_day in ordered_crops:
+            compatible = sorted(
+                (
+                    position
+                    for position, available_day in available_from.items()
+                    if available_day <= day
+                    and (
+                        position not in blocked_from
+                        or (
+                            day < blocked_from[position]
+                            and release_day is not None
+                            and release_day <= blocked_from[position]
+                        )
+                    )
+                ),
+                key=lambda position: (
+                    position not in blocked_from,
+                    blocked_from.get(position, 30),
+                    available_from[position],
+                    abs(position[0] - 4) + abs(position[1] - 4),
+                    position,
+                ),
+            )
+            if not compatible:
+                raise WholeFarmSolveError("execution handoff lacks crop target cells")
+            position = compatible[0]
             targets.append(CropTargetIntent(day, position[1], position[0], crop))
             del available_from[position]
             if release_day is not None and release_day > day:

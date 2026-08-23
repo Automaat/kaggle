@@ -24,6 +24,7 @@ from kaggriculture.tools.economics.whole_farm_backend import (
     MarketOrderIntent,
     RollingHybridExecutionProvider,
     SharedCapacity,
+    SpaceTarget,
     WholeFarmPlannerBackend,
     WholeFarmSnapshot,
     WholeFarmSolveError,
@@ -395,6 +396,41 @@ def test_crop_target_uses_projected_land_from_unlock_day():
     )
     targets = _crop_targets(snapshot, solved, ())
     assert tuple((target.y, target.x) for target in targets) == ((0, 5),)
+
+
+def test_crop_target_can_precede_future_animal_placement():
+    snapshot = replace(
+        _snapshot(),
+        cells=(SpaceCell((4, 4), 0, "EMPTY"),),
+    )
+    decision = SimpleNamespace(
+        crop="CARROT",
+        count=1,
+        existing_position=None,
+        plant_day=1,
+        release_day=4,
+    )
+    solved = SimpleNamespace(
+        crop_result=SimpleNamespace(decisions=(decision,)),
+        selected_investment=SimpleNamespace(projections=()),
+    )
+    animal_target = SpaceTarget("animal-0", "SHEEP", 4, 4, "BUILD", 5)
+    targets = _crop_targets(snapshot, solved, (animal_target,))
+    assert tuple((target.y, target.x) for target in targets) == ((4, 4),)
+
+    decision = SimpleNamespace(
+        crop="STRAWBERRY",
+        count=1,
+        existing_position=None,
+        plant_day=1,
+        release_day=None,
+    )
+    solved = SimpleNamespace(
+        crop_result=SimpleNamespace(decisions=(decision,)),
+        selected_investment=SimpleNamespace(projections=()),
+    )
+    with pytest.raises(WholeFarmSolveError, match="lacks crop target"):
+        _crop_targets(snapshot, solved, (animal_target,))
 
 
 def test_second_arm_plans_daily_crop_service_route():
