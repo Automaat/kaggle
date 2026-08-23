@@ -11,3 +11,4 @@ wheels/
 
 # Kaggle replay downloads
 replays_kaggle/episodes/
+replays/round39_*/*.html

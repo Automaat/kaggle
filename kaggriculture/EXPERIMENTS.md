@@ -3421,3 +3421,45 @@ can Agent 2.0 play a complete 30-day game against frozen 1.14.0.
 Decision: accept the rolling contract. Continue with a real whole-farm backend,
 complete routes and an offline replay executor. Kaggle packaging is out of
 scope for this comparison.
+
+## Round 39.18-39.20: first rolling offline games
+
+Status: negative and incomplete experiments. No score claim.
+
+Round 39.18 ran strategy 2.0 with the frozen 1.14 executor, seed 3980000,
+candidate seat 0, a five-day exact horizon and a strategic tail. It completed
+days 0 through 16 and failed at source step 409. The last complete checkpoint
+had $10,236 for strategy 2.0 and $9,774 for frozen 1.14. Strategy 2.0 had one
+quadrant, 13 standing melons, 13 melon seeds and no animals. The failure was
+`execution handoff lacks crop target cells`.
+
+The five-day tail valued immature melons without their remaining watering,
+movement, failure risk or persistent market-price impact. On day 9 the
+executor also accepted 24 melon seeds for a plan of 13. This left 22 seeds and
+$20 after three were planted. The replay proved that market orders lacked a
+stable acknowledgement boundary.
+
+Commits `a0ac8bf` and `1849c73` fix the two execution defects. Route repair now
+retains the committed handoff and removes only completed crop targets. Seed
+orders now have a stable identity and track planned, sent and acknowledged
+quantity. A partial acknowledgement of 11 for a plan of 13 can retry only 2.
+
+Round 39.19 and 39.20 tested the full economic horizon with the same seed and
+seat. Both were stopped before completion. Their progress is not a game result.
+The full horizon reduced the initial melon purchase but still selected 14
+melons for the season and selected no animals. It therefore removed the bad
+short-tail valuation but did not fix market saturation or fertilizer value.
+
+The frozen 1.14 replay shows the missing economic link. It had three cows on
+day 0, seven cows by day 9 and five additional sheep by day 11. Its fertilizer
+stock reached 12 on days 12 through 14. The current backend does not jointly
+value the chain from animal feed through fertilizer and a doubled crop sale.
+
+The compressed partial replays and daily progress files are retained. The
+derived HTML files remain local because they total about 55 MB and can be
+regenerated from the compressed replays.
+
+Decision: reject the five-day strategic tail as an economic default. Keep a
+full strategic horizon and a short route horizon. Before another full game,
+implement the separate market-supply and animal-to-fertilizer experiments in
+`research/round39_21_joint_market_fertilizer_plan.md`.
